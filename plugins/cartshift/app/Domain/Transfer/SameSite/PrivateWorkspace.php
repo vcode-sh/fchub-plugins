@@ -18,11 +18,9 @@ defined('ABSPATH') || exit;
  * served over HTTP is a data breach with a URL. The guided route removes the
  * typing, never the rule.
  *
- * `CARTSHIFT_TRANSFER_PRIVATE_DIR` WINS OUTRIGHT when it is set, because it is
- * already the directory `LoadedTargetTransferPipeline` reads. Everything from
- * `stage` onwards resolves its working directory through
- * `ConfiguredTransferEvidence`, so a guided run that chose its own would export
- * to one place and stage from another.
+ * Explicit server configuration wins outright when present. Otherwise the
+ * guided route stores the exact validated directory it chose, so export and
+ * target staging still resolve one name to one place.
  *
  * Without it, two fallbacks, each treated as a PARENT with CartShift owning a
  * subdirectory beneath it:
@@ -30,9 +28,7 @@ defined('ABSPATH') || exit;
  *   2. The system temp directory, which is what is left inside a container —
  *      the mounted playground has `/var/www` owned by root, so this is not a
  *      hypothetical branch.
- * A fallback workspace carries the source-side steps only. The target lifecycle
- * needs the configured constant; `isTransferDirectoryConfigured()` is how a
- * caller finds that out before promising a member anything.
+ * The chosen path is sealed before it becomes durable configuration.
  *
  * With nothing usable it throws. Falling back into `wp-content/uploads` would
  * publish the shop, silently, on exactly the hosts least able to notice.
@@ -51,23 +47,14 @@ final class PrivateWorkspace
         SourceIdentity::assertValidSourceKey($sourceKey);
     }
 
-    /**
-     * Has an operator configured the directory the transfer pipeline reads?
-     *
-     * `LoadedTargetTransferPipeline` resolves its own working directory through
-     * `ConfiguredTransferEvidence::privateDirectory()`, which reads a PHP
-     * constant or an environment variable and nothing else. That is deliberate —
-     * evidence a web request can set is not evidence — and it means a guided run
-     * cannot choose where `stage` and everything after it will look. Callers ask
-     * this to find out whether the run can get past `prepare`.
-     */
+    /** Whether the exact directory used by the transfer pipeline is valid. */
     public static function isTransferDirectoryConfigured(): bool
     {
         try {
             ConfiguredTransferEvidence::privateDirectory();
 
             return true;
-        } catch (\RuntimeException) {
+        } catch (\InvalidArgumentException|\RuntimeException) {
             return false;
         }
     }
@@ -76,8 +63,8 @@ final class PrivateWorkspace
      * The workspace, created if it is not there yet.
      *
      * THE CONFIGURED DIRECTORY WINS, VERBATIM. When
-     * `CARTSHIFT_TRANSFER_PRIVATE_DIR` is set it is not a parent to nest under —
-     * it is the exact directory the target pipeline will read, so nesting a
+     * a configured path exists it is not a parent to nest under — it is the
+     * exact directory the target pipeline will read, so nesting a
      * subdirectory beneath it would have the guided run export to one place and
      * the pipeline look in another. One name for one directory; the second
      * constant this class briefly invented was that drift waiting to happen.
@@ -101,8 +88,7 @@ final class PrivateWorkspace
         throw new \RuntimeException(
             'private_workspace_unavailable: CartShift found nowhere outside the web root it may write to. A '
             . 'transfer package holds every customer and order in the shop, so it is not going anywhere a '
-            . 'browser could reach. Define ' . ConfiguredTransferEvidence::PRIVATE_DIRECTORY . ' in '
-            . 'wp-config.php, pointing at a writable directory outside the site, and run this again.',
+            . 'browser could reach. Provide a writable private directory outside the site and run this again.',
         );
     }
 

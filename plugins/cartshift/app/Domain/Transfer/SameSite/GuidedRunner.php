@@ -173,14 +173,7 @@ final class GuidedRunner
         };
     }
 
-    /**
-     * The one-time configuration, checked in front rather than underneath.
-     *
-     * The raw failure is `transfer_private_directory_not_configured`, thrown
-     * inside the pipeline once it has already resolved a descriptor. Nobody
-     * reading that knows it means "paste two lines into wp-config.php", so the
-     * gate carries the same codes the setup screen shows.
-     */
+    /** Refuse before pipeline work if the guided workspace was not prepared. */
     private function assertConfigured(string $verb): void
     {
         if ($this->setup->isComplete()) {
@@ -188,11 +181,9 @@ final class GuidedRunner
         }
 
         throw new \RuntimeException(sprintf(
-            'guided_setup_incomplete: %s needs %s configured first. They are read from PHP constants or the '
-            . 'environment on purpose — evidence a web request can set is not evidence — so CartShift cannot '
-            . 'set them for you. The setup screen has the exact lines.',
+            'guided_setup_incomplete: %s needs the private guided workspace prepared first. '
+            . 'Return to the CartShift screen and run the store check again.',
             $verb,
-            implode(' and ', array_column($this->setup->missing(), 'constant')),
         ));
     }
 

@@ -87,4 +87,12 @@ final class SiteSourceIdentity
 
         return $winner;
     }
+
+    /** Remove only the identity minted by a preparation attempt that failed. */
+    public function forgetIfCurrent(string $sourceKey): void
+    {
+        if ($this->current() === $sourceKey) {
+            delete_option(self::OPTION);
+        }
+    }
 }

@@ -65,10 +65,8 @@ function serve(payload) {
       return payload;
     }
     if (method === 'POST' && endpoint === 'migration/initialise') {
+      if (payload.initialiseError) throw new Error('setup failed');
       return { initialised: true };
-    }
-    if (method === 'POST' && endpoint === 'migration/setup-lines') {
-      return { lines: "define('CARTSHIFT_TRANSFER_PRIVATE_DIR', '/srv/p');" };
     }
     if (method === 'POST' && endpoint === 'migration/decisions') {
       return payload.acceptResult || {
@@ -104,13 +102,22 @@ function serve(payload) {
 // carrying no arguments at all.
 beforeEach(() => {
   apiMock.mockReset();
-  Object.defineProperty(navigator, 'clipboard', {
-    configurable: true,
-    value: { writeText: vi.fn().mockResolvedValue(undefined) },
-  });
 });
 
 describe('GuidedMigrationScreen', () => {
+  it('keeps each journey label together so the connector begins after its copy', async () => {
+    serve(status());
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    const steps = wrapper.findAll('.cartshift-journey li');
+
+    expect(steps).toHaveLength(3);
+    expect(steps[0].find('.cartshift-step-copy').text()).toBe('CheckStore readiness');
+    expect(steps[1].find('.cartshift-step-copy').text()).toBe('ReviewYour choices');
+    expect(steps[2].find('.cartshift-step-copy').text()).toBe('MoveSafe migration');
+  });
+
   it('asks for the shop once on mount, without the expensive audit', async () => {
     serve(status());
     mountScreen();
@@ -165,17 +172,16 @@ describe('GuidedMigrationScreen', () => {
     await flushPromises();
 
     expect(wrapper.find('[data-test="preflight-warnings"]').text()).toContain('41 orders');
+    expect(wrapper.find('[data-test="preflight-warnings"]').attributes('open')).toBeUndefined();
     expect(wrapper.find('[data-test="preflight-ready"]').text()).toContain('No blocking');
     expect(wrapper.findAll('.button-primary')).toHaveLength(1);
   });
 
-  it('copies prepared setup lines without displaying an absolute path', async () => {
+  it('finishes private setup automatically without exposing server instructions', async () => {
     serve(
       status({
         setup: {
           complete: false,
-          missing: [{ constant: 'CARTSHIFT_TRANSFER_PRIVATE_DIR', purpose: 'Where the package lives.' }],
-          can_copy_lines: true,
           cutover: { available: false, message: 'Cutover is not ready yet.' },
         },
       })
@@ -183,29 +189,46 @@ describe('GuidedMigrationScreen', () => {
     const wrapper = mountScreen();
     await flushPromises();
 
-    const setup = wrapper.find('[data-test="setup"]');
-    expect(setup.exists()).toBe(true);
-    expect(setup.text()).not.toContain('/srv/p');
-    await wrapper.find('[data-test="setup-copy"]').trigger('click');
+    expect(wrapper.text()).not.toContain('wp-config.php');
+    expect(wrapper.text()).not.toContain('CARTSHIFT_TRANSFER_');
+    expect(wrapper.find('[data-test="setup-copy"]').exists()).toBe(false);
+    expect(wrapper.findAll('.button-primary')).toHaveLength(1);
+    expect(wrapper.find('[data-test="check-store"]').text()).toContain('Check my store');
+
+    await wrapper.find('[data-test="check-store"]').trigger('click');
     await flushPromises();
-    expect(apiMock.mock.calls).toContainEqual(['POST', 'migration/setup-lines']);
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      "define('CARTSHIFT_TRANSFER_PRIVATE_DIR', '/srv/p');"
-    );
+
+    expect(apiMock.mock.calls).toContainEqual(['POST', 'migration/initialise']);
   });
 
-  it('names the site only when asked, and never on a read', async () => {
+  it('introduces the migration in plain language and prepares the site only when asked', async () => {
     serve(status({ initialised: false, message: 'This site has not been named for transfer yet.' }));
     const wrapper = mountScreen();
     await flushPromises();
 
     expect(apiMock.mock.calls.every(([method]) => method === 'GET')).toBe(true);
-    expect(wrapper.find('[data-test="uninitialised"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="readiness-hero"]').text()).toContain('Ready to check your store?');
+    expect(wrapper.text()).not.toContain('named for transfer');
+    expect(wrapper.text()).not.toContain('transfer identity');
 
-    await wrapper.find('[data-test="uninitialised"] button').trigger('click');
+    await wrapper.find('[data-test="check-store"]').trigger('click');
     await flushPromises();
 
     expect(apiMock.mock.calls).toContainEqual(['POST', 'migration/initialise']);
+  });
+
+  it('keeps the clear setup action visible when private preparation fails', async () => {
+    const payload = status({ initialised: false, message: 'CartShift is ready to check this store.' });
+    payload.initialiseError = true;
+    serve(payload);
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    await wrapper.find('[data-test="check-store"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('[role="alert"]').text()).toContain('private migration workspace');
+    expect(wrapper.find('[data-test="check-store"]').exists()).toBe(true);
   });
 
   it('offers one obvious primary action for the readiness flow', async () => {
@@ -214,8 +237,56 @@ describe('GuidedMigrationScreen', () => {
     await flushPromises();
 
     expect(wrapper.findAll('.button-primary')).toHaveLength(1);
-    expect(wrapper.find('[data-test="start"]').text()).toContain('Check my shop');
+    expect(wrapper.find('[data-test="start"]').text()).toContain('Review my store');
+    expect(wrapper.find('[data-test="readiness-hero"]').text()).toContain('Ready for review');
     expect(wrapper.text()).not.toContain('Inspect the source first');
+  });
+
+  it('turns blockers into one clear next step and keeps warnings secondary', async () => {
+    const payload = status({
+      preflight: {
+        ready: false,
+        checks: {
+          fc_data: {
+            label: 'Existing FluentCart records',
+            severity: 'fail',
+            message: 'Remove test records in FluentCart, then check again.',
+          },
+          product_types: {
+            label: 'Product types',
+            severity: 'warn',
+            message: 'Two products will need manual review after migration.',
+          },
+        },
+      },
+    });
+    serve(payload);
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="readiness-hero"]').text()).toContain('Your store needs attention');
+    expect(wrapper.find('[data-test="blocking-checks"]').text()).toContain('Remove test records');
+    expect(wrapper.find('[data-test="preflight-warnings"]').text()).toContain('Worth knowing');
+    expect(wrapper.findAll('.button-primary')).toHaveLength(1);
+    expect(wrapper.find('[data-test="check-again"]').text()).toContain('Check again');
+  });
+
+  it('shows known blockers before automatic setup instead of claiming readiness', async () => {
+    serve(
+      status({
+        setup: { complete: false, cutover: { available: false, message: 'Cutover is not ready yet.' } },
+        plan_blocked: true,
+        plan_message: 'Active subscriptions need a supported migration route.',
+        subscriptions: { available: true },
+      })
+    );
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="readiness-hero"]').text()).toContain('Your store needs attention');
+    expect(wrapper.text()).toContain('Subscriptions need a supported migration route');
+    expect(wrapper.find('[data-test="check-store"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="check-again"]').exists()).toBe(true);
   });
 
   it('starts the durable rehearsal and shows persisted progress', async () => {
@@ -599,6 +670,56 @@ describe('GuidedMigrationScreen', () => {
     expect(wrapper.find('[data-test="run-failure"]').text()).toContain('Subscription availability changed');
   });
 
+  it('keeps one stop action when an outdated running check also blocks the current plan', async () => {
+    serve(
+      status({
+        plan_blocked: true,
+        plan_message: 'Active subscriptions need a supported migration route.',
+        run: {
+          phase: 'running',
+          completed_steps: 2,
+          total_steps: 12,
+          last_step: 'Inspect source records',
+          mode_changed: 'Subscription availability changed after this check started.',
+        },
+      })
+    );
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    expect(wrapper.findAll('.button-primary')).toHaveLength(1);
+    expect(wrapper.find('[data-test="stop-outdated-run"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="check-again"]').exists()).toBe(false);
+  });
+
+  it('makes cancellation the one clear action for an outdated owner review', async () => {
+    const item = {
+      review_id: 'decision-outdated0001',
+      kind: 'migration_decision',
+      title: 'Order 116',
+      summary: 'Keep the reviewed note private.',
+    };
+    serve(
+      status({
+        plan_blocked: true,
+        plan_message: 'Active subscriptions need a supported migration route.',
+        run: {
+          phase: 'awaiting_decisions',
+          completed_steps: 3,
+          total_steps: 12,
+          mode_changed: 'Subscription availability changed after this check started.',
+          review: { blockers: [], items: [item], proposal_counts: {} },
+        },
+      })
+    );
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    expect(wrapper.findAll('.button-primary')).toHaveLength(1);
+    expect(wrapper.find('.cartshift-review-actions .button-primary').text()).toContain('Cancel outdated review');
+    expect(wrapper.find('[data-test="check-again"]').exists()).toBe(false);
+  });
+
   it('keeps a saved failure visible when the current plan is blocked', async () => {
     serve(
       status({
@@ -661,5 +782,8 @@ describe('GuidedMigrationScreen', () => {
 
     expect(wrapper.find('[data-test="accept-run-decisions"]').attributes('disabled')).toBeDefined();
     expect(wrapper.find('[data-test="preflight-blocked"]').exists()).toBe(true);
+    expect(wrapper.findAll('.button-primary')).toHaveLength(1);
+    expect(wrapper.find('[data-test="check-again"]').classes()).toContain('button-primary');
+    expect(wrapper.find('[data-test="accept-run-decisions"]').classes()).not.toContain('button-primary');
   });
 });

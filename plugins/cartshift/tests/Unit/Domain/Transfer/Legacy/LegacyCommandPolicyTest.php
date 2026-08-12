@@ -66,8 +66,8 @@ final class LegacyCommandPolicyTest extends PluginTestCase
             LegacyCommandPolicy::effectsFor('rest:POST:cartshift/v1/migration/cancel'),
         );
         self::assertSame(
-            ['private_files'],
-            LegacyCommandPolicy::effectsFor('rest:POST:cartshift/v1/migration/setup-lines'),
+            ['configuration_option', 'private_files'],
+            LegacyCommandPolicy::effectsFor('rest:POST:cartshift/v1/migration/initialise'),
         );
         self::assertSame(
             ['id_map', 'journal', 'private_files', 'target_commerce_rows', 'wordpress_files'],

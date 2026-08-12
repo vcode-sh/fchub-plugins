@@ -93,7 +93,6 @@ final readonly class LegacyCommandPolicy
         // all; `GuidedMigrationControllerTest` proves that under the same guard
         // the subscription audit uses.
         $add('rest:GET:cartshift/v1/migration/status', ['none']);
-        $add('rest:POST:cartshift/v1/migration/setup-lines', ['private_files']);
         $add('rest:POST:cartshift/v1/migration/start', [
             'id_map', 'journal', 'private_files', 'target_commerce_rows', 'wordpress_files',
         ]);
@@ -101,9 +100,9 @@ final readonly class LegacyCommandPolicy
         $add('rest:POST:cartshift/v1/migration/rollback', [
             'id_map', 'journal', 'private_files', 'target_commerce_rows', 'wordpress_files',
         ]);
-        // Minting the site's transfer source key. One explicit option write,
-        // once; merely opening the guided screen remains read-only.
-        $add('rest:POST:cartshift/v1/migration/initialise', ['configuration_option']);
+        // Mint the source key and create its sealed private workspace, once.
+        // Merely opening the guided screen remains read-only.
+        $add('rest:POST:cartshift/v1/migration/initialise', ['configuration_option', 'private_files']);
         // The owner's acceptance of a decision proposal, written to the
         // private workspace. It writes a file and nothing else.
         $add('rest:POST:cartshift/v1/migration/decisions', ['private_files']);

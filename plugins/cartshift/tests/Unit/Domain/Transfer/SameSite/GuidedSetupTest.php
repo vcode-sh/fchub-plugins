@@ -6,22 +6,12 @@ namespace CartShift\Tests\Unit\Domain\Transfer\SameSite;
 
 use CartShift\Domain\Transfer\Execution\ConfiguredTransferEvidence;
 use CartShift\Domain\Transfer\SameSite\GuidedSetup;
+use CartShift\Domain\Transfer\SameSite\GuidedSetupConfiguration;
+use CartShift\Domain\Transfer\SameSite\GuidedSetupLock;
 use CartShift\Domain\Transfer\SameSite\PrivateWorkspace;
 use CartShift\Tests\Unit\PluginTestCase;
 
-/**
- * The one-time `wp-config.php` edit, and the reason it cannot be avoided.
- *
- * `LoadedTargetTransferPipeline` resolves its working directory and its lease
- * holder through `ConfiguredTransferEvidence`, which reads a PHP constant or an
- * environment variable and nothing else. That is deliberate: evidence a web
- * request can set is not evidence. A guided run therefore cannot configure its
- * own way past `prepare` — it can only say, precisely, what is missing.
- *
- * The suggestions are round-tripped through the real validators rather than
- * pattern-matched, because a suggestion the pipeline would reject is worse than
- * no suggestion: it looks like help and costs an afternoon.
- */
+/** The guided route owns its private workspace setup; members do not edit PHP. */
 final class GuidedSetupTest extends PluginTestCase
 {
     private const string SOURCE_KEY = 'site-0123456789abcdef';
@@ -36,81 +26,191 @@ final class GuidedSetupTest extends PluginTestCase
         parent::tearDown();
     }
 
-    public function testAnUnconfiguredRuntimeIsNotReadyAndSaysWhichTwoThingsAreMissing(): void
+    public function testAnUnconfiguredRuntimeBecomesReadyThroughOneAutomaticSetup(): void
     {
         $setup = $this->guidedSetup();
 
         self::assertFalse($setup->isComplete());
-        self::assertSame(
-            [ConfiguredTransferEvidence::PRIVATE_DIRECTORY, ConfiguredTransferEvidence::OPERATOR_ID],
-            array_column($setup->missing(), 'constant'),
-        );
+        $setup->ensure();
+
+        self::assertTrue($setup->isComplete());
+        self::assertSame(self::OPERATOR, ConfiguredTransferEvidence::operatorId());
+        self::assertTrue(PrivateWorkspace::isOutsideWebRoot(ConfiguredTransferEvidence::privateDirectory()));
+        self::assertDirectoryExists(ConfiguredTransferEvidence::privateDirectory());
     }
 
-    /**
-     * A suggestion the pipeline would refuse is not help.
-     *
-     * `PrivateTransferFile::directory()` demands an existing, absolute,
-     * non-symlink directory with no group or other permissions, outside the web
-     * root. Rather than restate those five rules here and let the copies drift,
-     * the suggested value is fed to the real validator through the environment
-     * variable it actually reads.
-     */
-    public function testTheSuggestedDirectoryIsOneTheRealValidatorAccepts(): void
+    public function testAutomaticSetupIsIdempotent(): void
     {
-        $suggested = $this->guidedSetup()->suggestionFor(ConfiguredTransferEvidence::PRIVATE_DIRECTORY);
+        $setup = $this->guidedSetup();
+        $setup->ensure();
+        $first = get_option(GuidedSetupConfiguration::OPTION);
 
-        putenv(ConfiguredTransferEvidence::PRIVATE_DIRECTORY . '=' . $suggested);
+        $setup->ensure();
 
-        self::assertSame($suggested, ConfiguredTransferEvidence::privateDirectory());
-        self::assertTrue(PrivateWorkspace::isOutsideWebRoot($suggested));
+        self::assertSame($first, get_option(GuidedSetupConfiguration::OPTION));
     }
 
-    public function testTheSuggestedOperatorIsOneTheRealValidatorAccepts(): void
+    public function testSavedSetupBootsTheNextRequestThroughTheExistingEvidenceAdapter(): void
     {
-        $suggested = $this->guidedSetup()->suggestionFor(ConfiguredTransferEvidence::OPERATOR_ID);
+        $this->guidedSetup()->ensure();
+        $directory = ConfiguredTransferEvidence::privateDirectory();
 
-        putenv(ConfiguredTransferEvidence::OPERATOR_ID . '=' . $suggested);
+        putenv(ConfiguredTransferEvidence::PRIVATE_DIRECTORY);
+        putenv(ConfiguredTransferEvidence::OPERATOR_ID);
+        (new GuidedSetupConfiguration())->boot();
 
+        self::assertSame($directory, ConfiguredTransferEvidence::privateDirectory());
         self::assertSame(self::OPERATOR, ConfiguredTransferEvidence::operatorId());
     }
 
-    public function testTheSnippetIsPasteableAndCarriesBothDefines(): void
+    public function testAnEmptyEnvironmentValueDoesNotDisableSavedGuidedSetup(): void
     {
-        $snippet = $this->guidedSetup()->wpConfigSnippet();
+        $this->guidedSetup()->ensure();
+        $directory = ConfiguredTransferEvidence::privateDirectory();
+        putenv(ConfiguredTransferEvidence::PRIVATE_DIRECTORY . '=');
+        putenv(ConfiguredTransferEvidence::OPERATOR_ID . '=');
 
-        foreach ([ConfiguredTransferEvidence::PRIVATE_DIRECTORY, ConfiguredTransferEvidence::OPERATOR_ID] as $constant) {
-            self::assertStringContainsString("define('" . $constant . "',", $snippet);
+        (new GuidedSetupConfiguration())->boot();
+
+        self::assertSame($directory, ConfiguredTransferEvidence::privateDirectory());
+        self::assertSame(self::OPERATOR, ConfiguredTransferEvidence::operatorId());
+    }
+
+    public function testConcurrentFirstSetupUsesTheOneStoredWinner(): void
+    {
+        $winnerDirectory = (new PrivateWorkspace(self::SOURCE_KEY))->path();
+        $winner = ['private_directory' => $winnerDirectory, 'operator_id' => 'wp-user:2'];
+        $GLOBALS['_cartshift_test_add_option_callback'] = static function (string $option) use ($winner): bool {
+            $GLOBALS['_cartshift_test_options'][$option] = $winner;
+
+            return false;
+        };
+
+        try {
+            $this->guidedSetup()->ensure();
+        } finally {
+            unset($GLOBALS['_cartshift_test_add_option_callback']);
         }
 
-        self::assertStringNotContainsString('<', $snippet, 'A placeholder reached a snippet meant to be pasted.');
+        self::assertSame('wp-user:2', ConfiguredTransferEvidence::operatorId());
+        self::assertSame($winnerDirectory, ConfiguredTransferEvidence::privateDirectory());
     }
 
-    public function testAConfiguredRuntimeIsReadyAndAsksForNothing(): void
+    public function testExplicitServerConfigurationStillWins(): void
     {
-        $setup = $this->guidedSetup();
+        $directory = (new PrivateWorkspace(self::SOURCE_KEY))->path();
+        putenv(ConfiguredTransferEvidence::PRIVATE_DIRECTORY . '=' . $directory);
+        putenv(ConfiguredTransferEvidence::OPERATOR_ID . '=server-owner');
 
-        putenv(ConfiguredTransferEvidence::PRIVATE_DIRECTORY . '=' . $setup->suggestionFor(ConfiguredTransferEvidence::PRIVATE_DIRECTORY));
-        putenv(ConfiguredTransferEvidence::OPERATOR_ID . '=' . self::OPERATOR);
+        $this->guidedSetup()->ensure();
 
-        $ready = $this->guidedSetup();
-
-        self::assertTrue($ready->isComplete());
-        self::assertSame([], $ready->missing());
-        self::assertSame('', $ready->wpConfigSnippet());
+        self::assertSame($directory, ConfiguredTransferEvidence::privateDirectory());
+        self::assertSame('server-owner', ConfiguredTransferEvidence::operatorId());
+        self::assertArrayNotHasKey(GuidedSetupConfiguration::OPTION, $GLOBALS['_cartshift_test_options']);
     }
 
-    public function testHalfConfiguredIsNotConfigured(): void
+    public function testMalformedSavedSetupFailsClosed(): void
     {
-        putenv(ConfiguredTransferEvidence::OPERATOR_ID . '=' . self::OPERATOR);
+        $GLOBALS['_cartshift_test_options'][GuidedSetupConfiguration::OPTION] = [
+            'private_directory' => '/inside/the/site',
+            'operator_id' => 'operator with spaces',
+        ];
 
-        $setup = $this->guidedSetup();
+        self::assertFalse($this->guidedSetup()->isComplete());
 
-        self::assertFalse($setup->isComplete());
-        self::assertSame(
-            [ConfiguredTransferEvidence::PRIVATE_DIRECTORY],
-            array_column($setup->missing(), 'constant'),
-        );
+        $this->expectException(\RuntimeException::class);
+        $this->guidedSetup()->ensure();
+    }
+
+    public function testAutomaticSetupRepairsAStoredDirectoryThatNoLongerExists(): void
+    {
+        $GLOBALS['_cartshift_test_options'][GuidedSetupConfiguration::OPTION] = [
+            'private_directory' => '/a/removed/hosting/path',
+            'operator_id' => self::OPERATOR,
+        ];
+
+        $this->guidedSetup()->ensure();
+
+        $stored = get_option(GuidedSetupConfiguration::OPTION);
+        self::assertNotSame('/a/removed/hosting/path', $stored['private_directory']);
+        self::assertDirectoryExists($stored['private_directory']);
+        self::assertTrue($this->guidedSetup()->isComplete());
+    }
+
+    public function testASetupLockIsReleasedWhenItsRequestEnds(): void
+    {
+        $first = GuidedSetupLock::acquire('interrupted-request-test');
+
+        try {
+            GuidedSetupLock::acquire('interrupted-request-test');
+            self::fail('A concurrent request acquired the same setup lock.');
+        } catch (\RuntimeException $busy) {
+            self::assertStringContainsString('busy', $busy->getMessage());
+        }
+
+        unset($first);
+        $recovered = GuidedSetupLock::acquire('interrupted-request-test');
+
+        self::assertInstanceOf(GuidedSetupLock::class, $recovered);
+    }
+
+    public function testASetupLockRefusesASymlinkInTheSharedTemporaryArea(): void
+    {
+        $name = 'symlink-test-' . bin2hex(random_bytes(6));
+        $first = GuidedSetupLock::acquire($name);
+        unset($first);
+
+        $directory = realpath(sys_get_temp_dir()) . '/cartshift-locks-' . hash('sha256', ABSPATH);
+        $lockPath = $directory . '/' . hash('sha256', $name) . '.lock';
+        $target = tempnam(sys_get_temp_dir(), 'cartshift-lock-target-');
+        self::assertIsString($target);
+        unlink($lockPath);
+        symlink($target, $lockPath);
+        $modeBefore = fileperms($target) & 0777;
+
+        try {
+            GuidedSetupLock::acquire($name);
+            self::fail('A symlink was accepted as a CartShift setup lock.');
+        } catch (\RuntimeException $unsafe) {
+            self::assertStringContainsString('unsafe', $unsafe->getMessage());
+        } finally {
+            clearstatcache(true, $target);
+            $modeAfter = fileperms($target) & 0777;
+            unlink($lockPath);
+            unlink($target);
+        }
+
+        self::assertSame($modeBefore, $modeAfter);
+    }
+
+    public function testASetupLockNeverChmodsAPreExistingDirectorySymlink(): void
+    {
+        $name = 'directory-symlink-test-' . bin2hex(random_bytes(6));
+        $first = GuidedSetupLock::acquire($name);
+        unset($first);
+
+        $directory = realpath(sys_get_temp_dir()) . '/cartshift-locks-' . hash('sha256', ABSPATH);
+        $original = $directory . '-test-original';
+        $target = $directory . '-test-target';
+        rename($directory, $original);
+        mkdir($target, 0755);
+        symlink($target, $directory);
+        $modeBefore = fileperms($target) & 0777;
+
+        try {
+            GuidedSetupLock::acquire($name);
+            self::fail('A directory symlink was accepted for CartShift setup locks.');
+        } catch (\RuntimeException $unsafe) {
+            self::assertStringContainsString('unsafe', $unsafe->getMessage());
+        } finally {
+            clearstatcache(true, $target);
+            $modeAfter = fileperms($target) & 0777;
+            unlink($directory);
+            rename($original, $directory);
+            rmdir($target);
+        }
+
+        self::assertSame($modeBefore, $modeAfter);
     }
 
     /**
@@ -124,8 +224,7 @@ final class GuidedSetupTest extends PluginTestCase
      */
     public function testCutoverIsReportedUnavailableFromTheBrowserEvenWhenSetupIsComplete(): void
     {
-        putenv(ConfiguredTransferEvidence::PRIVATE_DIRECTORY . '=' . $this->guidedSetup()->suggestionFor(ConfiguredTransferEvidence::PRIVATE_DIRECTORY));
-        putenv(ConfiguredTransferEvidence::OPERATOR_ID . '=' . self::OPERATOR);
+        $this->guidedSetup()->ensure();
 
         $cutover = $this->guidedSetup()->cutover();
 

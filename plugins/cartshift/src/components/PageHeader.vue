@@ -1,15 +1,20 @@
 <template>
   <div class="cartshift-page-header">
-    <h1>{{ title }} <span style="font-size:11px;color:#999;font-weight:400;">v{{ version }}</span></h1>
+    <div v-if="guided" class="cartshift-brand">
+      <span class="cartshift-brand-mark dashicons dashicons-randomize" aria-hidden="true"></span>
+      <div>
+        <div class="cartshift-brand-line"><h1>{{ title }}</h1><span v-if="version" class="cartshift-version">v{{ version }}</span></div>
+        <p v-if="subtitle">{{ subtitle }}</p>
+      </div>
+    </div>
+    <h1 v-else>{{ title }} <span v-if="version" class="cartshift-version">v{{ version }}</span></h1>
     <div class="cartshift-theme-switcher">
       <button
         class="cartshift-theme-btn"
         :title="'Theme: ' + theme.themeMode.value"
         @click.stop="showDropdown = !showDropdown"
       >
-        <svg v-if="theme.themeMode.value === 'light'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-        <svg v-else-if="theme.themeMode.value === 'dark'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        <span class="dashicons" :class="themeIcon(theme.themeMode.value)" aria-hidden="true"></span>
       </button>
       <div v-if="showDropdown" class="cartshift-theme-dropdown">
         <button
@@ -19,9 +24,7 @@
           :class="{ active: theme.themeMode.value === opt.key }"
           @click="selectTheme(opt.key)"
         >
-          <svg v-if="opt.key === 'light'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-          <svg v-else-if="opt.key === 'dark'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <span class="dashicons" :class="themeIcon(opt.key)" aria-hidden="true"></span>
           {{ opt.label }}
         </button>
       </div>
@@ -34,6 +37,8 @@ import { ref, inject, onMounted, onBeforeUnmount } from 'vue';
 
 defineProps({
   title: { type: String, required: true },
+  subtitle: { type: String, default: '' },
+  guided: { type: Boolean, default: false },
 });
 
 const config = inject('config', {});
@@ -46,6 +51,10 @@ const themeOptions = [
   { key: 'dark', label: 'Dark' },
   { key: 'system', label: 'System' },
 ];
+
+function themeIcon(mode) {
+  return { light: 'dashicons-lightbulb', dark: 'dashicons-star-filled', system: 'dashicons-desktop' }[mode];
+}
 
 function selectTheme(mode) {
   theme.changeTheme(mode);

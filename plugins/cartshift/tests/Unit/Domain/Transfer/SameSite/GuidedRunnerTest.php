@@ -83,13 +83,8 @@ final class GuidedRunnerTest extends PluginTestCase
     // Refusal 2: the one-time configuration
     // ──────────────────────────────────────────────
 
-    /**
-     * The raw failure is `transfer_private_directory_not_configured`, thrown
-     * deep inside the pipeline after it has already resolved a descriptor. A
-     * member reading that has no idea it means "paste two lines". So the gate
-     * is in front, and it carries the same reason codes the setup screen shows.
-     */
-    public function testATargetStepIsRefusedWithSetupsOwnCodesWhenTheConstantsAreAbsent(): void
+    /** Missing guided setup stops before the target pipeline and points back to the GUI. */
+    public function testATargetStepIsRefusedBeforeDispatchWhenGuidedSetupIsAbsent(): void
     {
         $dispatched = 0;
 
@@ -104,20 +99,20 @@ final class GuidedRunnerTest extends PluginTestCase
             self::fail('A target step ran on an unconfigured runtime.');
         } catch (\RuntimeException $refusal) {
             self::assertStringContainsString('guided_setup_incomplete', $refusal->getMessage());
-            self::assertStringContainsString(ConfiguredTransferEvidence::PRIVATE_DIRECTORY, $refusal->getMessage());
-            self::assertStringContainsString(ConfiguredTransferEvidence::OPERATOR_ID, $refusal->getMessage());
+            self::assertStringContainsString('CartShift screen', $refusal->getMessage());
+            self::assertStringNotContainsString('CARTSHIFT_TRANSFER_', $refusal->getMessage());
         }
 
         self::assertSame(0, $dispatched);
     }
 
     /**
-     * The source side is unaffected by the missing constants, because nothing on
+     * The source side is unaffected by missing guided setup, because nothing on
      * it reads `ConfiguredTransferEvidence`. A setup gate that blocked the whole
      * run would be the "missing optional thing breaks everything" defect this
      * whole workstream started from.
      */
-    public function testTheSourceSideRunsWithoutTheTargetConstants(): void
+    public function testTheSourceSideRunsWithoutGuidedSetup(): void
     {
         $probed = [];
 

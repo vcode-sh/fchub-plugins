@@ -84,6 +84,16 @@ add_action('plugins_loaded', function () {
     load_plugin_textdomain('cartshift', false, 'cartshift/languages');
 });
 
+// Server constants and environment variables still win. The guided route only
+// supplies validated defaults when neither was configured explicitly.
+add_action('plugins_loaded', static function (): void {
+    try {
+        (new \CartShift\Domain\Transfer\SameSite\GuidedSetupConfiguration())->boot();
+    } catch (\Throwable) {
+        // The guided screen reports an invalid setup without taking down WordPress.
+    }
+}, 19);
+
 /**
  * Activation: run versioned database migrations.
  */

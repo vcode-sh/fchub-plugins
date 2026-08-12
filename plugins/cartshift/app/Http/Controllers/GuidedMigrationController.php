@@ -39,6 +39,7 @@ use WP_REST_Response;
 final class GuidedMigrationController
 {
     private const string NAMESPACE = 'cartshift/v1';
+    private const string STATUS_SOURCE_KEY = 'site-readiness-preview';
 
     /**
      * The probe arrives through a seam for the same reason every other symbol
@@ -67,12 +68,6 @@ final class GuidedMigrationController
         register_rest_route(self::NAMESPACE, '/migration/start', [
             'methods' => 'POST',
             'callback' => [$this, 'start'],
-            'permission_callback' => [$this, 'checkPermission'],
-        ]);
-
-        register_rest_route(self::NAMESPACE, '/migration/setup-lines', [
-            'methods' => 'POST',
-            'callback' => [$this, 'setupLines'],
             'permission_callback' => [$this, 'checkPermission'],
         ]);
 
@@ -117,28 +112,34 @@ final class GuidedMigrationController
             ]]);
         }
 
-        $sourceKey = (new SiteSourceIdentity())->current();
-
-        if ($sourceKey === null) {
-            // NAMING THE SITE IS A WRITE, AND THIS IS A READ.
-            // `ensure()` mints a key and stores it, which is a legitimate
-            // one-time configuration write and emphatically not something a
-            // status poll should do — the zero-write guard caught exactly that
-            // and was right to. So the screen is told the site has no name yet
-            // and offers the one action that gives it one.
-            return new WP_REST_Response(['data' => [
-                'guided_available' => true,
-                'initialised' => false,
-                'message' => 'This site has not been named for transfer yet. Naming writes only its transfer identity; '
-                    . 'simply opening this screen writes nothing.',
-            ]]);
-        }
-
-        $setup = new GuidedSetup($sourceKey, $this->operatorId());
         $preflight = (new PreflightCheck(rememberAdvisoryCounts: false))
             ->run(PreflightCheck::OPERATION_MIGRATION);
         $guidedPreflight = $this->guidedPreflightPayload($preflight);
         $subscriptionsActive = ($preflight['checks']['wc_subscriptions']['active'] ?? false) === true;
+        $sourceKey = (new SiteSourceIdentity())->current();
+
+        if ($sourceKey === null) {
+            $setup = new GuidedSetup(self::STATUS_SOURCE_KEY, $this->operatorId());
+            $data = [
+                'guided_available' => true,
+                'initialised' => false,
+                'message' => 'CartShift is ready to check this store.',
+                'preflight' => $this->guidedPreflightPresentation($guidedPreflight),
+                'subscriptions' => ['available' => $subscriptionsActive],
+                'setup' => [
+                    'complete' => false,
+                    'cutover' => ['available' => false, 'message' => $setup->cutover()['message']],
+                ],
+            ];
+
+            return new WP_REST_Response(['data' => $data + $this->plan(
+                self::STATUS_SOURCE_KEY,
+                $subscriptionsActive,
+                loadRun: false,
+            )]);
+        }
+
+        $setup = new GuidedSetup($sourceKey, $this->operatorId());
 
         $data = [
             'guided_available' => true,
@@ -149,8 +150,6 @@ final class GuidedMigrationController
             ],
             'setup' => [
                 'complete' => $setup->isComplete(),
-                'missing' => $setup->requirements(),
-                'can_copy_lines' => !$setup->isComplete(),
                 'cutover' => ['available' => false, 'message' => $setup->cutover()['message']],
             ],
         ];
@@ -198,23 +197,6 @@ final class GuidedMigrationController
             return new WP_REST_Response(['data' => $this->runPayload($state)]);
         } catch (\Throwable) {
             return $this->actionFailure('The readiness check could not continue. Refresh this page to see its saved state.');
-        }
-    }
-
-    /** Create the private directory only after the owner asks for pasteable setup lines. */
-    public function setupLines(WP_REST_Request $request): WP_REST_Response
-    {
-        $sourceKey = (new SiteSourceIdentity())->current();
-        if ($sourceKey === null) {
-            return $this->conflict('Name this site before copying setup lines.');
-        }
-
-        try {
-            return new WP_REST_Response(['data' => [
-                'lines' => (new GuidedSetup($sourceKey, $this->operatorId()))->wpConfigSnippet(),
-            ]]);
-        } catch (\Throwable) {
-            return $this->actionFailure('The setup lines could not be prepared.');
         }
     }
 
@@ -321,18 +303,20 @@ final class GuidedMigrationController
         }
     }
 
-    /**
-     * Name this site, once.
-     *
-     * The only write in the guided surface before the owner has reviewed
-     * anything, and it is declared as `configuration_option` in
-     * `LegacyCommandPolicy` rather than smuggled in behind a read.
-     */
+    /** Prepare the stable source identity and private workspace after one explicit click. */
     public function initialise(WP_REST_Request $request): WP_REST_Response
     {
-        return new WP_REST_Response(['data' => [
-            'initialised' => (new SiteSourceIdentity())->ensure() !== '',
-        ]]);
+        try {
+            $sourceKey = GuidedSetup::initialise($this->operatorId());
+            $setup = new GuidedSetup($sourceKey, $this->operatorId());
+
+            return new WP_REST_Response(['data' => [
+                'initialised' => true,
+                'setup_complete' => $setup->isComplete(),
+            ]]);
+        } catch (\Throwable) {
+            return $this->actionFailure('CartShift could not prepare its private workspace. Check the server permissions and try again.');
+        }
     }
 
     /** Stop adapter progress. Target rows already written remain rollback evidence, never silently disappear. */
@@ -417,12 +401,12 @@ final class GuidedMigrationController
      *
      * @return array<string, mixed>
      */
-    private function plan(string $sourceKey, bool $subscriptionsActive): array
+    private function plan(string $sourceKey, bool $subscriptionsActive, bool $loadRun = true): array
     {
         $run = null;
         try {
             $setup = new GuidedSetup($sourceKey, $this->operatorId());
-            if ($setup->isComplete()) {
+            if ($loadRun && $setup->isComplete()) {
                 $workspace = (new PrivateWorkspace($sourceKey))->path();
                 $run = (new GuidedRunStateRepository($workspace, $sourceKey))->get();
             } else {

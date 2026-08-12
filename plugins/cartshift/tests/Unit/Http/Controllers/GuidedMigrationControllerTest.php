@@ -15,6 +15,7 @@ use CartShift\Domain\Transfer\SameSite\GuidedCustomerDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedRunState;
 use CartShift\Domain\Transfer\SameSite\GuidedRunFailure;
 use CartShift\Domain\Transfer\SameSite\GuidedRollback;
+use CartShift\Domain\Transfer\SameSite\GuidedSetupConfiguration;
 use CartShift\Domain\Transfer\SameSite\GuidedStep;
 use CartShift\Domain\Transfer\SameSite\SiteSourceIdentity;
 use CartShift\Domain\Transfer\SourceIdentity;
@@ -83,6 +84,8 @@ final class GuidedMigrationControllerTest extends PluginTestCase
 
         self::assertSame([], $unnamed['violations'], 'The guided status endpoint attempted a write.');
         self::assertFalse($unnamed['result']['initialised']);
+        self::assertArrayHasKey('preflight', $unnamed['result']);
+        self::assertArrayHasKey('plan_blocked', $unnamed['result']);
 
         $this->nameTheSite();
 
@@ -90,6 +93,24 @@ final class GuidedMigrationControllerTest extends PluginTestCase
 
         self::assertSame([], $named['violations'], 'The guided status endpoint wrote once the site was named.');
         self::assertTrue($named['result']['initialised']);
+    }
+
+    public function testFreshStatusShowsKnownBlockersBeforePreparingTheSite(): void
+    {
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): string {
+            if (str_contains($query, 'SHOW TABLES LIKE')) return 'exists';
+            if (str_contains($query, "post_type = 'fluent-products'")) return '1';
+            return '0';
+        };
+
+        $watched = \CartShiftZeroWriteGuard::watch(fn (): array => $this->guidedStatus());
+        $checks = array_column($watched['result']['preflight']['checks'], null, 'label');
+
+        self::assertSame([], $watched['violations']);
+        self::assertFalse($watched['result']['initialised']);
+        self::assertSame('fail', $checks['Existing FluentCart records']['severity']);
+        self::assertArrayNotHasKey('cartshift_site_source_key', $GLOBALS['_cartshift_test_options']);
+        self::assertArrayNotHasKey(GuidedSetupConfiguration::OPTION, $GLOBALS['_cartshift_test_options']);
     }
 
     public function testStatusWithUnsupportedProductsReadsTheirImpactWithoutCachingIt(): void
@@ -136,12 +157,35 @@ final class GuidedMigrationControllerTest extends PluginTestCase
         self::assertStringNotContainsString('wc_get_', $encoded);
     }
 
-    public function testNamingTheSiteIsAnExplicitActionAndIsIdempotent(): void
+    public function testPreparingTheSiteIsAnExplicitActionAndIsIdempotent(): void
     {
         $first = $this->nameTheSite();
 
         self::assertMatchesRegularExpression('/\Asite-[a-f0-9]{16}\z/D', $first);
         self::assertSame($first, $this->nameTheSite());
+        self::assertArrayHasKey(GuidedSetupConfiguration::OPTION, $GLOBALS['_cartshift_test_options']);
+    }
+
+    public function testFailedPreparationLeavesNoPartialSiteIdentity(): void
+    {
+        $GLOBALS['_cartshift_test_add_option_callback'] = static function (string $option, mixed $value): bool {
+            if ($option === GuidedSetupConfiguration::OPTION) {
+                return false;
+            }
+            $GLOBALS['_cartshift_test_options'][$option] = $value;
+
+            return true;
+        };
+
+        try {
+            $response = $this->controller()->initialise(new WP_REST_Request());
+        } finally {
+            unset($GLOBALS['_cartshift_test_add_option_callback']);
+        }
+
+        self::assertSame(422, $response->get_status());
+        self::assertNull((new SiteSourceIdentity())->current());
+        self::assertArrayNotHasKey(GuidedSetupConfiguration::OPTION, $GLOBALS['_cartshift_test_options']);
     }
 
     /**
@@ -157,24 +201,16 @@ final class GuidedMigrationControllerTest extends PluginTestCase
         self::assertContains('option state changed', $watched['violations']);
     }
 
-    public function testTheShopIsToldWhatIsMissingRatherThanJustThatItIsNotReady(): void
+    public function testAutomaticSetupDoesNotExposeServerConfiguration(): void
     {
         $this->nameTheSite();
 
         $setup = $this->guidedStatus()['setup'];
 
-        self::assertFalse($setup['complete']);
-        self::assertSame(
-            [ConfiguredTransferEvidence::PRIVATE_DIRECTORY, ConfiguredTransferEvidence::OPERATOR_ID],
-            array_column($setup['missing'], 'constant'),
-        );
-        self::assertTrue($setup['can_copy_lines']);
-        self::assertArrayNotHasKey('snippet', $setup);
-        self::assertArrayNotHasKey('suggested', $setup['missing'][0]);
-
-        $response = $this->controller()->setupLines(new WP_REST_Request());
-        self::assertSame(200, $response->get_status());
-        self::assertStringContainsString('define(', $response->get_data()['data']['lines']);
+        self::assertTrue($setup['complete']);
+        self::assertArrayNotHasKey('missing', $setup);
+        self::assertArrayNotHasKey('can_copy_lines', $setup);
+        self::assertStringNotContainsString('CARTSHIFT_TRANSFER_', json_encode($setup, JSON_THROW_ON_ERROR));
     }
 
     /**
@@ -806,7 +842,7 @@ final class GuidedMigrationControllerTest extends PluginTestCase
 
     public function testUnconfiguredStatusDoesNotExposeOrCreateTheSuggestedPrivateDirectory(): void
     {
-        $sourceKey = $this->nameTheSite();
+        $sourceKey = (new SiteSourceIdentity())->ensure();
         $expected = sys_get_temp_dir() . '/cartshift-private/' . $sourceKey;
         $before = is_dir($expected) ? (glob($expected . '/*') ?: []) : null;
 
