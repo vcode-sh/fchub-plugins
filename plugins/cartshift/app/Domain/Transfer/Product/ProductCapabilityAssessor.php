@@ -84,16 +84,6 @@ final class ProductCapabilityAssessor
                 }
             }
 
-            if ($variation->stock->ownership === StockOwnership::Parent && !$context->supports('shared_parent_stock')) {
-                return $this->blocked('parent_stock_owner_unrepresentable', $context, [
-                    'stock_owner' => $variation->stock->owner?->canonical(),
-                    'affected_variants' => count(array_filter(
-                        $record->variations,
-                        static fn (VariationRecord $candidate): bool => $candidate->stock->ownership === StockOwnership::Parent,
-                    )),
-                ]);
-            }
-
             if (($variation->price->saleStartsUtc !== null || $variation->price->saleEndsUtc !== null)
                 && !$context->supports('exact_sale_scheduler')) {
                 return $this->blocked('scheduled_sale_unrepresentable', $context);
@@ -131,6 +121,10 @@ final class ProductCapabilityAssessor
             'field_decision_fingerprint' => $context->fieldDecisions->fingerprint,
             'dependent_orders' => $context->dependentOrders,
             'dependent_subscriptions' => $context->dependentSubscriptions,
+            'stock_exception_count' => count(array_filter(
+                $record->variations,
+                static fn (VariationRecord $variation): bool => $variation->stock->ownership === StockOwnership::Parent,
+            )),
         ]);
     }
 
@@ -362,6 +356,12 @@ final class ProductCapabilityAssessor
     {
         $profiles = [$record->stock, ...array_map(static fn (VariationRecord $variation): StockProfile => $variation->stock, $record->variations)];
         foreach ($profiles as $stock) {
+            // Parent-owned stock is deliberately projected unavailable with
+            // backorders disabled. Its exact source setting remains in the
+            // target exception evidence for the owner's post-migration setup.
+            if ($stock->ownership === StockOwnership::Parent) {
+                continue;
+            }
             if ($stock->backorders === 'yes' && !$context->supports('backorders_yes')) {
                 return $this->blocked('backorders_yes_unproved', $context);
             }

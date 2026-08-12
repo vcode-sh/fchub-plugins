@@ -411,6 +411,34 @@ final class PreflightCheckTest extends PluginTestCase
         $this->assertTrue($result['ready'], 'An unsupported type is advisory, not blocking.');
     }
 
+    public function testReadOnlyPreflightReportsUnsupportedTypesWithoutWritingItsAdvisoryCache(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+        $GLOBALS['_cartshift_test_transients'] = [];
+        $GLOBALS['_cartshift_test_get_results_callback'] = static fn (string $query): array =>
+            str_contains($query, 'product_type')
+                ? [(object) ['slug' => 'course', 'count' => 2]]
+                : [];
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): string {
+            if (str_contains($query, 'SHOW TABLES LIKE')) {
+                return 'exists';
+            }
+            if (str_contains($query, 'woocommerce_order_items')) {
+                return '41';
+            }
+            if (str_contains($query, 'wc_orders')) {
+                return '699';
+            }
+
+            return '0';
+        };
+
+        $result = (new PreflightCheck(rememberAdvisoryCounts: false))->run();
+
+        $this->assertSame(41, $result['checks']['product_types']['unsupported_product_types']['orders_affected']);
+        $this->assertSame([], $GLOBALS['_cartshift_test_transients']);
+    }
+
     /**
      * The exact real-world numbers this task fixes: a live store (WooCommerce
      * 11.0.0, HPOS, 699 orders) with 27 products, 2 of them LearnDash `course`

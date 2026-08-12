@@ -102,6 +102,42 @@ final readonly class TransferDecisionSet
         return $this->auditFindingDecisions;
     }
 
+    /** @param list<string> $keys Exact identity and finding-code keys from a stale audit report. */
+    public function withoutAuditFindings(array $keys): self
+    {
+        if (!array_is_list($keys)) {
+            throw new \InvalidArgumentException('Transfer audit finding removal keys must be a list.');
+        }
+        $remaining = $this->auditFindingDecisions;
+        foreach ($keys as $key) {
+            if (!is_string($key) || !isset($remaining[$key])) {
+                throw new \InvalidArgumentException('Transfer audit finding removal key is invalid.');
+            }
+            unset($remaining[$key]);
+        }
+
+        return new self($this->decisions, $remaining, $this->targetFindingDecisions);
+    }
+
+    /** @param list<string> $identities Exact canonical identities from stale record evidence. */
+    public function withoutRecords(array $identities): self
+    {
+        if (!array_is_list($identities)) {
+            throw new \InvalidArgumentException('Transfer record removal identities must be a list.');
+        }
+        $remaining = $this->decisions;
+        foreach ($identities as $canonical) {
+            if (!is_string($canonical)
+                || SourceIdentity::fromCanonical($canonical)->canonical() !== $canonical
+                || !isset($remaining[$canonical])) {
+                throw new \InvalidArgumentException('Transfer record removal identity is invalid.');
+            }
+            unset($remaining[$canonical]);
+        }
+
+        return new self($remaining, $this->auditFindingDecisions, $this->targetFindingDecisions);
+    }
+
     /** @return array<string, array<string, mixed>> */
     public function targetFindings(): array
     {

@@ -79,7 +79,23 @@ final class ProductSourceMatrixContractTest extends InstalledContractTestCase
         self::assertSame(['parent', 'self'], $result['stock_modes']);
         self::assertSame([true, 'parent', false], $result['source_stock_values']);
         self::assertSame(11, $result['parent_stock_quantity']);
-        self::assertSame('parent_stock_owner_unrepresentable', $result['parent_stock_block_reason']);
+        self::assertSame([
+            'outcome' => 'ready',
+            'reason' => 'product_ready',
+            'exception_count' => 1,
+        ], $result['parent_stock_assessment']);
+        self::assertSame([
+            'manage_stock' => 1,
+            'total_stock' => 0,
+            'available' => 0,
+            'committed' => 0,
+            'on_hold' => 0,
+            'stock_status' => 'out-of-stock',
+            'backorders' => 0,
+        ], array_diff_key($result['parent_stock_projection'], ['exception' => true]));
+        self::assertSame('shared_parent_stock', $result['parent_stock_projection']['exception']['type']);
+        self::assertSame(11, $result['parent_stock_projection']['exception']['source_stock']['quantity']);
+        self::assertTrue($result['parent_stock_projection']['exception']['requires_manual_resolution']);
         self::assertSame('inherited', $result['variation_assets']['parent']['media'][0]['provenance']);
         self::assertSame('variation', $result['variation_assets']['parent']['media'][0]['role']);
         self::assertSame('own', $result['variation_assets']['self']['media'][0]['provenance']);

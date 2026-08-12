@@ -121,6 +121,41 @@ final class SimpleVariationPlannerTest extends PluginTestCase
         self::assertSame(1234, $baseline['other_info']['signup_fee']);
     }
 
+    #[\PHPUnit\Framework\Attributes\DataProvider('parentStockProvider')]
+    public function testParentStockUsesOneConservativeProjectionAndPreservesItsSourceEvidence(
+        ?int $quantity,
+        string $status,
+        string $backorders,
+    ): void {
+        $parent = ProductAssessmentFixture::identity('42');
+        $variation = ProductAssessmentFixture::variation($parent, [
+            'identity' => ProductAssessmentFixture::identity('42:variation:101'),
+            'stock' => new StockProfile(StockOwnership::Parent, $parent, $quantity, $status, $backorders, false, 2),
+        ]);
+
+        $baseline = (new FluentCartSimpleVariationContract())->baseline($variation, $this->context());
+        $exception = $baseline['other_info']['stock_migration_exception'];
+
+        self::assertSame(1, $baseline['manage_stock']);
+        self::assertSame(0, $baseline['total_stock']);
+        self::assertSame(0, $baseline['available']);
+        self::assertSame(0, $baseline['committed']);
+        self::assertSame(0, $baseline['on_hold']);
+        self::assertSame('out-of-stock', $baseline['stock_status']);
+        self::assertSame(0, $baseline['backorders']);
+        self::assertSame($variation->stock->toArray(), $exception['source_stock']);
+        self::assertSame('shared_parent_stock', $exception['type']);
+        self::assertTrue($exception['requires_manual_resolution']);
+    }
+
+    /** @return iterable<string,array{?int,string,string}> */
+    public static function parentStockProvider(): iterable
+    {
+        yield 'positive in stock' => [7, 'instock', 'no'];
+        yield 'zero out of stock' => [0, 'outofstock', 'notify'];
+        yield 'unknown backorder stock' => [null, 'onbackorder', 'yes'];
+    }
+
     public function testReviewedSkuOverrideIsAppliedWithoutChangingTheSourceRecord(): void
     {
         $parent = ProductAssessmentFixture::identity('42');
@@ -198,14 +233,6 @@ final class SimpleVariationPlannerTest extends PluginTestCase
             'productType' => 'variable',
             'variations' => [ProductAssessmentFixture::variation($parent, ['identity' => $child, 'sku' => str_repeat('x', 31)])],
         ], 'target_schema_unrepresentable'];
-
-        yield 'parent stock' => [[
-            'productType' => 'variable',
-            'variations' => [ProductAssessmentFixture::variation($parent, [
-                'identity' => $child,
-                'stock' => new StockProfile(StockOwnership::Parent, $parent, 3, 'instock', 'no', false, null),
-            ])],
-        ], 'target_shared_stock_unavailable'];
 
         yield 'notify backorders' => [[
             'productType' => 'variable',

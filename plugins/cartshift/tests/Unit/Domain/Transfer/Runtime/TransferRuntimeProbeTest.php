@@ -7,6 +7,7 @@ namespace CartShift\Tests\Unit\Domain\Transfer\Runtime;
 use CartShift\Domain\Transfer\Runtime\TransferRuntimeProbe;
 use CartShift\Domain\Transfer\Runtime\TransferRuntimeSymbols;
 use CartShift\Domain\Transfer\Runtime\TransferSchemaInspector;
+use CartShift\Domain\Transfer\Runtime\TransferTopology;
 use PHPUnit\Framework\TestCase;
 
 final class TransferRuntimeProbeTest extends TestCase
@@ -91,6 +92,74 @@ final class TransferRuntimeProbeTest extends TestCase
         self::assertNotSame($first->fingerprint, $second->fingerprint);
     }
 
+    // ──────────────────────────────────────────────
+    // Which topology this runtime is
+    // ──────────────────────────────────────────────
+
+    /**
+     * The classification exists today and decides nothing. These are the tests
+     * that make it decide, because the shop with WooCommerce and FluentCart in
+     * one install is the common case and it currently has no route at all.
+     */
+    public function testOneInstallHoldingBothPluginsIsSameSite(): void
+    {
+        $probe = new TransferRuntimeProbe(new FakeTransferRuntimeSymbols(), new FakeSchemaInspector());
+
+        self::assertSame(TransferTopology::SameSite, $probe->topology());
+    }
+
+    public function testARuntimeWithoutWooCommerceIsCrossRuntime(): void
+    {
+        // A FluentCart-only target. It can receive a package; it cannot read a
+        // shop, because there is no shop here to read.
+        $symbols = new FakeTransferRuntimeSymbols(functions: []);
+
+        self::assertSame(
+            TransferTopology::CrossRuntime,
+            (new TransferRuntimeProbe($symbols, new FakeSchemaInspector()))->topology(),
+        );
+    }
+
+    public function testARuntimeWithoutFluentCartIsCrossRuntime(): void
+    {
+        // A WooCommerce-only source. It can export; it has nothing to write into.
+        $symbols = new FakeTransferRuntimeSymbols(absentClasses: ['FluentCart\\App\\Models\\Order']);
+
+        self::assertSame(
+            TransferTopology::CrossRuntime,
+            (new TransferRuntimeProbe($symbols, new FakeSchemaInspector()))->topology(),
+        );
+    }
+
+    /**
+     * `runtime_fingerprint` is bound into cutover approvals — an operator reads
+     * it, passes it to `--cutover-approval`, and a fingerprint that has moved
+     * since invalidates the approval. Folding topology into it would invalidate
+     * every approval in flight to report something that is not a compatibility
+     * fact about a role. So the classification travels beside the report.
+     */
+    public function testClassifyingTheTopologyDoesNotDisturbTheRuntimeFingerprint(): void
+    {
+        $probe = new TransferRuntimeProbe(new FakeTransferRuntimeSymbols(), FakeSchemaInspector::targetBaseline());
+
+        $before = $probe->inspect('target')->fingerprint;
+        $probe->topology();
+
+        self::assertSame($before, $probe->inspect('target')->fingerprint);
+    }
+
+    public function testTopologyIsAnsweredWithoutReadingASingleSchema(): void
+    {
+        // The guided screen asks this on every page load. A classification that
+        // walked twenty-six tables to answer "are both plugins here" would put
+        // a schema read behind a question `class_exists()` settles.
+        $schema = new FakeSchemaInspector();
+
+        (new TransferRuntimeProbe(new FakeTransferRuntimeSymbols(), $schema))->topology();
+
+        self::assertSame(0, $schema->inspectionCount);
+    }
+
     private function probeWithOrderRateType(string $type): TransferRuntimeProbe
     {
         $schema = FakeSchemaInspector::targetBaseline()
@@ -102,10 +171,14 @@ final class TransferRuntimeProbeTest extends TestCase
 
 final class FakeTransferRuntimeSymbols implements TransferRuntimeSymbols
 {
-    /** @param list<string>|null $functions */
+    /**
+     * @param list<string>|null $functions
+     * @param list<string> $absentClasses Classes this runtime has NOT loaded.
+     */
     public function __construct(
         private readonly ?array $functions = null,
         private readonly array $digests = [],
+        private readonly array $absentClasses = [],
     ) {
     }
 
@@ -116,7 +189,7 @@ final class FakeTransferRuntimeSymbols implements TransferRuntimeSymbols
 
     public function classExists(string $class): bool
     {
-        return true;
+        return !in_array($class, $this->absentClasses, true);
     }
 
     public function methodExists(string $class, string $method): bool

@@ -126,6 +126,39 @@ final class TransferRuntimeProbe implements TransferRuntimeInspector
     ) {
     }
 
+    /**
+     * Is this one WordPress holding both ends of the migration?
+     *
+     * Symbols only, no schema read: the guided screen asks on every load, and
+     * "are both plugins booted here" is a question `class_exists()` settles
+     * without walking twenty-six tables. Readiness is a separate question and
+     * `inspect()` still owns it — a same-site runtime can be classified and
+     * still be blocked, which is exactly what a stale schema looks like.
+     *
+     * DELIBERATELY NOT PART OF THE REPORT. `TransferRuntimeReport::$fingerprint`
+     * is bound into cutover approvals: an operator reads it and passes it to
+     * `--cutover-approval`, and a fingerprint that has moved since invalidates
+     * the approval. Folding topology into it would invalidate every approval in
+     * flight in order to record something that is not a compatibility fact
+     * about a role.
+     */
+    public function topology(): TransferTopology
+    {
+        foreach (self::SOURCE_FUNCTIONS as $function) {
+            if (!$this->symbols->functionExists($function)) {
+                return TransferTopology::CrossRuntime;
+            }
+        }
+
+        foreach ([...self::SOURCE_CLASSES, ...self::TARGET_MODELS] as $class) {
+            if (!$this->symbols->classExists($class)) {
+                return TransferTopology::CrossRuntime;
+            }
+        }
+
+        return TransferTopology::SameSite;
+    }
+
     public function inspect(string $role): TransferRuntimeReport
     {
         if (!in_array($role, [self::ROLE_SOURCE, self::ROLE_TARGET], true)) {

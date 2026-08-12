@@ -10,12 +10,12 @@ Reads your WooCommerce database. Maps everything into FluentCart. Products becom
 - **Customers** — accounts, addresses, guest checkouts. Everyone who ever gave you money
 - **Orders** — line items, shipping, taxes, meta. The paper trail
 - **Subscriptions** — WooCommerce Subscriptions → FluentCart recurring billing. The escape hatch
-- **Coupons** — discount rules translated to FluentCart's format. Because apparently people keep these
+- **Coupons** — applied coupon history stays with orders; standalone coupon definitions are reported but are not migrated yet
 - **ID mapping** — old IDs → new IDs. Nothing gets orphaned
 - **Preflight checks** — refuses to start when starting would produce nonsense. See below
 - **Batch processing** — won't eat your server's RAM for breakfast
-- **Admin wizard** — step-by-step UI. Not a CLI you'll forget the flags for
-- **WP-CLI** — `wp cartshift`, for when you would rather forget the flags
+- **Guided screen** — one WordPress running both plugins gets a wizard that reads the shop, shows warnings, compromises and surviving decisions in plain English, and stops before target writes when a safe result or rollback cannot be proved
+- **Transfer engine** — the package, evidence and rollback contracts stay underneath the guided screen. A different-site migration needs its own guided product route and is not exposed as terminal instructions here
 
 ## Requirements
 
@@ -39,7 +39,7 @@ Turn it on in **WooCommerce → Settings → Advanced → Features**, set order 
 3. Activate
 4. Open the migrator in wp-admin (Tools → CartShift)
 5. Run preflight — fix whatever it complains about
-6. Migrate. Watch the progress bar. Resist the urge to refresh
+6. Review what CartShift found. Safe compromises are reported with manual next steps; unsafe collisions and unproved rollback stop before target writes
 7. Deactivate when done — this plugin has no business running permanently
 
 ## How it works
@@ -49,7 +49,9 @@ Turn it on in **WooCommerce → Settings → Advanced → Features**, set order 
 3. **Customers** — user accounts and guest checkouts
 4. **Orders** — recreates with correct product/customer references via ID map
 5. **Subscriptions** — maps billing cycles from WooCommerce Subscriptions (if present)
-6. **Coupons** — translates WooCommerce's discount logic to FluentCart's format
+6. **Coupons** — preserves applied order history; standalone definitions appear in the migration report but are not migrated yet
+
+WooCommerce and FluentCart do not model every feature the same way. CartShift does not pretend otherwise. A variation that shares its parent's WooCommerce stock is migrated active but unavailable, with zero FluentCart stock and backorders disabled. The original shared stock evidence is retained, and the guided report explains how to allocate it manually without multiplying inventory across variants.
 
 Each migrator extends `AbstractMigrator` and hands the orchestrator a batch at a time. Each mapper translates WooCommerce's... creative data structures into something a normal database would recognise.
 
@@ -58,7 +60,7 @@ Each migrator extends `AbstractMigrator` and hands the orchestrator a batch at a
 Three outcomes, and they mean different things:
 
 - **✗ Failure** — blocks. Migrating anyway would produce wrong or missing data. Missing WooCommerce, missing FluentCart, HPOS off, missing migration tables
-- **⚠ Warning** — proceeds. Something you should know: a modest memory limit, unsupported product types that will be skipped, FluentCart already holding data, a WooCommerce sync that hasn't caught up
+- **⚠ Warning** — proceeds. Something you should know: a modest memory limit, unsupported product types or standalone coupons that will be skipped, a WooCommerce sync that hasn't caught up
 - **✓ Pass** — nothing to say
 
 A warning is advice, not a veto. A low memory limit on a twenty-product store is fine, and pretending otherwise would just teach you to ignore the screen.
@@ -66,7 +68,8 @@ A warning is advice, not a veto. A low memory limit on a twenty-product store is
 ## The fine print
 
 - **Back up your database.** I shouldn't have to say this but here I am, saying it
-- **One-way trip.** There's no undo. That's the point — you're leaving WooCommerce
+- **No guessed undo.** The guided route does not write target records until it can prove a completed rehearsal can be rolled back exactly
+- **No silent approximation.** When target semantics differ, the report names the compromise, preserves the source evidence and gives the owner practical next steps
 - **Deactivate after.** This is a migration tool, not a roommate. It leaves when the job's done
 - **Uninstalling keeps your data.** The ID map is the only record of which WooCommerce row became which FluentCart row, and you will want it the week after you think you don't. Deleting the plugin leaves `{prefix}cartshift_id_map` and `{prefix}cartshift_migration_log` behind on purpose
 

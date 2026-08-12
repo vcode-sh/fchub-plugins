@@ -115,14 +115,6 @@ final class ProductCapabilityAssessorTest extends PluginTestCase
             'variations' => [ProductAssessmentFixture::variation($parent, ['identity' => $child])],
         ], ['custom_variation_attributes' => false], 'custom_attribute_renderer_unproved'];
 
-        yield 'parent-managed stock without shared owner' => [[
-            'productType' => 'variable',
-            'variations' => [ProductAssessmentFixture::variation($parent, [
-                'identity' => $child,
-                'stock' => new StockProfile(StockOwnership::Parent, $parent, 7, 'instock', 'no', false, null),
-            ])],
-        ], ['shared_parent_stock' => false], 'parent_stock_owner_unrepresentable'];
-
         yield 'scheduled sale without exact scheduler' => [[
             'variations' => [ProductAssessmentFixture::variation($parent, [
                 'price' => new \CartShift\Domain\Transfer\Product\PriceRecord(
@@ -142,6 +134,25 @@ final class ProductCapabilityAssessorTest extends PluginTestCase
                 'stock' => ProductAssessmentFixture::stock($parent, 'notify'),
             ])],
         ], ['backorders_notify' => false, 'backorders_yes' => true], 'backorders_notify_unproved'];
+    }
+
+    public function testParentManagedStockIsReadyForTheConservativeExceptionProjection(): void
+    {
+        $parent = ProductAssessmentFixture::identity('42');
+        $assessment = $this->assessor->assess(ProductAssessmentFixture::product([
+            'productType' => 'variable',
+            'variations' => [ProductAssessmentFixture::variation($parent, [
+                'identity' => ProductAssessmentFixture::identity('42:variation:101'),
+                'stock' => new StockProfile(StockOwnership::Parent, $parent, 7, 'instock', 'yes', false, 2),
+            ])],
+        ]), $this->context(capabilities: [
+            'shared_parent_stock' => false,
+            'backorders_yes' => false,
+            'backorders_notify' => false,
+        ]));
+
+        self::assertSame(AssessmentOutcome::Ready, $assessment->outcome);
+        self::assertSame(1, $assessment->context['stock_exception_count']);
     }
 
     public function testCustomAttributesPassOnlyWithRendererAndCartProof(): void

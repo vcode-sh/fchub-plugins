@@ -38,22 +38,16 @@ final class FluentCartSimpleVariationContract
             throw new SourceRecordException('target_shipping_class_missing', 'Source variation shipping class has no exact target mapping.');
         }
 
-        if ($record->stock->ownership === StockOwnership::Parent) {
-            throw new SourceRecordException(
-                'target_shared_stock_unavailable',
-                'Installed FluentCart simple variations have no quantity-bearing shared parent stock owner.',
-            );
-        }
-
-        if ($record->stock->backorders !== 'no') {
+        $parentStockException = $record->stock->ownership === StockOwnership::Parent;
+        if (!$parentStockException && $record->stock->backorders !== 'no') {
             throw new SourceRecordException(
                 'target_backorders_' . $record->stock->backorders . '_unavailable',
                 'Installed FluentCart stores a backorder flag but has no proved simple-variation purchase consumer.',
             );
         }
 
-        $managed = $record->stock->ownership === StockOwnership::Self;
-        if ($managed && $record->stock->quantity === null) {
+        $managed = in_array($record->stock->ownership, [StockOwnership::Self, StockOwnership::Parent], true);
+        if ($managed && !$parentStockException && $record->stock->quantity === null) {
             throw new SourceRecordException('target_schema_unrepresentable', 'Managed target stock requires an explicit quantity.');
         }
 
@@ -72,13 +66,31 @@ final class FluentCartSimpleVariationContract
             'source_price' => $record->price->toArray(),
             'source_stock_ownership' => $record->stock->ownership->value,
         ];
+        if ($parentStockException) {
+            $otherInfo['stock_migration_exception'] = [
+                'version' => 1,
+                'type' => 'shared_parent_stock',
+                'source_variation' => $record->identity->canonical(),
+                'source_stock' => $record->stock->toArray(),
+                'target_projection' => [
+                    'manage_stock' => 1,
+                    'total_stock' => 0,
+                    'available' => 0,
+                    'committed' => 0,
+                    'on_hold' => 0,
+                    'stock_status' => 'out-of-stock',
+                    'backorders' => 0,
+                ],
+                'requires_manual_resolution' => true,
+            ];
+        }
 
         if ($record->typeConfiguration !== []) {
             $otherInfo = [...$otherInfo, ...$this->subscriptionTerms($record->typeConfiguration)];
         }
 
         $paymentType = (string) $otherInfo['payment_type'];
-        $quantity = $managed ? (int) $record->stock->quantity : 0;
+        $quantity = $managed && !$parentStockException ? (int) $record->stock->quantity : 0;
         $comparePrice = $record->price->regularPrice !== null
             && $record->price->regularPrice > $record->price->activePrice
                 ? $record->price->regularPrice
@@ -90,7 +102,7 @@ final class FluentCartSimpleVariationContract
             'sold_individually' => $record->stock->soldIndividually ? 1 : 0,
             'manage_stock' => $managed ? 1 : 0,
             'payment_type' => $paymentType,
-            'stock_status' => match ($record->stock->status) {
+            'stock_status' => $parentStockException ? 'out-of-stock' : match ($record->stock->status) {
                 'instock' => 'in-stock',
                 'outofstock' => 'out-of-stock',
                 'onbackorder' => 'backorder',

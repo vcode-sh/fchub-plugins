@@ -1,0 +1,280 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CartShift\Domain\Transfer\SameSite;
+
+defined('ABSPATH') || exit;
+
+/**
+ * Every argument of a same-site transfer, computed instead of typed.
+ *
+ * The v2 contract asks an operator for sixteen things and an ordering, across
+ * two shells. Fifteen of the sixteen are only variable because the cross-runtime
+ * topology makes them variable — on one WordPress there is one role pair, one
+ * disk, one shop and one clock, so CartShift can answer them itself. This class
+ * is where it does.
+ *
+ * PURE, AND THAT IS LOAD-BEARING. No `$wpdb`, no options, no filesystem, no
+ * filters. State in, ordered verbs out. It is the object that decides what runs
+ * against somebody's shop, so it is the object that has to be exhaustively
+ * assertable rather than smoke-tested down one path.
+ *
+ * THE ORDERING IS NOT INVENTED HERE. `TransferRunState::canTransitionTo()` is
+ * the authority — Exported → Validated → Prepared → Staging → Staged →
+ * Reconciling → Reconciled → Promoted → CatalogueActivating → Completed — and
+ * the verb sequence below is the walk that produces it. Where that authority is
+ * silent, this class refuses rather than guesses; see `assertPlannable()`.
+ */
+final readonly class GuidedRunPlan
+{
+    private const string CONTEXT_REHEARSAL = 'rehearsal';
+    private const string CONTEXT_CUTOVER = 'cutover';
+
+    private const string DECISION_SET = 'decisions.json';
+
+    /**
+     * Verbs that exist and whose position in the sequence is not established by
+     * anything in this repository.
+     *
+     * @var list<string>
+     */
+    private const array UNPLANNED_SUBSCRIPTION_VERBS = [
+        'prepare-subscription-cutover',
+        'release-subscription-source',
+        'activate-subscriptions',
+    ];
+
+    private function __construct(
+        private string $sourceKey,
+        private string $workspace,
+        private string $operator,
+        private string $decidedAtUtc,
+        private GuidedEvidence $evidence,
+        private bool $includesSubscriptions,
+        private string $executionContext,
+        /** Null means every kind, which is what a shop moving to FluentCart means. */
+        private ?array $clauses,
+    ) {
+        // THE FORMAT IS NOT A PREFERENCE. `TransferDecisionProposalPipeline`
+        // refuses anything but ISO 8601 with the T and the Z, and it does so
+        // several steps into a run. Rejecting it here means a plan that exists
+        // is a plan whose timestamp its consumer will accept. Found against the
+        // mounted shop: this shipped as `Y-m-d H:i:s`, and the test asserted
+        // that same wrong shape — a test pinning a defect rather than catching it.
+        if (preg_match('/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/D', $decidedAtUtc) !== 1) {
+            throw new \InvalidArgumentException(
+                'A decision timestamp must be ISO 8601 UTC, as gmdate(\'Y-m-d\\TH:i:s\\Z\') produces. Given: '
+                . $decidedAtUtc,
+            );
+        }
+
+        if (trim($operator) === '') {
+            throw new \InvalidArgumentException('A decision needs an operator.');
+        }
+    }
+
+    /**
+     * @param array<string, string>|null $clauses Lower-level selection override. Null is every supported kind.
+     */
+    public static function rehearsal(
+        string $sourceKey,
+        string $workspace,
+        string $operator,
+        string $decidedAtUtc,
+        GuidedEvidence $evidence,
+        bool $includesSubscriptions,
+        ?array $clauses = null,
+    ): self {
+        return new self(
+            $sourceKey,
+            $workspace,
+            $operator,
+            $decidedAtUtc,
+            $evidence,
+            $includesSubscriptions,
+            self::CONTEXT_REHEARSAL,
+            $clauses,
+        );
+    }
+
+    /**
+     * A cutover, which exists only downstream of a rehearsal that finished.
+     *
+     * The proof is the parameter, so skipping the rehearsal is not a decision an
+     * operator can take — there is nothing to pass.
+     *
+     * @param array<string, string>|null $clauses
+     */
+    public static function cutover(
+        string $sourceKey,
+        string $workspace,
+        string $operator,
+        string $decidedAtUtc,
+        GuidedEvidence $evidence,
+        RehearsalProof $proof,
+        bool $includesSubscriptions = false,
+        ?array $clauses = null,
+    ): self {
+        return new self(
+            $sourceKey,
+            $workspace,
+            $operator,
+            $decidedAtUtc,
+            $evidence,
+            $includesSubscriptions,
+            self::CONTEXT_CUTOVER,
+            $clauses,
+        );
+    }
+
+    public function includesSubscriptions(): bool
+    {
+        return $this->includesSubscriptions;
+    }
+
+    /**
+     * Why subscriptions are not in this plan, or null when they are.
+     *
+     * An absent add-on is a capability that is not here. It is never a
+     * subscription selection that came back empty, and the two must not be
+     * spelled the same way anywhere a person can read them.
+     */
+    public function subscriptionsSkippedReason(): ?string
+    {
+        return $this->includesSubscriptions ? null : 'wc_subscriptions_inactive';
+    }
+
+    /**
+     * The whole run, in order.
+     *
+     * @return list<GuidedStep>
+     */
+    public function steps(): array
+    {
+        $this->assertPlannable();
+
+        $decisionSet = $this->workspace . '/' . self::DECISION_SET;
+        $packageDestination = $this->workspace . '/guided-packages/' . substr(hash(
+            'sha256',
+            $this->sourceKey . '|' . $this->operator . '|' . $this->decidedAtUtc,
+        ), 0, 24);
+
+        return [
+            $this->step('compatibility', ['role' => 'source']),
+            $this->step('compatibility', ['role' => 'target']),
+            // THE AUDIT READS THE DECISIONS TOO.
+            // Without `--decision-set` it judges the shop as if nobody had
+            // decided anything, so the nine order-note findings the owner has
+            // just accepted still read as blockers and `export` refuses with
+            // "a selected record did not pass source assessment". The CLI takes
+            // the same optional flag; omitting it here made acceptance
+            // invisible to the very step that gates on it. Found by running the
+            // whole rehearsal, not by any assertion.
+            $this->step('audit', [
+                'role' => 'source',
+                'source-key' => $this->sourceKey,
+            ] + $this->selection() + ['decision-set' => $decisionSet]),
+            $this->step('propose-decisions', [
+                'role' => 'source',
+                'source-key' => $this->sourceKey,
+            ] + $this->selection() + [
+                'decision-set' => $decisionSet,
+                'operator' => $this->operator,
+                'decided-at' => $this->decidedAtUtc,
+            ]),
+            $this->step('export', [
+                'role' => 'source',
+                'source-key' => $this->sourceKey,
+            ] + $this->selection() + [
+                'decision-set' => $decisionSet,
+                'destination' => $packageDestination,
+            ]),
+            $this->step('validate-package', [
+                'role' => 'target',
+                'decision-set' => $decisionSet,
+            ], ['package']),
+            $this->step('prepare', [
+                'role' => 'target',
+            ], ['package'], [
+                'decision-set' => $decisionSet,
+                'private-dir' => $this->workspace,
+                'execution-context' => $this->executionContext,
+            ]),
+            ...array_map(
+                fn (string $verb): GuidedStep => $this->step(
+                    $verb,
+                    ['role' => 'target'],
+                    ['package', 'descriptor', 'confirm'],
+                    ['execution-context' => $this->executionContext],
+                ),
+                ['stage', 'reconcile', 'promote', 'activate-catalogue', 'complete'],
+            ),
+        ];
+    }
+
+    /**
+     * Refuse the part that is not written yet, by name.
+     *
+     * The state machine fixes the commerce ordering exactly and says nothing
+     * about where the three subscription verbs belong. Emitting a plausible
+     * order would be an invention that migrates real subscribers; omitting them
+     * quietly would be the empty-dataset defect wearing a wizard. Neither is
+     * available, so a shop with subscriptions stops here with a code that names
+     * the missing work.
+     */
+    private function assertPlannable(): void
+    {
+        if ($this->includesSubscriptions) {
+            throw new \RuntimeException(sprintf(
+                'guided_subscription_sequence_unplanned: this shop has WooCommerce Subscriptions, and the '
+                . 'position of %s in the transfer sequence is not established by anything CartShift can read. '
+                . 'Migrate it through the WP-CLI transfer contract until it is.',
+                implode(', ', self::UNPLANNED_SUBSCRIPTION_VERBS),
+            ));
+        }
+    }
+
+    /**
+     * All supported commerce kinds, with the captured subscription mode made
+     * explicit so a later plugin activation cannot widen an in-flight run.
+     *
+     * @return array<string, string|true>
+     */
+    private function selection(): array
+    {
+        return $this->clauses ?? [
+            'all-kinds' => true,
+            'subscriptions' => $this->includesSubscriptions ? 'all' : 'none',
+        ];
+    }
+
+    /**
+     * @param array<string, string|true> $leading
+     * @param list<string> $needs Evidence options, supplied when it has arrived.
+     * @param array<string, string|true> $trailing
+     */
+    private function step(string $verb, array $leading, array $needs = [], array $trailing = []): GuidedStep
+    {
+        $resolved = [];
+        $pending = [];
+
+        foreach ($needs as $option) {
+            $value = match ($option) {
+                'package' => $this->evidence->packagePath,
+                'descriptor' => $this->evidence->descriptor,
+                'confirm' => $this->evidence->selectionFingerprint,
+            };
+
+            $value === null ? $pending[] = $option : $resolved[$option] = $value;
+        }
+
+        sort($pending);
+
+        return new GuidedStep(
+            $verb,
+            [...$leading, ...$resolved, ...$trailing, 'format' => 'json'],
+            $pending,
+        );
+    }
+}

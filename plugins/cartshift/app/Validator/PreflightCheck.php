@@ -114,6 +114,7 @@ final class PreflightCheck
      */
     public function __construct(
         private readonly RuntimeSymbols $symbols = new LoadedRuntimeSymbols(),
+        private readonly bool $rememberAdvisoryCounts = true,
     ) {
     }
 
@@ -596,7 +597,10 @@ final class PreflightCheck
         $ordersAffected = 0;
 
         if ($hasWarning) {
-            $ordersAffected = self::countOrdersAffectedByTypes(array_keys($unsupported));
+            $ordersAffected = self::countOrdersAffectedByTypes(
+                array_keys($unsupported),
+                $this->rememberAdvisoryCounts,
+            );
             $totalOrders    = self::countMigratableOrders();
 
             $typeNames = implode(', ', array_map(
@@ -754,7 +758,7 @@ final class PreflightCheck
      *
      * @param list<string> $slugs
      */
-    public static function countOrdersAffectedByTypes(array $slugs): int
+    public static function countOrdersAffectedByTypes(array $slugs, bool $remember = true): int
     {
         if ($slugs === []) {
             return 0;
@@ -792,7 +796,9 @@ final class PreflightCheck
 
         $count = (int) $wpdb->get_var($sql);
 
-        self::rememberOrdersAffected($slugs, $count);
+        if ($remember) {
+            self::rememberOrdersAffected($slugs, $count);
+        }
 
         return $count;
     }

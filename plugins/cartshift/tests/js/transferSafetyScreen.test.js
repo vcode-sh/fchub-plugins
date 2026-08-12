@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
-import { h, inject, ref } from 'vue';
+import { ref } from 'vue';
 
 const { apiMock, clipboardMock } = vi.hoisted(() => ({
   apiMock: vi.fn(),
@@ -310,25 +310,22 @@ describe('TransferSafetyScreen on a site with no transfer source key', () => {
 });
 
 describe('TransferSafetyScreen mounting', () => {
-  it('the app mounts only the safety surface, not the legacy wizard', async () => {
+  /**
+   * The app now mounts the guided screen; this one is what the guided screen
+   * shows a cross-runtime shop, where a package really does have to be carried
+   * between two WordPress installs. The retired wizard stays unmounted either
+   * way — that was the point of the original assertion and it still holds.
+   */
+  it('the app mounts the guided surface, not the legacy wizard', async () => {
     const { default: App } = await import('@/App.vue');
-    const ThemeProbe = {
-      setup() {
-        const theme = inject('theme');
-
-        return () => h('div', { 'data-test': 'transfer-safety' }, theme?.themeMode?.value ?? 'missing');
-      },
-    };
     const wrapper = mount(App, {
       global: {
-        stubs: {
-          TransferSafetyScreen: ThemeProbe,
-        },
+        provide: { config: {}, theme: { themeMode: ref('light'), changeTheme: vi.fn() } },
+        stubs: { GuidedMigrationScreen: { template: '<div data-test="guided" />' } },
       },
     });
 
-    expect(wrapper.find('[data-test="transfer-safety"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="transfer-safety"]').text()).not.toBe('missing');
+    expect(wrapper.find('[data-test="guided"]').exists()).toBe(true);
     expect(wrapper.findComponent({ name: 'PreflightScreen' }).exists()).toBe(false);
     expect(wrapper.findComponent({ name: 'ProgressScreen' }).exists()).toBe(false);
     expect(wrapper.findComponent({ name: 'ResultsScreen' }).exists()).toBe(false);

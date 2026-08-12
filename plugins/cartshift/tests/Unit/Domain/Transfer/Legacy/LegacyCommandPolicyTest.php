@@ -57,6 +57,22 @@ final class LegacyCommandPolicyTest extends PluginTestCase
         self::assertSame(['none'], LegacyCommandPolicy::effectsFor('rest:POST:cartshift/v1/preview'));
         self::assertContains('configuration_option', LegacyCommandPolicy::effectsFor('rest:POST:cartshift/v1/subscriptions/packages/prepare'));
         self::assertContains('scheduled_actions', LegacyCommandPolicy::effectsFor('action:' . BatchProcessor::hookName()));
+        self::assertSame(
+            ['id_map', 'journal', 'private_files', 'target_commerce_rows', 'wordpress_files'],
+            LegacyCommandPolicy::effectsFor('rest:POST:cartshift/v1/migration/start'),
+        );
+        self::assertSame(
+            ['private_files'],
+            LegacyCommandPolicy::effectsFor('rest:POST:cartshift/v1/migration/cancel'),
+        );
+        self::assertSame(
+            ['private_files'],
+            LegacyCommandPolicy::effectsFor('rest:POST:cartshift/v1/migration/setup-lines'),
+        );
+        self::assertSame(
+            ['id_map', 'journal', 'private_files', 'target_commerce_rows', 'wordpress_files'],
+            LegacyCommandPolicy::effectsFor('rest:POST:cartshift/v1/migration/rollback'),
+        );
         self::assertSame([], array_filter(
             array_keys($GLOBALS['_cartshift_test_actions']),
             static fn (string $hook): bool => str_starts_with($hook, 'wp_ajax_'),

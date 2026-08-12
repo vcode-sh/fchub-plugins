@@ -205,13 +205,18 @@ final class ProductReconciler
         }
 
         $variationIds = [];
+        $cartableVariationIds = [];
         foreach ($plan->variations as $variation) {
             $targetVariationId = $sourceMap[$variation->sourceVariation->canonical()] ?? null;
             if (is_int($targetVariationId)) {
                 $variationIds[] = $targetVariationId;
+                if (!isset($variation->targetOtherInfo['stock_migration_exception'])) {
+                    $cartableVariationIds[] = $targetVariationId;
+                }
             }
         }
         sort($variationIds);
+        sort($cartableVariationIds);
         $behaviour = $this->gateway->behaviour($targetId, $variationIds);
         if (!$plan->historicalPlaceholder && ($behaviour['buy_section_rendered'] ?? false) !== true) {
             $failures[] = 'buy_section_missing';
@@ -224,7 +229,8 @@ final class ProductReconciler
         $checkout = array_values(array_map('intval', (array) ($behaviour['checkout_object_ids'] ?? [])));
         sort($cartable);
         sort($checkout);
-        if (!$plan->historicalPlaceholder && ($cartable !== $variationIds || $checkout !== $variationIds)) {
+        if (!$plan->historicalPlaceholder
+            && ($cartable !== $cartableVariationIds || $checkout !== $cartableVariationIds)) {
             $failures[] = 'variation_not_cartable_exactly_once';
         }
         if ($plan->historicalPlaceholder && ($cartable !== [] || $checkout !== [])) {

@@ -5,7 +5,13 @@ declare(strict_types=1);
 namespace CartShift\Tests\Unit\Domain\Transfer\Product;
 
 use CartShift\Domain\Transfer\Product\FluentCartProductWriter;
+use CartShift\Domain\Transfer\Product\ProductAssessmentContext;
+use CartShift\Domain\Transfer\Product\ProductFieldDecisionSet;
+use CartShift\Domain\Transfer\Product\ProductFieldDisposition;
 use CartShift\Domain\Transfer\Product\ProductReconciler;
+use CartShift\Domain\Transfer\Product\ProductStagePlan;
+use CartShift\Domain\Transfer\Product\StockOwnership;
+use CartShift\Domain\Transfer\Product\StockProfile;
 use CartShift\Domain\Transfer\StageContext;
 use CartShift\Tests\Unit\PluginTestCase;
 
@@ -120,6 +126,68 @@ final class ProductReconcilerTest extends PluginTestCase
 
         self::assertFalse($reconciled->matches);
         self::assertContains('variation_source_cardinality_mismatch', $reconciled->failures);
+    }
+
+    public function testParentStockVariationMustStayUncartableWhileItsOrdinarySiblingStillWorks(): void
+    {
+        $parent = ProductAssessmentFixture::identity('42');
+        $shared = ProductAssessmentFixture::identity('42:variation:101');
+        $ordinary = ProductAssessmentFixture::identity('42:variation:102');
+        $record = ProductAssessmentFixture::product([
+            'productType' => 'variable',
+            'variations' => [
+                ProductAssessmentFixture::variation($parent, [
+                    'identity' => $shared,
+                    'stock' => new StockProfile(StockOwnership::Parent, $parent, 11, 'instock', 'yes', false, 2),
+                ]),
+                ProductAssessmentFixture::variation($parent, [
+                    'identity' => $ordinary,
+                    'stock' => new StockProfile(StockOwnership::Self, $ordinary, 5, 'instock', 'no', false, 2),
+                ]),
+            ],
+        ]);
+        $plan = ProductStagePlan::build($record, new ProductAssessmentContext(
+            ['standard', 'none'],
+            [],
+            ProductFieldDecisionSet::all(ProductFieldDisposition::Migrate),
+            targetShippingClasses: ['none' => 0],
+        ));
+        $gateway = new InMemoryProductTargetGateway();
+        $maps = new InMemoryCheckedMappingStore();
+        $writer = new FluentCartProductWriter($gateway, $maps, new ProductReconciler($gateway, $maps));
+
+        $result = $writer->stage($plan, $this->context());
+        $sharedId = $maps->get($shared)?->targetId;
+        $ordinaryId = $maps->get($ordinary)?->targetId;
+
+        self::assertIsInt($sharedId);
+        self::assertIsInt($ordinaryId);
+        self::assertSame(1, $plan->detailFields['manage_stock']);
+        self::assertSame('out-of-stock', $gateway->variations[$sharedId]['stock_status']);
+        self::assertSame(0, $gateway->variations[$sharedId]['available']);
+        self::assertArrayHasKey('stock_migration_exception', $gateway->variations[$sharedId]['other_info']);
+        self::assertNotContains($sharedId, $gateway->behaviour($result->targetId, $result->variationIds)['cartable_variation_ids']);
+        self::assertContains($ordinaryId, $gateway->behaviour($result->targetId, $result->variationIds)['cartable_variation_ids']);
+
+        $gateway->cartableOverride = [$sharedId, $ordinaryId];
+        $gateway->checkoutOverride = [$sharedId, $ordinaryId];
+        $unsafe = (new ProductReconciler($gateway, $maps))->reconcile(
+            $plan,
+            $result->targetId,
+            $result->targetFingerprint,
+        );
+
+        self::assertFalse($unsafe->matches);
+        self::assertContains('variation_not_cartable_exactly_once', $unsafe->failures);
+
+        $gateway->cartableOverride = null;
+        $gateway->checkoutOverride = null;
+        $gateway->details[$result->targetId]['manage_stock'] = 0;
+        self::assertContains(
+            $sharedId,
+            $gateway->behaviour($result->targetId, $result->variationIds)['cartable_variation_ids'],
+            'The test gateway must model FluentCart requiring product-level stock management.',
+        );
     }
 
     /** @return array{InMemoryProductTargetGateway, InMemoryCheckedMappingStore, FluentCartProductWriter, \CartShift\Domain\Transfer\Product\ProductStagePlan} */

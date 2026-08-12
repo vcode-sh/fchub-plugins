@@ -97,7 +97,10 @@ final readonly class ProductStagePlan
             'max_price' => max($prices),
             'default_variation_id' => 0,
             'variation_type' => FluentCartSimpleVariationContract::VARIATION_TYPE,
-            'stock_availability' => 'in-stock',
+            'stock_availability' => array_filter(
+                $variations,
+                static fn (SimpleVariationPlan $plan): bool => $plan->targetFields['stock_status'] !== 'out-of-stock',
+            ) === [] ? 'out-of-stock' : 'in-stock',
             'other_info' => [
                 'group_pricing_by' => 'none',
                 'source_identity' => $record->identity->canonical(),
@@ -124,7 +127,10 @@ final readonly class ProductStagePlan
                 'field_registry_version' => $record->fieldRegistryVersion,
             ],
             'default_media' => [],
-            'manage_stock' => 0,
+            'manage_stock' => array_filter(
+                $variations,
+                static fn (SimpleVariationPlan $plan): bool => $plan->targetFields['manage_stock'] === 1,
+            ) === [] ? 0 : 1,
             'manage_downloadable' => $downloads === [] ? 0 : 1,
         ];
         $sourceFingerprint = $record->envelope()->privateContentDigest;
@@ -180,6 +186,7 @@ final readonly class ProductStagePlan
             );
         }
         $detail = $this->detailFields;
+        $detail['manage_stock'] = 1;
         $detail['other_info']['historical_placeholder'] = true;
         $detail['other_info']['historical_line_shape'] = $historicalLineShape;
         $product = $this->productFields;

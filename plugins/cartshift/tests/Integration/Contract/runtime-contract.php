@@ -220,6 +220,22 @@ if ($case === 'woo-product-source-matrix') {
             ),
         ),
     );
+    $parentStockVariation = array_values(array_filter(
+        $records['stock_parent']->variations,
+        static fn ($variation): bool => $variation->stock->ownership
+            === \CartShift\Domain\Transfer\Product\StockOwnership::Parent,
+    ))[0] ?? throw new RuntimeException('Parent-stock variation fixture is missing.');
+    $parentStockProjection = (new \CartShift\Domain\Transfer\Product\FluentCartSimpleVariationContract())->baseline(
+        $parentStockVariation,
+        new \CartShift\Domain\Transfer\Product\ProductAssessmentContext(
+            ['standard', 'none'],
+            [],
+            \CartShift\Domain\Transfer\Product\ProductFieldDecisionSet::all(
+                \CartShift\Domain\Transfer\Product\ProductFieldDisposition::Migrate,
+            ),
+            targetShippingClasses: [$parentStockVariation->shippingClassSlug => 0],
+        ),
+    );
 
     $simplePrice = $records['simple']->variations[0]->price;
     $blankPrice = $records['blank']->variations[0]->price;
@@ -342,7 +358,21 @@ if ($case === 'woo-product-source-matrix') {
         'stock_modes' => $stockModes,
         'source_stock_values' => $sourceStockValues,
         'parent_stock_quantity' => $records['stock_parent']->stock->quantity,
-        'parent_stock_block_reason' => $parentStockAssessment->reasonCode,
+        'parent_stock_assessment' => [
+            'outcome' => $parentStockAssessment->outcome->value,
+            'reason' => $parentStockAssessment->reasonCode,
+            'exception_count' => $parentStockAssessment->context['stock_exception_count'] ?? null,
+        ],
+        'parent_stock_projection' => [
+            'manage_stock' => $parentStockProjection['manage_stock'],
+            'total_stock' => $parentStockProjection['total_stock'],
+            'available' => $parentStockProjection['available'],
+            'committed' => $parentStockProjection['committed'],
+            'on_hold' => $parentStockProjection['on_hold'],
+            'stock_status' => $parentStockProjection['stock_status'],
+            'backorders' => $parentStockProjection['backorders'],
+            'exception' => $parentStockProjection['other_info']['stock_migration_exception'] ?? null,
+        ],
         'variation_assets' => $variationAssets,
         'positive_day_expiry_reason' => $downloadPolicyReason,
         'unsupported' => $unsupported,

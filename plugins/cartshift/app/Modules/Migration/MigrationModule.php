@@ -34,6 +34,7 @@ final class MigrationModule implements ModuleInterface
         \CartShift\Http\Controllers\MappingController::class,
         \CartShift\Http\Controllers\SubscriptionAuditController::class,
         \CartShift\Http\Controllers\SubscriptionPackageController::class,
+        \CartShift\Http\Controllers\GuidedMigrationController::class,
     ];
 
     #[\Override]

@@ -111,9 +111,12 @@ final class TransferCommand
             return;
         }
 
-        $report = (new TransferRuntimeProbe())->inspect($role);
+        $probe = new TransferRuntimeProbe();
+        $report = $probe->inspect($role);
         $document = [
             'role' => $report->role,
+            // Beside the fingerprint, never inside it. See TransferRuntimeProbe::topology().
+            'topology' => $probe->topology()->value,
             'runtime_fingerprint' => $report->fingerprint,
             'ready' => $report->isReady(),
             'versions' => $report->versions,

@@ -1003,10 +1003,19 @@ final class InMemoryProductTargetGateway implements ProductTargetGateway
 
     public function behaviour(int $productId, array $variationIds): array
     {
+        $productManagesStock = ($this->details[$productId]['manage_stock'] ?? 0) === 1;
+        $cartable = array_values(array_filter(
+            $variationIds,
+            fn (int $variationId): bool => isset($this->variations[$variationId])
+                && (!$productManagesStock
+                    || ($this->variations[$variationId]['manage_stock'] ?? 0) !== 1
+                    || ($this->variations[$variationId]['stock_status'] ?? null) !== 'out-of-stock'),
+        ));
+
         return [
             'buy_section_rendered' => $this->buySectionRendered,
-            'cartable_variation_ids' => $this->cartableOverride ?? array_values($variationIds),
-            'checkout_object_ids' => $this->checkoutOverride ?? array_values($variationIds),
+            'cartable_variation_ids' => $this->cartableOverride ?? $cartable,
+            'checkout_object_ids' => $this->checkoutOverride ?? $cartable,
             'rendered_media_hashes' => array_column($this->media[$productId] ?? [], 'sha256'),
             'readable_download_hashes' => array_column($this->downloads, 'sha256'),
         ];

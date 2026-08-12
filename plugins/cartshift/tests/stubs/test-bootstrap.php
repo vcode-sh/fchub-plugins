@@ -23,7 +23,7 @@ if (!defined('OBJECT')) {
 // test ever asserts on this value, have it read cartshift.php's source rather
 // than this constant, as MigrationsTest::testTheTwoVersionConstantsAgree does.
 if (!defined('CARTSHIFT_VERSION')) {
-    define('CARTSHIFT_VERSION', '1.5.0');
+    define('CARTSHIFT_VERSION', '1.5.1');
 }
 
 if (!defined('CARTSHIFT_PLUGIN_PATH')) {
@@ -126,6 +126,13 @@ if (!function_exists('rest_url')) {
     }
 }
 
+if (!function_exists('get_current_user_id')) {
+    function get_current_user_id(): int
+    {
+        return (int) ($GLOBALS['_cartshift_test_current_user_id'] ?? 1);
+    }
+}
+
 if (!function_exists('get_option')) {
     function get_option(string $option, mixed $default = false): mixed
     {
@@ -137,6 +144,21 @@ if (!function_exists('update_option')) {
     function update_option(string $option, mixed $value, ?bool $autoload = null): bool
     {
         $GLOBALS['_cartshift_test_options'][$option] = $value;
+        return true;
+    }
+}
+
+if (!function_exists('add_option')) {
+    function add_option(string $option, mixed $value, string $deprecated = '', ?bool $autoload = null): bool
+    {
+        if (isset($GLOBALS['_cartshift_test_add_option_callback'])) {
+            return (bool) ($GLOBALS['_cartshift_test_add_option_callback'])($option, $value);
+        }
+        if (array_key_exists($option, $GLOBALS['_cartshift_test_options'])) {
+            return false;
+        }
+        $GLOBALS['_cartshift_test_options'][$option] = $value;
+
         return true;
     }
 }

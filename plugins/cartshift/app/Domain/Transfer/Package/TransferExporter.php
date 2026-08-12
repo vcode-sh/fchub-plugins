@@ -58,7 +58,13 @@ final readonly class TransferExporter
         $closure = $this->closureResolver->resolve($selection, $roots, $lookup, $reverseLookup);
         $validated = (new TransferDependencyGraph())->validate($closure->records, $decisions);
         if (!$validated->closed) {
-            throw new SourceRecordException('dependency_graph_blocked', 'Export dependency graph or decision set is invalid.');
+            // NAME THE REASONS. The closure already computed why it is open;
+            // discarding them left "invalid" with nothing to act on, which is
+            // the same unactionable shape the per-record refusal below had.
+            throw new SourceRecordException('dependency_graph_blocked', sprintf(
+                'Export dependency graph or decision set is invalid: %s.',
+                implode(', ', $validated->reasonCodes) ?: 'no reason reported',
+            ));
         }
         $context = new AssessmentContext([
             'selection_fingerprint' => $closure->rootSelectionFingerprint,
@@ -74,7 +80,17 @@ final readonly class TransferExporter
             }
             $assessment = $assessor->assess($record, $context);
             if (!in_array($assessment->outcome, [AssessmentOutcome::Ready, AssessmentOutcome::Linked], true)) {
-                throw new SourceRecordException('record_blocked', 'A selected record did not pass source assessment.');
+                // NAME THE RECORD. The assessment already knows which row it is
+                // and why it stopped; discarding both left an operator with
+                // "a selected record" and no way to find it among thousands.
+                // The identity is a source key, kind and ID — the same triple
+                // every other refusal in the transfer contract reports.
+                throw new SourceRecordException('record_blocked', sprintf(
+                    'Source record %s did not pass source assessment: %s (%s).',
+                    $record->identity->canonical(),
+                    $assessment->reasonCode,
+                    $assessment->outcome->value,
+                ));
             }
         }
 

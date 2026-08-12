@@ -12,6 +12,70 @@ use CartShift\Tests\Unit\PluginTestCase;
 
 final class TransferDecisionSetTest extends PluginTestCase
 {
+    public function testRemovingOneAuditFindingPreservesEveryOtherDecisionScope(): void
+    {
+        $set = TransferDecisionSet::fromArray([
+            [
+                'identity' => 'shop-alpha:order:42',
+                'scope' => 'audit_finding',
+                'finding_code' => 'order_note_visibility_decision_required',
+                'action' => 'approve_mapping',
+                'note_policy' => 'preserve_history_select_canonical',
+                'note_count' => 1,
+                'customer_visible_note_count' => 0,
+                'source_fingerprint' => str_repeat('a', 64),
+                'operator' => 'owner',
+                'reason' => 'Old audit evidence.',
+                'decided_at' => '2026-08-11T01:00:00Z',
+            ],
+            [
+                'identity' => 'shop-alpha:product:9',
+                'action' => 'activate_catalogue',
+                'target_status' => 'publish',
+                'source_fingerprint' => str_repeat('b', 64),
+                'operator' => 'owner',
+                'reason' => 'Keep this record decision.',
+                'decided_at' => '2026-08-11T01:00:00Z',
+            ],
+        ]);
+
+        $without = $set->withoutAuditFindings([
+            'shop-alpha:order:42|order_note_visibility_decision_required',
+        ]);
+
+        self::assertSame([], $without->auditFindings());
+        self::assertNotNull($without->for(new SourceIdentity('shop-alpha', 'product', '9')));
+    }
+
+    public function testRemovingOneRecordPreservesAuditAndTargetScopes(): void
+    {
+        $record = [
+            'identity' => 'shop-alpha:product:9',
+            'action' => 'activate_catalogue',
+            'target_status' => 'publish',
+            'source_fingerprint' => str_repeat('a', 64),
+            'operator' => 'owner',
+            'reason' => 'Replace only this record.',
+            'decided_at' => '2026-08-11T01:00:00Z',
+        ];
+        $audit = [
+            'identity' => 'shop-alpha:product:9',
+            'scope' => 'audit_finding',
+            'finding_code' => 'product_lookup_missing',
+            'action' => 'excluded_by_policy',
+            'source_fingerprint' => str_repeat('b', 64),
+            'operator' => 'owner',
+            'reason' => 'Keep this audit decision.',
+            'decided_at' => '2026-08-11T01:00:00Z',
+        ];
+        $set = TransferDecisionSet::fromArray([$record, $audit]);
+
+        $without = $set->withoutRecords(['shop-alpha:product:9']);
+
+        self::assertNull($without->for(new SourceIdentity('shop-alpha', 'product', '9')));
+        self::assertEquals([$audit], $without->rows());
+    }
+
     public function testPrivateCanonicalDecisionFileRoundTripsAndChangedOrderingIsRejected(): void
     {
         $path = sys_get_temp_dir() . '/cartshift-decisions-' . bin2hex(random_bytes(8)) . '.json';

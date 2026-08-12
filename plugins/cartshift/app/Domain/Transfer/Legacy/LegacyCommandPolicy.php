@@ -88,6 +88,25 @@ final readonly class LegacyCommandPolicy
         foreach (['decide', 'bulk', 'clear'] as $route) {
             $add('rest:POST:cartshift/v1/mapping/' . $route, ['mapping_decisions'], 'mapping');
         }
+        // The guided screen's only surface. It reads the runtime, the setup
+        // constants and — when asked — the source audit, and writes nothing at
+        // all; `GuidedMigrationControllerTest` proves that under the same guard
+        // the subscription audit uses.
+        $add('rest:GET:cartshift/v1/migration/status', ['none']);
+        $add('rest:POST:cartshift/v1/migration/setup-lines', ['private_files']);
+        $add('rest:POST:cartshift/v1/migration/start', [
+            'id_map', 'journal', 'private_files', 'target_commerce_rows', 'wordpress_files',
+        ]);
+        $add('rest:POST:cartshift/v1/migration/cancel', ['private_files']);
+        $add('rest:POST:cartshift/v1/migration/rollback', [
+            'id_map', 'journal', 'private_files', 'target_commerce_rows', 'wordpress_files',
+        ]);
+        // Minting the site's transfer source key. One explicit option write,
+        // once; merely opening the guided screen remains read-only.
+        $add('rest:POST:cartshift/v1/migration/initialise', ['configuration_option']);
+        // The owner's acceptance of a decision proposal, written to the
+        // private workspace. It writes a file and nothing else.
+        $add('rest:POST:cartshift/v1/migration/decisions', ['private_files']);
         $add('rest:GET:cartshift/v1/subscriptions/audit', ['none']);
         $add('rest:GET:cartshift/v1/subscriptions/audit/records', ['none']);
         $add('rest:GET:cartshift/v1/subscriptions/packages', ['none']);
