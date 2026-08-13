@@ -56,11 +56,11 @@
       ],
       "docs_path": "/docs/fchub-memberships",
       "admin_path": "admin.php?page=fchub-memberships",
-      "version": "1.4.5",
+      "version": "1.4.6",
       "docs_url": "https://fchub.co/docs/fchub-memberships",
-      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.5",
-      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-memberships/v1.4.5/fchub-memberships-1.4.5.zip",
-      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-memberships/v1.4.5/fchub-memberships-1.4.5.zip.sha256"
+      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.6",
+      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-memberships/v1.4.6/fchub-memberships-1.4.6.zip",
+      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-memberships/v1.4.6/fchub-memberships-1.4.6.zip.sha256"
     },
     "fchub-portal-extender": {
       "name": "Portal Extender",
