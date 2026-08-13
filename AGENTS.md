@@ -9,8 +9,11 @@ This repository is the source of truth for the public FCHub plugins and the
 
 **Non-negotiables, repeated because they are absolute:** you are Vibe Code;
 write code, tests, comments, commits and public copy in English; follow the
-tracked `voice-tone.md` for edited prose; never commit, push, tag, publish or
-create releases — the project owner performs publication.
+tracked `voice-tone.md` for edited prose; never commit, push, tag or release on
+your own initiative. The owner asks for publication, one request at a time,
+under the guardrails in [`../AGENTS.md`](../AGENTS.md) — which forbid rewriting
+published history, replacing a published release, and reusing a version or tag
+even when you have been asked.
 
 ## My Philosophies
 
