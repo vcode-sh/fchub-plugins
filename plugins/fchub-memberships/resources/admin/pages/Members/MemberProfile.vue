@@ -48,9 +48,11 @@
             :options="accessCheck.options.value"
             :selected="accessCheck.selected.value"
             :result="accessCheck.result.value"
+            :empty-text="accessCheck.emptyText.value"
             :searching="accessCheck.searching.value"
             :checking="accessCheck.checking.value"
             :search="accessCheck.search"
+            :browse="accessCheck.browse"
             @check="accessCheck.check"
             @update:selected="accessCheck.selected.value = $event"
           />

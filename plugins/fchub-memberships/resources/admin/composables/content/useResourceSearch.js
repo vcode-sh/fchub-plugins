@@ -77,12 +77,11 @@ export function useResourceSearch({
     timer = setTimer(() => run(next), searchDelay)
   }
 
-  // Opening the dropdown is already the member's deliberate act; making them
-  // watch a 250ms spinner for a cached list would be a lie.
+  // Opening the dropdown is already the member's deliberate act, so the recent
+  // list loads without waiting out a debounce it does not need. Typing can beat
+  // the open event, so a query already on its way always wins.
   function browse() {
-    if (timer) clearTimer(timer)
-    timer = null
-    query.value = ''
+    if (timer || query.value) return undefined
     loading.value = true
     error.value = ''
     return run('')

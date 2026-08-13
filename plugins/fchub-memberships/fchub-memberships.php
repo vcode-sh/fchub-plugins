@@ -3,7 +3,7 @@
  * Plugin Name: FCHub Memberships
  * Plugin URI: https://fchub.co/docs/fchub-memberships
  * Description: Membership workspace for FluentCart with guided plans, protected content, member care, automation, integrations, and reporting
- * Version: 1.4.5
+ * Version: 1.4.6
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -11,7 +11,7 @@
  * Text Domain: fchub-memberships
  * Domain Path: /languages
  * Requires at least: 7.0
- * Tested up to:    7.0
+ * Tested up to:    7.0.4
  * Requires PHP: 8.3
  * Requires Plugins: fluent-cart
  * Update URI: https://fchub.co/fchub-memberships
@@ -19,7 +19,7 @@
 
 defined('ABSPATH') || exit;
 
-defined('FCHUB_MEMBERSHIPS_VERSION') || define('FCHUB_MEMBERSHIPS_VERSION', '1.4.5');
+defined('FCHUB_MEMBERSHIPS_VERSION') || define('FCHUB_MEMBERSHIPS_VERSION', '1.4.6');
 defined('FCHUB_MEMBERSHIPS_FILE') || define('FCHUB_MEMBERSHIPS_FILE', __FILE__);
 defined('FCHUB_MEMBERSHIPS_PATH') || define('FCHUB_MEMBERSHIPS_PATH', plugin_dir_path(__FILE__));
 defined('FCHUB_MEMBERSHIPS_URL') || define('FCHUB_MEMBERSHIPS_URL', plugin_dir_url(__FILE__));

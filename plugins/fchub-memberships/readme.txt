@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, memberships, content-restriction, subscriptions, ecommerce
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.4.5
+Stable tag: 1.4.6
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -111,35 +111,7 @@ When reporting a problem, include the WordPress, PHP, FluentCart and FCHub Membe
 
 == Changelog ==
 
-= 1.4.5 =
+The full, readable release history lives in CHANGELOG.md in the source
+repository, which is where it is written and where it stays complete:
 
-* Restored GitHub release updates. WordPress.org listing is still pending, so without this the plugin had no update channel at all.
-
-= 1.4.4 =
-
-* Fixed the Access Granted email listing an empty bullet instead of the granted resources.
-* Resolved each membership rule to its real title and permalink before the email is sent.
-* Fixed the drip schedule showing a bare dash instead of a readable unlock date.
-* Skipped resources that no longer exist, are unpublished, or are not addressable content.
-* Omitted the resources and drip sections entirely when nothing can be listed.
-
-= 1.4.3 =
-
-* Add every eligible Space from a FluentCommunity Space Group to a plan in one action.
-* Show linked FluentCart products as soon as an existing plan opens.
-* Prevent duplicate product connections and keep the list accurate after changes.
-* Provide clear retry actions when linked products or plan members cannot be loaded.
-* Improve delayed-access previews and give content-rule controls more breathing room.
-
-= 1.4.2 =
-
-* Fixed automatic plan slugs for Polish accents and other international scripts.
-* Added server-authoritative slug previews, collision checks and safe 100-byte limits.
-* Rejected titles and custom slugs that WordPress cannot turn into a usable identifier.
-
-= 1.4.1 =
-
-* Prepared WordPress.org metadata and dependency declarations.
-* Replaced remote Inter loading with licensed local font subsets.
-* Removed the legacy GitHub updater.
-* Clarified opt-in webhooks, authenticated REST access, data retention and build instructions.
+https://github.com/vcode-sh/fchub-plugins/blob/main/plugins/fchub-memberships/CHANGELOG.md

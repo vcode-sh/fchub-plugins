@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.6 - 2026-08-13
 
 The member profile used to show database rows and call them memberships. A plan
 writes one row per rule, so one membership could appear as six cards, each with
@@ -47,6 +47,56 @@ now fixed rather than documented.
   titles are read in one query rather than one per grant.
 - Profile loading no longer issues a query per grant, and stopped shipping fifty
   audit entries the admin app never read.
+
+### Finding the content you want to protect
+
+Three screens asked the same question — *which piece of content?* — with three
+separate implementations, and none of them could reliably say what you had
+picked. The plan editor stored the id and threw the title away. The profile's
+"Can they open it?" search read two fields the listing endpoint has never sent,
+so every single result read `post #55`; its test fixture invented one of those
+fields, which is why nothing caught it.
+
+- **The title you picked stays picked.** Selecting a resource now records its
+  name alongside its id, everywhere and always. Searching again, removing an
+  earlier rule, or reopening a saved plan can no longer turn your choice back
+  into a number. Rule headers read `Posts · Checkout · immediately` instead of
+  `Posts · selected resource · immediately`.
+- **Drafts are findable.** Content search only ever looked at published posts,
+  so a draft, a scheduled post, or a private page could not be protected —
+  you cannot pick what the search refuses to admit exists. All five editable
+  statuses are now searchable.
+- **Results say what they are.** Each row carries its type and, when it is not
+  simply published, its status: `Checkout · Pages · Draft`. Published items get
+  no badge, because a badge on everything tells you nothing.
+- **No secret character minimum.** The plan editor wanted one character, the
+  protect wizard silently wanted two, and neither said so. Search now runs from
+  the first keystroke, an empty box means "recent", and opening the dropdown
+  shows a cached list immediately rather than a spinner it does not need.
+- **The access check acts on what you chose.** Picking an item and then
+  searching again used to drop the option behind your selection, which left the
+  Check access button doing nothing at all. The choice now survives any later
+  search, and the panel browses protected content on open instead of demanding
+  two characters it never mentioned.
+- **One picker instead of two.** The plan editor and the protect wizard share a
+  single component. The parallel copy — three index-keyed option maps, two
+  debounce implementations, a session counter and an in-flight request cache —
+  is gone, along with the class of bug that came from keying a rule's title by
+  its position in an array.
+
+## 1.4.5 - 2026-08-11
+
+- Restored GitHub release updates. The WordPress.org listing is still pending,
+  so without this the plugin had no update channel at all.
+
+## 1.4.4 - 2026-08-10
+
+- Fixed the Access Granted email listing an empty bullet instead of the granted
+  resources, and resolved each rule to its real title and permalink first.
+- Fixed the drip schedule showing a bare dash instead of a readable unlock date.
+- Skipped resources that no longer exist, are unpublished, or are not
+  addressable content, and omitted the resources and drip sections entirely when
+  nothing can be listed.
 
 ## 1.4.3 - 2026-08-06
 

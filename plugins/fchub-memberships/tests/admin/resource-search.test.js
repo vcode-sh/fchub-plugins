@@ -76,7 +76,9 @@ describe('resource search', () => {
     expect(engine.loading.value).toBe(false)
   })
 
-  it('drops a pending keystroke when the dropdown is reopened', async () => {
+  // Typing can open the dropdown, so the open event can arrive after the first
+  // keystroke. Browsing must not cancel the query it raced.
+  it('never cancels a query that is already on its way', async () => {
     const searchResources = vi.fn().mockResolvedValue({ data: PAGE_ROWS })
     const { engine, flush } = setup({ searchResources })
 
@@ -85,7 +87,11 @@ describe('resource search', () => {
     await flush()
 
     expect(searchResources).toHaveBeenCalledTimes(1)
-    expect(searchResources).toHaveBeenCalledWith({ type: 'page', query: '' })
+    expect(searchResources).toHaveBeenCalledWith({ type: 'page', query: 'checkout' })
+
+    // Reopening while a query is showing keeps that query's results.
+    await engine.browse()
+    expect(searchResources).toHaveBeenCalledTimes(1)
   })
 
   it('coalesces a burst of keystrokes into a single request', async () => {

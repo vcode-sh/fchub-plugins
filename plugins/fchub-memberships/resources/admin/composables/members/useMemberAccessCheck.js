@@ -1,47 +1,103 @@
-import { ref, unref } from 'vue'
+import { computed, ref, unref, watch } from 'vue'
 import { accessCheck, content } from '@/api/index.js'
 import { describeAccessReason } from '@/pages/Members/memberProfileUi.js'
+
+const SEARCH_DELAY = 250
 
 /**
  * Answers "can this member open that?" using the same evaluator the front end
  * runs, over the resources the plugin actually protects.
+ *
+ * The chosen item stays listed whatever a later search returns, so the option
+ * backing the selection cannot disappear and leave the check with nothing to
+ * act on.
  */
 export function useMemberAccessCheck(userId, {
   contentApi = content,
   accessCheckApi = accessCheck,
+  setTimer = setTimeout,
+  clearTimer = clearTimeout,
+  searchDelay = SEARCH_DELAY,
 } = {}) {
   const searching = ref(false)
   const checking = ref(false)
-  const options = ref([])
+  const results = ref([])
+  const chosen = ref(null)
   const selected = ref('')
   const result = ref(null)
+  const query = ref('')
+  let requestId = 0
+  let timer = null
 
-  async function search(term) {
-    const query = String(term || '').trim()
-    if (query.length < 2) {
-      options.value = []
+  const options = computed(() => {
+    if (!chosen.value || results.value.some((item) => item.value === chosen.value.value)) {
+      return results.value
+    }
+    return [chosen.value, ...results.value]
+  })
+
+  const emptyText = computed(() => {
+    if (searching.value) return 'Searching…'
+    return query.value
+      ? `No protected content matches “${query.value}”`
+      : 'Nothing is protected yet'
+  })
+
+  // Pure derivation, flushed synchronously so checking straight after a
+  // selection acts on that selection.
+  watch(selected, (value) => {
+    if (!value) {
+      chosen.value = null
       return
     }
+    const found = results.value.find((item) => item.value === value)
+    if (found) chosen.value = found
+  }, { flush: 'sync' })
 
+  function toOption(rule) {
+    return {
+      value: `${rule.resource_type}:${rule.resource_id}`,
+      label: rule.resource_title || `${rule.resource_type} #${rule.resource_id}`,
+      typeLabel: rule.resource_type_label || rule.resource_type,
+      resourceType: rule.resource_type,
+      resourceId: rule.resource_id,
+    }
+  }
+
+  function search(term) {
+    const next = String(term || '').trim()
+    if (timer) clearTimer(timer)
+    query.value = next
     searching.value = true
+    timer = setTimer(() => load(next), searchDelay)
+  }
+
+  // Opening the dropdown should show what is protected, not an empty box.
+  // Typing can beat the open event, so a query already on its way always wins.
+  function browse() {
+    if (timer || query.value) return undefined
+    searching.value = true
+    return load('')
+  }
+
+  async function load(term) {
+    timer = null
+    const id = ++requestId
     try {
-      const response = await contentApi.list({ search: query, per_page: 20 })
+      const response = await contentApi.list({ search: term, per_page: 20 })
       const rules = response.data ?? response ?? []
-      options.value = rules.map((rule) => ({
-        value: `${rule.resource_type}:${rule.resource_id}`,
-        label: rule.title || rule.resource_label || `${rule.resource_type} #${rule.resource_id}`,
-        resourceType: rule.resource_type,
-        resourceId: rule.resource_id,
-      }))
+      if (id !== requestId) return
+      results.value = rules.map(toOption)
     } catch {
-      options.value = []
+      if (id !== requestId) return
+      results.value = []
     } finally {
-      searching.value = false
+      if (id === requestId) searching.value = false
     }
   }
 
   async function check() {
-    const option = options.value.find((item) => item.value === selected.value)
+    const option = chosen.value
     if (!option) return
 
     checking.value = true
@@ -68,8 +124,9 @@ export function useMemberAccessCheck(userId, {
 
   function reset() {
     selected.value = ''
+    chosen.value = null
     result.value = null
   }
 
-  return { searching, checking, options, selected, result, search, check, reset }
+  return { searching, checking, options, emptyText, selected, result, search, browse, check, reset }
 }

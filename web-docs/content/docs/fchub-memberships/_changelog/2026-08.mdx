@@ -1,3 +1,75 @@
+### v1.4.6 <Badge>Latest</Badge>
+
+*Released 13 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.6)
+
+Two screens spent this release admitting they had been showing you database
+internals and calling it information.
+
+#### A membership is one thing, not six rows
+
+The member profile listed grant rows. A plan writes one row per access rule, so a
+single membership could appear as six cards, each with its own Pause button — and
+pausing one of them left the other five wide open. The profile now groups by plan,
+agreeing with the member list instead of contradicting it, and the rules survive
+inside the card as "what this plan unlocks", which is what they always were.
+
+Pause and resume act on the whole membership. `POST /admin/members/pause` and
+`/resume` keep their request shape and still accept a `grant_id`, but resolve it to
+its membership first. Half-paused access is no longer a reachable state.
+
+The header answers the question people actually arrive with — does this person have
+access, and is it going to renew — instead of offering three counters and letting
+you do the arithmetic. Grant history and activity merged into one timeline, which
+now includes revocations and pauses; they were previously read from fields that
+never existed, so they had never appeared at all.
+
+#### Things that were quietly broken
+
+Every membership date picker emits `YYYY-MM-DD`. The REST layer has only ever
+accepted `Y-m-d H:i:s`. Extending, bulk-extending and granting with an expiry all
+failed with "Invalid parameter: expires_at" the moment anyone touched the calendar.
+A chosen day now becomes the last second of that day, so the member keeps all of it.
+
+Access that had not started yet was filed under Ended, labelled Active in its row,
+and findable by no filter — the row status was an alphabetical minimum over a
+column, which is a fun way to decide anything. It is now called Scheduled, in the
+summary, the filter and the row alike.
+
+Extending is written to the audit log, and `+1 month` / `+1 year` are measured from
+the current expiry, so extending an unexpired membership can no longer shorten it.
+Bulk export writes one row per membership rather than repeating a member once per
+protected resource.
+
+#### Finding the content you want to protect
+
+Three screens asked *which piece of content?* with three separate implementations,
+and none of them could reliably say what you had picked.
+
+The plan editor stored the id and threw the title away, then read the rule back to
+you as `Post #1234`. Selecting a resource now records its name alongside its id,
+always — searching again, removing an earlier rule, or reopening a saved plan can
+no longer turn your choice back into a number.
+
+The profile's own "Can they open it?" search was worse: it read two fields the
+listing endpoint has never sent, so *every* result was named `post #55`. Its test
+fixture had invented one of those fields, which is the tidy explanation for why a
+green suite sat on top of a search that had never once displayed a title. Picking
+an item and searching again also dropped the option behind the selection, leaving
+the Check access button to do nothing at all. Both are fixed, and the panel now
+lists protected content when you open it rather than waiting for two characters it
+never asked for out loud.
+
+Content search also only ever looked at published posts, so a draft, a scheduled
+post or a private page could not be protected — you cannot pick what the search
+refuses to admit exists. All five editable statuses are searchable, and each result
+carries its type and, when it is not simply published, its status. There is no
+character minimum any more: the plan editor wanted one, the protect wizard silently
+wanted two, and neither mentioned it. Search runs from the first keystroke, an empty
+box means "recent", and opening the dropdown shows a cached list rather than a
+spinner it does not need.
+
+<Separator className="my-8" />
+
 ### v1.4.5
 
 *Released 9 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.5)
@@ -20,7 +92,7 @@ rather than a fatal on activation, and the whole decision now hangs on one flag 
 
 <Separator className="my-8" />
 
-### v1.4.4 <Badge>Latest</Badge>
+### v1.4.4
 
 *Released 9 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.4)
 

@@ -511,7 +511,7 @@ window.fetch = async (input, init = {}) => {
   if (url.includes('/admin/content')) {
     const search = (new URL(url, 'https://example.com').searchParams.get('search') || '').toLowerCase()
     const rules = search
-      ? [{ id: 1, resource_type: 'post', resource_id: '55', title: 'Members Only Lesson' }]
+      ? [{ id: 1, resource_type: 'post', resource_id: '55', resource_title: 'Members Only Lesson', resource_type_label: 'Posts' }]
       : []
     return { ok: true, status: 200, json: async () => ({ data: rules, total: rules.length }) }
   }

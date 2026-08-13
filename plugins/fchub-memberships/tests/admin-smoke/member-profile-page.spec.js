@@ -69,7 +69,7 @@ test('answers a protected-content access question with the evaluator reason', as
 
   const check = page.getByRole('region', { name: 'Access check' })
   await check.getByRole('combobox').fill('members')
-  await page.getByRole('option', { name: 'Members Only Lesson' }).click()
+  await page.getByRole('option', { name: /Members Only Lesson/ }).click()
   await check.getByRole('button', { name: 'Check access' }).click()
 
   await expect(check.locator('.check-result')).toContainText('drip has not released it')

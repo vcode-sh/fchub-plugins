@@ -18,14 +18,22 @@
 			:remote-method="search"
 			:loading="searching"
 			class="check-select"
+			popper-class="resource-picker-popper"
 			@update:model-value="$emit('update:selected', $event)"
+			@visible-change="$event && browse()"
 		>
+			<template #empty>
+				<p class="resource-picker-empty">{{ emptyText }}</p>
+			</template>
 			<el-option
 				v-for="option in options"
 				:key="option.value"
 				:label="option.label"
 				:value="option.value"
-			/>
+			>
+				<span class="resource-picker-title">{{ option.label }}</span>
+				<span class="resource-picker-meta">{{ option.typeLabel }}</span>
+			</el-option>
 		</el-select>
 
 		<el-button
@@ -63,9 +71,11 @@ defineProps({
 	options: { type: Array, required: true },
 	selected: { type: String, default: "" },
 	result: { type: Object, default: null },
+	emptyText: { type: String, default: "" },
 	searching: { type: Boolean, default: false },
 	checking: { type: Boolean, default: false },
 	search: { type: Function, required: true },
+	browse: { type: Function, required: true },
 });
 
 defineEmits(["check", "update:selected"]);

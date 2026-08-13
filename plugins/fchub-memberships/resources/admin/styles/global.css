@@ -477,3 +477,43 @@ body.dark #fchub-memberships-app .el-input-group__append {
 body.dark #fchub-memberships-app .el-loading-mask {
   background-color: rgba(26, 29, 35, 0.8);
 }
+
+/* Resource pickers — content search in the plan editor, the protect wizard and
+   the member-profile access check. The popper is teleported to the body, so
+   these cannot live inside any one component. */
+.resource-picker {
+  width: 100%;
+}
+
+.resource-picker-popper {
+  max-width: calc(100vw - 16px);
+  box-sizing: border-box;
+}
+
+.resource-picker-popper .el-select-dropdown__item {
+  height: auto;
+  padding-top: 7px;
+  padding-bottom: 7px;
+  line-height: 1.35;
+}
+
+.resource-picker-title,
+.resource-picker-meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resource-picker-meta {
+  color: var(--fchub-text-secondary);
+  font-size: 12px;
+}
+
+.resource-picker-empty {
+  margin: 0;
+  padding: 12px 20px;
+  color: var(--fchub-text-secondary);
+  font-size: 13px;
+  text-align: center;
+}

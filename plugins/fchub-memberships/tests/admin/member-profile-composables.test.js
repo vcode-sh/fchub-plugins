@@ -237,11 +237,25 @@ describe('member activity composable', () => {
 })
 
 describe('member access check composable', () => {
-  function checkSetup(overrides = {}) {
+  // The listing endpoint sends resource_title / resource_type_label. Anything
+  // else here would be a fixture agreeing with the code instead of the API.
+  const PROTECTED_POST = {
+    resource_type: 'post',
+    resource_id: '55',
+    resource_title: 'Members only',
+    resource_type_label: 'Posts',
+  }
+  const PROTECTED_PAGE = {
+    resource_type: 'page',
+    resource_id: '56',
+    resource_title: 'Member welcome',
+    resource_type_label: 'Pages',
+  }
+
+  function checkSetup(overrides = {}, rows = [PROTECTED_POST]) {
+    const scheduled = []
     const contentApi = {
-      list: vi.fn().mockResolvedValue({
-        data: [{ resource_type: 'post', resource_id: '55', title: 'Members only' }],
-      }),
+      list: vi.fn().mockResolvedValue({ data: rows }),
     }
     const accessCheckApi = {
       check: vi.fn().mockResolvedValue({
@@ -252,26 +266,77 @@ describe('member access check composable', () => {
       ...overrides,
     }
 
-    return { contentApi, accessCheckApi, check: useMemberAccessCheck(ref(21), { contentApi, accessCheckApi }) }
+    const check = useMemberAccessCheck(ref(21), {
+      contentApi,
+      accessCheckApi,
+      setTimer: (callback) => {
+        scheduled.push(callback)
+        return callback
+      },
+      clearTimer: (callback) => {
+        const index = scheduled.indexOf(callback)
+        if (index >= 0) scheduled.splice(index, 1)
+      },
+    })
+    const flush = () => Promise.all(scheduled.splice(0, scheduled.length).map((run) => run()))
+
+    return { contentApi, accessCheckApi, check, flush, scheduled }
   }
 
-  it('does not search on a single character', async () => {
-    const { check, contentApi } = checkSetup()
+  it('names protected content by the field the listing endpoint actually sends', async () => {
+    const { check, flush } = checkSetup()
 
-    await check.search('a')
+    check.search('members')
+    await flush()
 
-    expect(contentApi.list).not.toHaveBeenCalled()
-    expect(check.options.value).toEqual([])
+    expect(check.options.value[0]).toMatchObject({
+      value: 'post:55',
+      label: 'Members only',
+      typeLabel: 'Posts',
+    })
   })
 
-  it('turns protected content into options and answers with the evaluator reason', async () => {
-    const { check, accessCheckApi } = checkSetup()
+  it('browses protected content before a single character is typed', async () => {
+    const { check, contentApi, flush } = checkSetup()
 
-    await check.search('members')
+    check.browse()
+    await flush()
+
+    expect(contentApi.list).toHaveBeenCalledWith({ search: '', per_page: 20 })
+    expect(check.options.value).toHaveLength(1)
+  })
+
+  it('never lets the dropdown opening cancel a query already on its way', async () => {
+    const { check, contentApi, flush } = checkSetup()
+
+    check.search('members')
+    await check.browse()
+    await flush()
+
+    expect(contentApi.list).toHaveBeenCalledTimes(1)
+    expect(contentApi.list).toHaveBeenCalledWith({ search: 'members', per_page: 20 })
+  })
+
+  it('coalesces a burst of keystrokes into a single listing request', async () => {
+    const { check, contentApi, flush } = checkSetup()
+
+    check.search('mem')
+    check.search('memb')
+    check.search('members')
+    await flush()
+
+    expect(contentApi.list).toHaveBeenCalledTimes(1)
+    expect(contentApi.list).toHaveBeenCalledWith({ search: 'members', per_page: 20 })
+  })
+
+  it('answers with the evaluator reason', async () => {
+    const { check, accessCheckApi, flush } = checkSetup()
+
+    check.search('members')
+    await flush()
     check.selected.value = 'post:55'
     await check.check()
 
-    expect(check.options.value[0].label).toBe('Members only')
     expect(accessCheckApi.check).toHaveBeenCalledWith({
       user_id: 21,
       resource_type: 'post',
@@ -282,10 +347,30 @@ describe('member access check composable', () => {
     expect(check.result.value.resource).toBe('Members only')
   })
 
-  it('checks nothing when the selection does not match a loaded option', async () => {
+  it('still checks the chosen item after a later search replaced the list', async () => {
+    const { check, accessCheckApi, contentApi, flush } = checkSetup()
+
+    check.search('members')
+    await flush()
+    check.selected.value = 'post:55'
+
+    contentApi.list.mockResolvedValue({ data: [PROTECTED_PAGE] })
+    check.search('welcome')
+    await flush()
+
+    expect(check.options.value.map((option) => option.value)).toEqual(['post:55', 'page:56'])
+
+    await check.check()
+    expect(accessCheckApi.check).toHaveBeenCalledWith({
+      user_id: 21,
+      resource_type: 'post',
+      resource_id: '55',
+    })
+  })
+
+  it('checks nothing when no option is selected', async () => {
     const { check, accessCheckApi } = checkSetup()
 
-    check.selected.value = 'post:999'
     await check.check()
 
     expect(accessCheckApi.check).not.toHaveBeenCalled()
@@ -293,9 +378,10 @@ describe('member access check composable', () => {
   })
 
   it('reports a failed check rather than pretending the member has no access', async () => {
-    const { check } = checkSetup({ check: vi.fn().mockRejectedValue(new Error('evaluator unavailable')) })
+    const { check, flush } = checkSetup({ check: vi.fn().mockRejectedValue(new Error('evaluator unavailable')) })
 
-    await check.search('members')
+    check.search('members')
+    await flush()
     check.selected.value = 'post:55'
     await check.check()
 
