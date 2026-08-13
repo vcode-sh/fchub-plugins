@@ -299,6 +299,31 @@ final class ImportStackTest extends PluginTestCase
         self::assertSame([], $granted);
     }
 
+    public function test_a_member_without_an_email_never_reaches_the_customer_table(): void
+    {
+        // The existing blank-email assertion also passes when the table is
+        // missing, so the guard itself goes untested. Here the table exists and
+        // would happily return a row, leaving the guard as the only thing that
+        // can refuse.
+        $queries = [];
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_var'] = static function (string $query) use (&$queries): int|string {
+            $queries[] = $query;
+
+            return str_contains($query, 'SHOW TABLES LIKE') ? 'wp_fct_customers' : 0;
+        };
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_row'] = static function (string $query) use (&$queries): ?array {
+            $queries[] = $query;
+
+            return ['id' => 999];
+        };
+
+        $service = new ImportService();
+
+        self::assertNull($service->ensureFluentCartCustomer([]));
+        self::assertNull($service->ensureFluentCartCustomer(['email' => '']));
+        self::assertSame([], $queries, 'A blank email must not be looked up at all.');
+    }
+
     public function test_import_service_handles_existing_customers_missing_tables_and_member_processing_failures(): void
     {
         $service = new ImportService();

@@ -43,6 +43,80 @@ final class AccessEvaluatorAdversarialTest extends PluginTestCase
         self::assertFalse($result['drip_locked']);
     }
 
+    public function test_a_wildcard_grant_still_honours_its_own_drip_lock(): void
+    {
+        $result = $this->evaluateWithGrants([
+            '55' => null,
+            '*' => ['id' => 2, 'trial_ends_at' => null, 'drip_available_at' => '2026-05-01 00:00:00'],
+        ]);
+
+        self::assertFalse($result['allowed']);
+        self::assertSame(Constants::REASON_DRIP_LOCKED, $result['reason']);
+        self::assertSame('2026-05-01 00:00:00', $result['drip_available_at']);
+    }
+
+    public function test_a_wildcard_grant_reports_an_elapsed_trial_as_over(): void
+    {
+        $result = $this->evaluateWithGrants([
+            '55' => null,
+            '*' => ['id' => 2, 'trial_ends_at' => '2026-01-01 00:00:00', 'drip_available_at' => null],
+        ]);
+
+        self::assertTrue($result['allowed']);
+        self::assertSame(Constants::REASON_WILDCARD_GRANT, $result['reason']);
+        self::assertFalse($result['trial_active']);
+    }
+
+    public function test_the_earlier_of_two_drip_locks_is_the_one_reported(): void
+    {
+        // The member should be told the soonest date anything opens, not
+        // whichever lock the evaluator happened to inspect last.
+        $result = $this->evaluateWithGrants([
+            '55' => ['id' => 1, 'trial_ends_at' => null, 'drip_available_at' => '2026-04-01 00:00:00'],
+            '*' => ['id' => 2, 'trial_ends_at' => null, 'drip_available_at' => '2026-05-01 00:00:00'],
+        ]);
+
+        self::assertFalse($result['allowed']);
+        self::assertSame(Constants::REASON_DRIP_LOCKED, $result['reason']);
+        self::assertSame('2026-04-01 00:00:00', $result['drip_available_at']);
+    }
+
+    /**
+     * @param array<string, array<string, mixed>|null> $grants keyed by resource id
+     * @return array<string, mixed>
+     */
+    private function evaluateWithGrants(array $grants): array
+    {
+        AccessEvaluator::clearCache();
+        $GLOBALS['_fchub_test_user_can'][9]['manage_options'] = false;
+        $timezone = new \DateTimeZone('UTC');
+        $clock = new Clock(new \DateTimeImmutable('2026-03-14 00:00:00', $timezone), $timezone);
+
+        $evaluator = new AccessEvaluator(null, null, null, $clock);
+        $this->inject(
+            $evaluator,
+            new class($grants) extends GrantRepository {
+                public function __construct(private array $grants)
+                {
+                }
+
+                public function getActiveGrant(int $userId, string $provider, string $resourceType, string $resourceId): ?array
+                {
+                    return $this->grants[$resourceId] ?? null;
+                }
+
+                public function getEffectivePlanMembershipsForUser(int $userId): array
+                {
+                    return [];
+                }
+            },
+            new class extends PlanRuleResolver {},
+            new class extends ProtectionRuleRepository {}
+        );
+
+        return $evaluator->evaluate(9, 'wordpress_core', 'post', '55');
+    }
+
     private function inject(AccessEvaluator $evaluator, object $grantRepo, object $ruleResolver, object $protectionRepo): void
     {
         foreach ([

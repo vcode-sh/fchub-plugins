@@ -123,6 +123,45 @@ final class DripEvaluatorTest extends PluginTestCase
         self::assertArrayHasKey('days_left', $locked);
     }
 
+    public function test_the_timeline_only_credits_grants_that_are_still_active(): void
+    {
+        // A revoked row must not unlock its rule. The fake filters honestly, so
+        // dropping the status filter hands the timeline a revoked grant.
+        $grants = new class extends GrantRepository {
+            public function getByUserId(int $userId, array $filters = []): array
+            {
+                $rows = [
+                    ['provider' => 'wordpress_core', 'resource_type' => 'post', 'resource_id' => '55', 'drip_available_at' => null, 'status' => 'active'],
+                    ['provider' => 'wordpress_core', 'resource_type' => 'page', 'resource_id' => '77', 'drip_available_at' => null, 'status' => 'revoked'],
+                ];
+
+                if (($filters['status'] ?? '') === '') {
+                    return $rows;
+                }
+
+                return array_values(array_filter($rows, static fn(array $r): bool => $r['status'] === $filters['status']));
+            }
+        };
+
+        $resolver = new class extends PlanRuleResolver {
+            public function resolveUniqueRules(int $planId): array
+            {
+                return [
+                    ['id' => 1, 'provider' => 'wordpress_core', 'resource_type' => 'post', 'resource_id' => '55', 'drip_type' => 'immediate', 'drip_delay_days' => 0, 'drip_date' => null, 'sort_order' => 1],
+                    ['id' => 2, 'provider' => 'wordpress_core', 'resource_type' => 'page', 'resource_id' => '77', 'drip_type' => 'immediate', 'drip_delay_days' => 0, 'drip_date' => null, 'sort_order' => 2],
+                ];
+            }
+        };
+
+        $evaluator = new DripEvaluator();
+        $this->inject($evaluator, $grants, $resolver);
+
+        $statuses = array_column($evaluator->getTimeline(1, 5), 'status', 'resource_id');
+
+        self::assertSame('unlocked', $statuses['55']);
+        self::assertSame('locked', $statuses['77']);
+    }
+
     public function test_get_timeline_and_plan_schedule_transform_and_sort_rules(): void
     {
         $grants = new class extends GrantRepository {

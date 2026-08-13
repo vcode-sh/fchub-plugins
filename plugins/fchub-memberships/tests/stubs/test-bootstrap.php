@@ -1648,3 +1648,28 @@ if (!function_exists('dbDelta')) {
         return [];
     }
 }
+
+if (!function_exists('shortcode_atts')) {
+    /**
+     * @param array<string, mixed> $pairs
+     * @param array<string, mixed> $atts
+     * @return array<string, mixed>
+     */
+    function shortcode_atts(array $pairs, $atts, string $shortcode = ''): array
+    {
+        $atts = is_array($atts) ? $atts : [];
+        $out = [];
+        foreach ($pairs as $name => $default) {
+            $out[$name] = array_key_exists($name, $atts) ? $atts[$name] : $default;
+        }
+
+        return $out;
+    }
+}
+
+if (!function_exists('do_shortcode')) {
+    function do_shortcode(string $content = '', bool $ignoreHtml = false): string
+    {
+        return $content;
+    }
+}

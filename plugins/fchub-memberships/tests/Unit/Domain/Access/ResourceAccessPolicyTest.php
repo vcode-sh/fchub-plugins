@@ -65,6 +65,26 @@ final class ResourceAccessPolicyTest extends PluginTestCase
         self::assertSame('7', $policy->pathsForPlan(5)[0]['qualifier']['resource_id']);
     }
 
+    public function test_a_resource_path_without_a_qualifier_is_refused(): void
+    {
+        $policy = new ResourceAccessPolicy('wordpress_core', 'post', '42');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Resource access paths require a qualifying resource.');
+
+        $policy->addPlanPath(5, null, 'resource');
+    }
+
+    public function test_a_path_basis_outside_the_known_two_is_refused(): void
+    {
+        $policy = new ResourceAccessPolicy('wordpress_core', 'post', '42');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Resource access path basis is invalid.');
+
+        $policy->addPlanPath(5, null, 'taxonomy');
+    }
+
     public function test_global_rule_shortcut_fails_closed_when_protection_probe_fails(): void
     {
         $GLOBALS['_fchub_test_wpdb_overrides']['get_var'] = static function (string $query, \wpdb $wpdb): int {

@@ -15,6 +15,36 @@ use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class GrantRepositoryTest extends PluginTestCase
 {
+    public function test_the_active_grant_read_excludes_unstarted_and_expired_rows(): void
+    {
+        // Every protection check goes through this read, so both date
+        // predicates have to point the right way.
+        $query = '';
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_row'] = static function (string $sql) use (&$query): ?array {
+            $query = $sql;
+
+            return null;
+        };
+
+        $timezone = new \DateTimeZone('UTC');
+        $repository = new GrantRepository(
+            new Clock(new \DateTimeImmutable('2026-08-13 12:00:00', $timezone), $timezone)
+        );
+        $repository->getActiveGrant(17, 'wordpress_core', 'post', '55');
+
+        self::assertStringContainsString("status = 'active'", $query);
+        self::assertStringContainsString(
+            "(starts_at IS NULL OR starts_at <= '2026-08-13 12:00:00')",
+            $query,
+            'A membership that has not started yet must not be returned.'
+        );
+        self::assertStringContainsString(
+            "(expires_at IS NULL OR expires_at > '2026-08-13 12:00:00')",
+            $query,
+            'A membership that has already expired must not be returned.'
+        );
+    }
+
     public function test_grant_write_clears_shared_effective_access_counts(): void
     {
         AccessEvaluator::clearCache();
