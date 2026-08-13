@@ -45,12 +45,25 @@ final class GuidedRunnerTest extends PluginTestCase
     private const string WORKSPACE = '/srv/private/cartshift';
     private const string OPERATOR = 'wp-user:1';
 
+    private string $privateDirectory;
+
+    #[\Override]
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->privateDirectory = realpath(sys_get_temp_dir())
+            . '/cartshift-guided-runner-' . bin2hex(random_bytes(6));
+        mkdir($this->privateDirectory, 0700, true);
+    }
+
     #[\Override]
     protected function tearDown(): void
     {
         putenv(ConfiguredTransferEvidence::PRIVATE_DIRECTORY);
         putenv(ConfiguredTransferEvidence::OPERATOR_ID);
         unset($GLOBALS['_cartshift_test_get_col_callback'], $GLOBALS['_cartshift_test_get_results_callback']);
+        $this->removeTree($this->privateDirectory);
 
         parent::tearDown();
     }
@@ -764,7 +777,7 @@ final class GuidedRunnerTest extends PluginTestCase
 
     private function configure(): void
     {
-        putenv(ConfiguredTransferEvidence::PRIVATE_DIRECTORY . '=' . sys_get_temp_dir());
+        putenv(ConfiguredTransferEvidence::PRIVATE_DIRECTORY . '=' . $this->privateDirectory);
         putenv(ConfiguredTransferEvidence::OPERATOR_ID . '=' . self::OPERATOR);
     }
 
