@@ -41,6 +41,13 @@ final readonly class TransferDecisionProposalBuilder
                     'password_protection_policy' => 'excluded_by_policy',
                 ],
                 'order_note_visibility_decision_required' => $this->orderNoteFinding($context),
+                'order_item_parent_missing',
+                'order_money_mismatch',
+                'product_lookup_stale',
+                'target_schema_unrepresentable',
+                'unrepresentable_product_dependency',
+                'unsupported_product_dependency',
+                'unsupported_product_type' => ['action' => 'excluded_by_policy'],
                 default => null,
             };
             if ($resolution === null) {

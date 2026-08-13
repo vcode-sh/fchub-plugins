@@ -98,6 +98,20 @@
           <p v-else><strong>{{ item.line_count }} order items kept with their names, prices and product links.</strong></p>
           <p>No replacement variation was guessed. The historical order remains accurate even though its old variation is gone.</p>
         </template>
+        <template v-else-if="item.type === 'source_scope'">
+          <ul>
+            <li v-if="item.omitted_subscriptions">{{ item.omitted_subscriptions }} ended subscriptions stayed in WooCommerce.</li>
+            <li v-if="item.omitted_wordpress_accounts">{{ item.omitted_wordpress_accounts }} unrelated WordPress accounts stayed untouched.</li>
+            <li v-if="item.guest_order_profiles">
+              {{ item.guest_order_profiles }} guest checkouts moved only with their orders
+              ({{ item.unique_guest_emails }} guest email addresses).
+            </li>
+            <li v-if="item.unlinked_order_profiles">
+              {{ item.unlinked_order_profiles }} orders moved without a customer profile because WooCommerce had no usable customer email.
+            </li>
+          </ul>
+          <p v-if="item.guest_order_profiles"><strong>No WordPress accounts were created for guests.</strong></p>
+        </template>
       </article>
     </section>
   </section>

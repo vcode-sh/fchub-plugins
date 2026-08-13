@@ -13,6 +13,7 @@ use CartShift\Domain\Transfer\Product\StockOwnership;
 use CartShift\Domain\Transfer\Product\StockProfile;
 use CartShift\Domain\Transfer\RecordEnvelope;
 use CartShift\Domain\Transfer\SelectionClause;
+use CartShift\Domain\Transfer\SelectionMode;
 use CartShift\Domain\Transfer\SourceIdentity;
 use CartShift\Domain\Transfer\SameSite\GuidedEvidence;
 use CartShift\Domain\Transfer\SameSite\GuidedCollisionDecisionBuilder;
@@ -20,6 +21,8 @@ use CartShift\Domain\Transfer\SameSite\GuidedCustomerDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedProductDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedRunner;
 use CartShift\Domain\Transfer\SameSite\GuidedRunPlan;
+use CartShift\Domain\Transfer\SameSite\GuidedSourceScope;
+use CartShift\Domain\Transfer\SameSite\GuidedSourceDependencyIndex;
 use CartShift\Domain\Transfer\SameSite\GuidedSetup;
 use CartShift\Domain\Transfer\SameSite\GuidedStep;
 use CartShift\Domain\Transfer\TransferSelection;
@@ -193,6 +196,83 @@ final class GuidedRunnerTest extends PluginTestCase
         self::assertSame([], $result['proposal_decisions']);
     }
 
+    public function testGuidedProposalDoesNotTreatEveryWordPressUserOrEndedSubscriptionAsARoot(): void
+    {
+        $selection = new TransferSelection(
+            self::SOURCE_KEY,
+            SelectionClause::all(),
+            SelectionClause::none(),
+            SelectionClause::all(),
+            SelectionClause::ids([21, 22]),
+        );
+        $scope = new GuidedSourceScope($selection, 683, 17);
+        $seen = null;
+        $proposal = [
+            'status' => 'owner_review_required',
+            'blockers' => [],
+            'base_decision_fingerprint' => TransferDecisionSet::empty()->fingerprint(),
+            'proposal_decisions' => [],
+            'proposal_counts' => ['records' => 0, 'total' => 0],
+            'decision_set' => ['decisions' => []],
+        ];
+        $runner = $this->runner(
+            proposalPipeline: static function (TransferSelection $actual) use (&$seen, $proposal): array {
+                $seen = $actual;
+                return $proposal;
+            },
+            productDecisions: new GuidedProductDecisionBuilder(
+                static fn (): iterable => [],
+                static fn (): array => [],
+                static fn (): array => ['orders' => 0, 'subscriptions' => 0],
+            ),
+            sourceScope: static fn (): GuidedSourceScope => $scope,
+        );
+
+        $runner->run($this->stepFor('propose-decisions', GuidedEvidence::none()));
+
+        self::assertSame($selection, $seen);
+        self::assertSame(SelectionMode::None, $seen->customers->mode);
+        self::assertSame([21, 22], $seen->subscriptions->ids);
+    }
+
+    public function testProposalEnrichmentUsesTheCandidateDecisionSetItPresents(): void
+    {
+        $skip = [
+            'identity' => self::SOURCE_KEY . ':order:42',
+            'scope' => 'audit_finding',
+            'finding_code' => 'order_money_mismatch',
+            'action' => 'excluded_by_policy',
+            'source_fingerprint' => str_repeat('c', 64),
+            'operator' => self::OPERATOR,
+            'reason' => 'Owner review required for the exact source anomaly.',
+            'decided_at' => '2026-08-12T11:00:00Z',
+        ];
+        $proposal = [
+            'status' => 'owner_review_required',
+            'blockers' => [],
+            'base_decision_fingerprint' => TransferDecisionSet::empty()->fingerprint(),
+            'proposal_decisions' => [$skip],
+            'proposal_counts' => ['audit_findings' => 1, 'records' => 0, 'total' => 1],
+            'decision_set' => ['decisions' => [$skip]],
+        ];
+        $seen = null;
+        $runner = $this->runner(
+            proposalPipeline: static fn (): array => $proposal,
+            sourceDependencyIndex: static function (TransferSelection $selection, TransferDecisionSet $decisions) use (&$seen): GuidedSourceDependencyIndex {
+                $seen = $decisions;
+                return new GuidedSourceDependencyIndex([]);
+            },
+        );
+
+        $runner->run($this->stepFor('propose-decisions', GuidedEvidence::none()));
+
+        self::assertInstanceOf(TransferDecisionSet::class, $seen);
+        self::assertSame(
+            'excluded_by_policy',
+            $seen->forAuditFinding(self::SOURCE_KEY . ':order:42', 'order_money_mismatch')['action'] ?? null,
+        );
+    }
+
     // ──────────────────────────────────────────────
     // The translation, asserted across a whole plan
     // ──────────────────────────────────────────────
@@ -329,6 +409,7 @@ final class GuidedRunnerTest extends PluginTestCase
                 self::assertSame('/srv/private/cartshift/package.ndjson', $package);
                 self::assertSame('/srv/private/cartshift/decisions.json', $decisionSet);
             },
+            sourceScope: static fn (): GuidedSourceScope => self::emptySourceScope(),
         );
 
         // The subset with an injectable seam. `audit`, `propose-decisions` and
@@ -683,6 +764,8 @@ final class GuidedRunnerTest extends PluginTestCase
         ?GuidedProductDecisionBuilder $productDecisions = null,
         ?GuidedCustomerDecisionBuilder $customerDecisions = null,
         ?GuidedCollisionDecisionBuilder $collisionDecisions = null,
+        ?\Closure $sourceScope = null,
+        ?\Closure $sourceDependencyIndex = null,
     ): GuidedRunner
     {
         return new GuidedRunner(
@@ -702,7 +785,20 @@ final class GuidedRunnerTest extends PluginTestCase
                 static fn (): iterable => [],
                 static fn (): array => [],
             ),
+            sourceScope: $sourceScope ?? static fn (): GuidedSourceScope => self::emptySourceScope(),
+            sourceDependencyIndex: $sourceDependencyIndex,
         );
+    }
+
+    private static function emptySourceScope(): GuidedSourceScope
+    {
+        return new GuidedSourceScope(new TransferSelection(
+            self::SOURCE_KEY,
+            SelectionClause::all(),
+            SelectionClause::none(),
+            SelectionClause::all(),
+            SelectionClause::none(),
+        ), 0, 0);
     }
 
     private function plan(GuidedEvidence $evidence, bool $includesSubscriptions = false): GuidedRunPlan

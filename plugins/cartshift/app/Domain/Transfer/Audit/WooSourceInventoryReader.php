@@ -116,6 +116,7 @@ final class WooSourceInventoryReader implements SourceInventoryInspector
 
         $productFacts = [];
         $unsupportedProducts = [];
+        $unrepresentableProducts = [];
 
         foreach ($inventory->productIds as $id) {
             $facts = null;
@@ -140,6 +141,7 @@ final class WooSourceInventoryReader implements SourceInventoryInspector
             $facts ??= $this->source->product($id);
 
             if ($facts === null) {
+                $unrepresentableProducts[$id] = true;
                 ++$counts['products_blocked'];
                 ++$counts['products_blocked_hydration'];
                 $blockers[] = $this->blocker(
@@ -158,6 +160,7 @@ final class WooSourceInventoryReader implements SourceInventoryInspector
 
             if ((int) ($facts['sku_length'] ?? 0) > 30) {
                 $productBlocked = true;
+                $unrepresentableProducts[$id] = true;
                 ++$capabilities['target_schema']['sku_over_limit'];
                 $blockers[] = $this->blocker(
                     'target_schema_unrepresentable',
@@ -239,6 +242,7 @@ final class WooSourceInventoryReader implements SourceInventoryInspector
             $this->recordOrderCapabilities($facts, $capabilities);
             $orderBlocked = false;
             $dependentUnsupportedTypes = [];
+            $dependentUnrepresentableProducts = [];
             $hasDownloadableProduct = false;
 
             $noteCount = (int) ($facts['note_count'] ?? 0);
@@ -264,6 +268,9 @@ final class WooSourceInventoryReader implements SourceInventoryInspector
 
                 if (isset($unsupportedProducts[$productId])) {
                     $dependentUnsupportedTypes[$unsupportedProducts[$productId]] = true;
+                }
+                if (isset($unrepresentableProducts[$productId])) {
+                    $dependentUnrepresentableProducts[$productId] = true;
                 }
 
                 if (!in_array($productId, $inventory->productIds, true)) {
@@ -329,6 +336,15 @@ final class WooSourceInventoryReader implements SourceInventoryInspector
                         'product_type_count' => count($types),
                         'product_types' => implode(',', $types),
                     ],
+                );
+            }
+
+            if ($dependentUnrepresentableProducts !== []) {
+                $orderBlocked = true;
+                $blockers[] = $this->blocker(
+                    'unrepresentable_product_dependency',
+                    sprintf('%s:order:%d', $selection->sourceKey, $id),
+                    ['product_count' => count($dependentUnrepresentableProducts)],
                 );
             }
 

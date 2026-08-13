@@ -65,6 +65,8 @@ final class LoadedWooTransferRecordLoader
             $selection->fingerprint(),
             relationshipResolver: static fn (int $orderId): array => $relationships[$orderId] ?? [],
             missingProductResolver: $historical->resolveLine(...),
+            customerExists: static fn (int $customerId): bool => function_exists('get_userdata')
+                && get_userdata($customerId) !== false,
         );
 
         return new self(

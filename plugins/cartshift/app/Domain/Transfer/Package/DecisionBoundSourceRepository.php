@@ -159,16 +159,16 @@ final class DecisionBoundSourceRepository
             return $identity;
         }
         if ($identity->entityType === RecordKind::Product->value
-            && str_contains($identity->sourceId, ':variation:')) {
+            && !in_array($code, ['product_lookup_missing', 'product_lookup_stale'], true)
+            && preg_match('/\A([1-9][0-9]*):/D', $identity->sourceId, $match) === 1) {
             return new SourceIdentity(
                 $identity->sourceKey,
                 RecordKind::Product->value,
-                explode(':variation:', $identity->sourceId, 2)[0],
+                $match[1],
             );
         }
         if ($identity->entityType === RecordKind::Order->value
-            && $code === 'historical_product_missing'
-            && preg_match('/\A([1-9][0-9]*):(?:item|product):/D', $identity->sourceId, $match) === 1) {
+            && preg_match('/\A([1-9][0-9]*):/D', $identity->sourceId, $match) === 1) {
             return new SourceIdentity($identity->sourceKey, RecordKind::Order->value, $match[1]);
         }
 

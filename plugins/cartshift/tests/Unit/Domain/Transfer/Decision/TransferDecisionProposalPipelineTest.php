@@ -67,18 +67,31 @@ final class TransferDecisionProposalPipelineTest extends PluginTestCase
         TransferDecisionSet::fromArray($result['decision_set']['decisions']);
     }
 
-    public function testUnsupportedAuditFindingStopsBeforeRecordHydration(): void
+    public function testUnrepresentableRecordIsProposedAsAnExplicitSkipBeforeHydration(): void
     {
         $selection = new TransferSelection(
             'shop-alpha', SelectionClause::all(), SelectionClause::none(), SelectionClause::none(), SelectionClause::none(),
         );
-        $audit = static fn (TransferSelection $selected, TransferDecisionSet $decisions): TransferAuditReport => TransferAuditReport::create(
-            'shop-alpha', $selected->fingerprint(), str_repeat('r', 64), false, [], [], [[
-                'code' => 'target_schema_unrepresentable',
-                'identity' => 'shop-alpha:product:10',
-                'context' => ['field' => 'sku', 'evidence_fingerprint' => str_repeat('e', 64)],
-            ]], $decisions->fingerprint(),
-        );
+        $audit = static function (TransferSelection $selected, TransferDecisionSet $decisions): TransferAuditReport {
+            $resolved = $decisions->forAuditFinding(
+                'shop-alpha:product:10',
+                'target_schema_unrepresentable',
+            ) !== null;
+            return TransferAuditReport::create(
+                'shop-alpha',
+                $selected->fingerprint(),
+                str_repeat('r', 64),
+                $resolved,
+                [],
+                [],
+                $resolved ? [] : [[
+                    'code' => 'target_schema_unrepresentable',
+                    'identity' => 'shop-alpha:product:10',
+                    'context' => ['field' => 'sku', 'evidence_fingerprint' => str_repeat('e', 64)],
+                ]],
+                $decisions->fingerprint(),
+            );
+        };
         $hydrated = false;
         $pipeline = new TransferDecisionProposalPipeline($audit, static function () use (&$hydrated): iterable {
             $hydrated = true;
@@ -86,12 +99,10 @@ final class TransferDecisionProposalPipelineTest extends PluginTestCase
         });
         $result = $pipeline->propose($selection, TransferDecisionSet::empty(), 'owner', '2026-08-11T01:00:00Z');
 
-        self::assertSame('blocked', $result['status']);
-        self::assertFalse($hydrated);
-        self::assertNotEmpty(array_filter(
-            $result['blockers'],
-            static fn (array $blocker): bool => str_contains($blocker['code'], 'requires_manual_resolution'),
-        ));
+        self::assertSame('owner_review_required', $result['status']);
+        self::assertTrue($hydrated);
+        self::assertSame([], $result['blockers']);
+        self::assertSame('excluded_by_policy', $result['proposal_decisions'][0]['action']);
     }
 
     public function testStaleAuditApprovalIsReproposedFromTheCurrentUnderlyingFinding(): void

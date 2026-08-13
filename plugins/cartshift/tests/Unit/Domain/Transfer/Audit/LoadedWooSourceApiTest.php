@@ -132,6 +132,20 @@ final class LoadedWooSourceApiTest extends PluginTestCase
             'source_created_utc' => '2026-08-01T10:00:00Z',
         ], $facts['missing_product_refs'][0]['line_shape']);
     }
+
+    public function testDeletedOrderLineWithRetainedProductIdStillUsesHistoricalPlaceholder(): void
+    {
+        $item = new InventoryOrderItemDouble(74, 9467, 'Deleted course', '25.00', 1, false);
+        $GLOBALS['_cartshift_test_wc_orders'][9469] = new InventoryOrderDouble(9469, [$item]);
+        $GLOBALS['_cartshift_test_order_item_meta'][74]['_product_id'] = '9467';
+
+        $facts = (new LoadedWooSourceApi())->order(9469);
+
+        self::assertIsArray($facts);
+        self::assertSame([], $facts['product_ids']);
+        self::assertSame(74, $facts['missing_product_refs'][0]['line_id']);
+        self::assertSame(9467, $facts['missing_product_refs'][0]['product_id']);
+    }
 }
 
 final readonly class InventoryDownloadDouble
@@ -240,6 +254,7 @@ final readonly class InventoryOrderItemDouble
         private string $name,
         private string $subtotal,
         private int $quantity,
+        private bool $productAvailable = true,
     ) {}
 
     public function get_id(): int { return $this->id; }
@@ -248,6 +263,7 @@ final readonly class InventoryOrderItemDouble
     public function get_subtotal(): string { return $this->subtotal; }
     public function get_quantity(): int { return $this->quantity; }
     public function get_meta(string $key, bool $single = true): string { return ''; }
+    public function get_product(): ?object { return $this->productAvailable ? new \stdClass() : null; }
 }
 
 final readonly class InventoryOrderDouble

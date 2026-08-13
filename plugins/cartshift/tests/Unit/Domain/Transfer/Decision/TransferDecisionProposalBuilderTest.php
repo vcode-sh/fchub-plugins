@@ -26,6 +26,37 @@ final class TransferDecisionProposalBuilderTest extends PluginTestCase
         TransferDecisionSet::fromArray($first['rows']);
     }
 
+    public function testUnrepresentableSourceRecordsAreProposedAsExplicitSkips(): void
+    {
+        $report = TransferAuditReport::create(
+            'shop-alpha',
+            str_repeat('a', 64),
+            str_repeat('b', 64),
+            false,
+            [],
+            [],
+            [[
+                'code' => 'order_money_mismatch',
+                'identity' => 'shop-alpha:order:42',
+                'context' => ['evidence_fingerprint' => str_repeat('c', 64)],
+            ], [
+                'code' => 'unsupported_product_type',
+                'identity' => 'shop-alpha:product:9',
+                'context' => ['evidence_fingerprint' => str_repeat('d', 64)],
+            ]],
+        );
+
+        $proposal = (new TransferDecisionProposalBuilder())->auditFindings(
+            $report,
+            'owner',
+            '2026-08-11T01:00:00Z',
+        );
+
+        self::assertSame([], $proposal['blockers']);
+        self::assertSame(['excluded_by_policy', 'excluded_by_policy'], array_column($proposal['rows'], 'action'));
+        TransferDecisionSet::fromArray($proposal['rows']);
+    }
+
     public function testMultipleVisibleNotesStopInsteadOfChoosingConveniently(): void
     {
         $order = $this->record('order', '42', [

@@ -19,12 +19,14 @@ final class OrderRecordFactory
     private readonly ?\Closure $relationshipResolver;
     private readonly ?\Closure $currencyRateAdapter;
     private readonly ?\Closure $missingProductResolver;
+    private readonly \Closure $customerExists;
 
     /**
      * @param (callable(int): iterable<object>)|null $notesReader
      * @param (callable(int): array<string, mixed>|list<array<string, mixed>>)|null $relationshipResolver
      * @param (callable(string, string, object): array{rate: string, evidence: string})|null $currencyRateAdapter
      * @param (callable(object, object): array{identity: SourceIdentity, fulfilment_type: string})|null $missingProductResolver
+     * @param (callable(int): bool)|null $customerExists
      * @param list<string> $approvedMetaKeys
      */
     public function __construct(
@@ -35,6 +37,7 @@ final class OrderRecordFactory
         ?callable $relationshipResolver = null,
         ?callable $currencyRateAdapter = null,
         ?callable $missingProductResolver = null,
+        ?callable $customerExists = null,
         private readonly array $approvedMetaKeys = [],
     ) {
         $this->currency($sourceStoreCurrency);
@@ -46,6 +49,9 @@ final class OrderRecordFactory
         $this->relationshipResolver = $relationshipResolver === null ? null : $relationshipResolver(...);
         $this->currencyRateAdapter = $currencyRateAdapter === null ? null : $currencyRateAdapter(...);
         $this->missingProductResolver = $missingProductResolver === null ? null : $missingProductResolver(...);
+        $this->customerExists = $customerExists === null
+            ? static fn (int $customerId): bool => $customerId > 0
+            : $customerExists(...);
     }
 
     public function fromWooOrder(object $order, string $sourceKey): OrderRecord
@@ -121,9 +127,10 @@ final class OrderRecordFactory
         $this->assertProviderReferencesUnique($paymentEvents);
 
         $customerId = (int) $this->call($order, 'get_customer_id', 0);
-        $customer = $customerId > 0
+        $billingEmail = trim((string) $this->call($order, 'get_billing_email', ''));
+        $customer = $customerId > 0 && ($this->customerExists)($customerId)
             ? new SourceIdentity($sourceKey, RecordKind::Customer->value, (string) $customerId)
-            : (trim((string) $this->call($order, 'get_billing_email', '')) !== ''
+            : ($billingEmail !== '' && filter_var($billingEmail, FILTER_VALIDATE_EMAIL) !== false
                 ? new SourceIdentity($sourceKey, RecordKind::Customer->value, $identity->sourceId . ':guest')
                 : null);
 

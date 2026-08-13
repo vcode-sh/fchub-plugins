@@ -40,6 +40,79 @@ final class GuidedDecisionReviewTest extends PluginTestCase
         self::assertDoesNotMatchRegularExpression('/[a-f0-9]{64}/', $encoded);
     }
 
+    public function testPresentationExplainsTheDeliberatelyNarrowSourceScopeAndApprovalKeepsItForTheReport(): void
+    {
+        $proposal = $this->proposal();
+        $proposal['source_scope'] = [
+            'included_subscriptions' => 13,
+            'omitted_subscriptions' => 17,
+            'included_registered_customers' => 361,
+            'omitted_wordpress_accounts' => 322,
+            'guest_order_profiles' => 7,
+            'unique_guest_emails' => 2,
+            'unlinked_order_profiles' => 0,
+        ];
+        $proposal['migration_exceptions'] = [[
+            'kind' => 'source_scope',
+            ...$proposal['source_scope'],
+        ]];
+        $expectedScope = $proposal['source_scope'];
+        ksort($proposal['source_scope']); // Persisted guided state is canonical JSON and sorts object keys.
+        $review = new GuidedDecisionReview($this->customerBuilder());
+
+        $presentation = $review->presentation($proposal);
+
+        self::assertSame($expectedScope, $presentation['source_scope']);
+        self::assertStringNotContainsString('shop-alpha', json_encode($presentation['source_scope'], JSON_THROW_ON_ERROR));
+
+        $approved = $review->approve(
+            $proposal,
+            array_column($presentation['items'], 'review_id'),
+            'wp-user:9',
+            '2026-08-12T12:05:00Z',
+        );
+
+        self::assertSame('source_scope', $approved['migration_exceptions'][0]['kind']);
+        self::assertSame(17, $approved['migration_exceptions'][0]['omitted_subscriptions']);
+    }
+
+    public function testPresentationExplainsSourceAnomalySkipsWithoutInternalCodes(): void
+    {
+        $proposal = $this->proposal();
+        $skip = [
+            'identity' => 'shop-alpha:product:1:lookup:stale',
+            'scope' => 'audit_finding',
+            'finding_code' => 'product_lookup_stale',
+            'action' => 'excluded_by_policy',
+            'source_fingerprint' => str_repeat('e', 64),
+            'operator' => 'owner',
+            'reason' => 'Exact source anomaly requires an owner-reviewed skip.',
+            'decided_at' => '2026-08-12T12:00:00Z',
+        ];
+        $proposal['proposal_decisions'][] = $skip;
+        $proposal['decision_set']['decisions'][] = $skip;
+        $recordSkip = $skip;
+        $recordSkip['identity'] = 'shop-alpha:product:77';
+        $recordSkip['scope'] = 'record';
+        unset($recordSkip['finding_code']);
+        $proposal['proposal_decisions'][] = $recordSkip;
+        $proposal['decision_set']['decisions'][] = $recordSkip;
+
+        $presentation = (new GuidedDecisionReview($this->customerBuilder()))->presentation($proposal);
+        $item = array_values(array_filter(
+            $presentation['items'],
+            static fn (array $candidate): bool => $candidate['title'] === 'Product 1',
+        ))[0];
+
+        self::assertStringContainsString('Skip this product', $item['summary']);
+        self::assertStringNotContainsString('product_lookup_stale', json_encode($item, JSON_THROW_ON_ERROR));
+        self::assertNotEmpty(array_filter(
+            $presentation['items'],
+            static fn (array $candidate): bool => $candidate['title'] === 'Product 77'
+                && str_contains($candidate['summary'], 'Leave this record in WooCommerce'),
+        ));
+    }
+
     public function testEveryPresentedItemMustBeApprovedBeforeCustomerRowsAreResolved(): void
     {
         $review = new GuidedDecisionReview($this->customerBuilder());

@@ -273,6 +273,10 @@ final readonly class TransferAuditor
     /** @param array<string, mixed> $decision @param array{code: string, identity: string, context: array<string, scalar|null>} $finding */
     private function resolutionMatchesFinding(array $decision, array $finding): bool
     {
+        if (($decision['action'] ?? null) === 'excluded_by_policy') {
+            return true;
+        }
+
         if ($finding['code'] === 'historical_product_missing') {
             return ($decision['placeholder_identity'] ?? null) === ($finding['context']['placeholder_identity'] ?? null)
                 && ($decision['placeholder_fingerprint'] ?? null) === ($finding['context']['placeholder_fingerprint'] ?? null)

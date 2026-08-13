@@ -284,6 +284,21 @@ final class GuidedRunProjection
             if (!is_array($exception)) {
                 continue;
             }
+            if (($exception['kind'] ?? null) === 'source_scope') {
+                $groups['source-scope'] = [
+                    'type' => 'source_scope',
+                    'title' => 'What stays in WooCommerce',
+                    'message' => 'CartShift moves current commerce data and the customer records it actually needs. Historical subscriptions and unrelated WordPress accounts stay untouched.',
+                    'included_subscriptions' => max(0, (int) ($exception['included_subscriptions'] ?? 0)),
+                    'omitted_subscriptions' => max(0, (int) ($exception['omitted_subscriptions'] ?? 0)),
+                    'included_registered_customers' => max(0, (int) ($exception['included_registered_customers'] ?? 0)),
+                    'omitted_wordpress_accounts' => max(0, (int) ($exception['omitted_wordpress_accounts'] ?? 0)),
+                    'guest_order_profiles' => max(0, (int) ($exception['guest_order_profiles'] ?? 0)),
+                    'unique_guest_emails' => max(0, (int) ($exception['unique_guest_emails'] ?? 0)),
+                    'unlinked_order_profiles' => max(0, (int) ($exception['unlinked_order_profiles'] ?? 0)),
+                ];
+                continue;
+            }
             if (in_array($exception['kind'] ?? null, ['skipped_product', 'skipped_order', 'skipped_subscription'], true)) {
                 $kind = (string) $exception['kind'];
                 $orders = max(0, (int) ($exception['dependent_orders'] ?? 0));

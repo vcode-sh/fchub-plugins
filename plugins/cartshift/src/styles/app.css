@@ -2836,6 +2836,11 @@ body.dark #cartshift-app .cartshift-log-active-filter { background: #16232d; col
 .cartshift-suggestions { margin-top: 10px; }
 
 .cartshift-review-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 20px; align-items: center; margin: 20px 0 14px; padding: 16px 18px; border: 1px solid color-mix(in srgb, var(--cartshift-primary) 18%, var(--cartshift-border-color)); border-radius: 12px; background: color-mix(in srgb, var(--cartshift-primary-soft) 58%, var(--cartshift-card-bg)); }
+.cartshift-scope-summary { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; margin-top: 18px; padding: 16px; border: 1px solid var(--cartshift-border-color); border-radius: 12px; background: var(--cartshift-page-bg); }
+.cartshift-scope-summary > .dashicons { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--cartshift-primary); background: var(--cartshift-primary-soft); }
+#cartshift-app .cartshift-scope-summary h4 { margin: 0 0 7px; padding: 0; font-size: 13px; }
+#cartshift-app .cartshift-scope-summary ul { margin: 0; padding-left: 18px; color: var(--cartshift-text-secondary); }
+#cartshift-app .cartshift-scope-summary li { margin: 3px 0; font-size: 12px; line-height: 1.45; }
 .cartshift-review-summary > span:first-child { display: grid; gap: 3px; }
 .cartshift-review-summary strong { color: var(--cartshift-text-primary); font-size: 13px; }
 .cartshift-review-summary small { color: var(--cartshift-text-secondary); font-size: 12px; }

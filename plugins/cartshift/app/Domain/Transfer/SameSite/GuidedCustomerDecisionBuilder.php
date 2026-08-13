@@ -73,7 +73,13 @@ final readonly class GuidedCustomerDecisionBuilder
             }
         }
 
-        return array_replace($proposal, ['customer_questions' => $questions]);
+        $blockers = $this->remainingBlockers($proposal);
+
+        return array_replace($proposal, [
+            'status' => $blockers === [] ? 'owner_review_required' : 'blocked',
+            'blockers' => $blockers,
+            'customer_questions' => $questions,
+        ]);
     }
 
     /** @param array<string,mixed> $proposal @return array<string,mixed> */
@@ -276,11 +282,7 @@ final readonly class GuidedCustomerDecisionBuilder
             throw new \RuntimeException('guided_decision_proposal_missing');
         }
         $decisions = TransferDecisionSet::fromArray([...$existingRows, ...$rows]);
-        $blockers = array_values(array_filter(
-            is_array($proposal['blockers'] ?? null) ? $proposal['blockers'] : [],
-            static fn (mixed $blocker): bool => !is_array($blocker)
-                || ($blocker['code'] ?? null) !== 'customer_ownership_decision_requires_owner',
-        ));
+        $blockers = $this->remainingBlockers($proposal);
         $counts = is_array($proposal['proposal_counts'] ?? null) ? $proposal['proposal_counts'] : [];
         $counts['manual_customers'] = count($rows);
         $counts['total'] = count($decisions->rows());
@@ -311,6 +313,16 @@ final readonly class GuidedCustomerDecisionBuilder
         ksort($blockers, SORT_STRING);
 
         return array_values($blockers);
+    }
+
+    /** @param array<string,mixed> $proposal @return list<mixed> */
+    private function remainingBlockers(array $proposal): array
+    {
+        return array_values(array_filter(
+            is_array($proposal['blockers'] ?? null) ? $proposal['blockers'] : [],
+            static fn (mixed $blocker): bool => !is_array($blocker)
+                || ($blocker['code'] ?? null) !== 'customer_ownership_decision_requires_owner',
+        ));
     }
 
     /** @return array<string, mixed> */

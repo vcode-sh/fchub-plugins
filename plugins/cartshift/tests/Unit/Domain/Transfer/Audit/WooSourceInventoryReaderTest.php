@@ -153,6 +153,7 @@ final class WooSourceInventoryReaderTest extends PluginTestCase
 
         self::assertSame(1, $report->capabilities['target_schema']['sku_over_limit']);
         self::assertContains('target_schema_unrepresentable', $this->codes($report->blockers));
+        self::assertContains('unrepresentable_product_dependency', $this->codes($report->blockers));
         self::assertSame(1, $report->capabilities['subscription_schedules']['active_missing_next_payment']);
         self::assertSame(1, $report->capabilities['subscription_schedules']['active_missing_end']);
         self::assertContains('subscription_schedule_absence', $this->codes($report->blockers));

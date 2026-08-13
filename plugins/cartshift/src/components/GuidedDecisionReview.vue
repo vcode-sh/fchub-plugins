@@ -8,10 +8,31 @@
     <div v-if="notice" class="cartshift-alert cartshift-alert--warning" data-test="review-changed" role="status">
       <span class="dashicons dashicons-update" aria-hidden="true"></span><p>{{ notice }}</p>
     </div>
+    <section v-if="run.review?.source_scope" class="cartshift-scope-summary" data-test="source-scope-summary">
+      <span class="dashicons dashicons-filter" aria-hidden="true"></span>
+      <div>
+        <h4>What CartShift will leave alone</h4>
+        <ul>
+          <li v-if="run.review.source_scope.omitted_subscriptions">
+            {{ run.review.source_scope.omitted_subscriptions }} ended subscriptions stay in WooCommerce.
+          </li>
+          <li v-if="run.review.source_scope.omitted_wordpress_accounts">
+            {{ run.review.source_scope.omitted_wordpress_accounts }} unrelated WordPress accounts stay untouched.
+          </li>
+          <li v-if="run.review.source_scope.guest_order_profiles">
+            {{ run.review.source_scope.guest_order_profiles }} guest checkouts move only with their orders
+            ({{ run.review.source_scope.unique_guest_emails }} guest email addresses). No WordPress accounts are created for guests.
+          </li>
+          <li v-if="run.review.source_scope.unlinked_order_profiles">
+            {{ run.review.source_scope.unlinked_order_profiles }} orders move without a customer profile because WooCommerce has no usable customer email.
+          </li>
+        </ul>
+      </div>
+    </section>
     <div class="cartshift-review-summary" data-test="review-summary" aria-live="polite">
-      <span><strong>{{ completedCount }} of {{ itemCount }} complete</strong><small>{{ remainingCopy }}</small></span>
-      <span class="cartshift-review-summary-count">{{ Math.round((completedCount / itemCount) * 100) }}%</span>
-      <span class="cartshift-review-summary-track" aria-hidden="true"><i :style="{ width: `${(completedCount / itemCount) * 100}%` }"></i></span>
+      <span><strong>{{ completedStepCount }} of {{ reviewStepCount }} review steps complete</strong><small>{{ remainingCopy }}</small></span>
+      <span class="cartshift-review-summary-count">{{ progress }}%</span>
+      <span class="cartshift-review-summary-track" aria-hidden="true"><i :style="{ width: `${progress}%` }"></i></span>
     </div>
     <div class="cartshift-review-list" role="group" aria-label="Migration decisions">
       <section
@@ -72,7 +93,7 @@
     </ul>
     <div class="cartshift-review-actions">
       <button class="button" :class="{ 'button-primary': !run.mode_changed && !blocked }" data-test="accept-run-decisions" :disabled="busy || !canAccept" @click="$emit('accept')">
-        {{ busy ? 'Saving…' : `Confirm ${itemCount} ${itemCount === 1 ? 'decision' : 'decisions'}` }}
+        {{ busy ? 'Saving…' : 'Confirm review' }}
       </button>
       <button class="button" :class="{ 'button-primary': run.mode_changed }" :disabled="busy" @click="$emit('cancel')">
         {{ run.mode_changed ? 'Cancel outdated review' : 'Cancel review' }}
@@ -101,12 +122,6 @@ const groupPresentation = {
   subscriptions: { title: 'Subscriptions', icon: 'dashicons-update' },
   other: { title: 'Other decisions', icon: 'dashicons-yes-alt' },
 };
-const itemCount = computed(() => props.run.review?.items?.length || 0);
-const completedCount = computed(() => (props.run.review?.items || []).filter(isComplete).length);
-const remainingCopy = computed(() => {
-  const remaining = itemCount.value - completedCount.value;
-  return remaining === 0 ? 'Ready to continue' : `${remaining} ${remaining === 1 ? 'decision' : 'decisions'} left`;
-});
 const groups = computed(() => {
   const grouped = new Map();
   (props.run.review?.items || []).forEach((item) => {
@@ -129,6 +144,22 @@ const groups = computed(() => {
     }];
   });
 });
+const reviewStepCount = computed(() => groups.value.reduce(
+  (total, group) => total + (group.routineItems.length > 0 ? 1 : 0) + (group.items.length - group.routineItems.length),
+  0,
+));
+const completedStepCount = computed(() => groups.value.reduce((total, group) => {
+  const routineComplete = group.routineItems.length > 0 && group.allRoutineApproved ? 1 : 0;
+  const choicesComplete = group.items.filter((item) => item.choices?.length && isComplete(item)).length;
+  return total + routineComplete + choicesComplete;
+}, 0));
+const remainingCopy = computed(() => {
+  const remaining = reviewStepCount.value - completedStepCount.value;
+  return remaining === 0 ? 'Ready to continue' : `${remaining} ${remaining === 1 ? 'step' : 'steps'} left`;
+});
+const progress = computed(() => reviewStepCount.value === 0
+  ? 0
+  : Math.round((completedStepCount.value / reviewStepCount.value) * 100));
 
 function isComplete(item) {
   return item.choices?.length

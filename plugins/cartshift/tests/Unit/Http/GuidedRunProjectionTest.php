@@ -241,6 +241,36 @@ final class GuidedRunProjectionTest extends PluginTestCase
         self::assertStringNotContainsString('site-0123456789abcdef', json_encode($report, JSON_THROW_ON_ERROR));
     }
 
+    public function testDeliberatelyOmittedHistoryBecomesOnePlainScopeReport(): void
+    {
+        $state = GuidedRunState::start(
+            'site-0123456789abcdef',
+            'wp-user:1',
+            '2026-08-12T12:00:00Z',
+        )->afterFailure('propose-decisions', new GuidedRunFailure('review_failed', [
+            'migration_exceptions' => [[
+                'kind' => 'source_scope',
+                'included_subscriptions' => 13,
+                'omitted_subscriptions' => 17,
+                'included_registered_customers' => 361,
+                'omitted_wordpress_accounts' => 322,
+                'guest_order_profiles' => 7,
+                'unique_guest_emails' => 2,
+                'source_key' => 'site-0123456789abcdef',
+            ]],
+        ]));
+
+        $report = (new GuidedRunProjection())->run($state)['migration_exceptions'][0];
+
+        self::assertSame('source_scope', $report['type']);
+        self::assertSame('What stays in WooCommerce', $report['title']);
+        self::assertSame(17, $report['omitted_subscriptions']);
+        self::assertSame(322, $report['omitted_wordpress_accounts']);
+        self::assertSame(7, $report['guest_order_profiles']);
+        self::assertSame(2, $report['unique_guest_emails']);
+        self::assertStringNotContainsString('site-0123456789abcdef', json_encode($report, JSON_THROW_ON_ERROR));
+    }
+
     public function testDuplicateSkuChangesBecomeOnePlainProductFollowUp(): void
     {
         $state = GuidedRunState::start(

@@ -45,7 +45,7 @@ final readonly class GuidedRunPlan
         private GuidedEvidence $evidence,
         private bool $includesSubscriptions,
         private string $executionContext,
-        /** Null means every kind, which is what a shop moving to FluentCart means. */
+        /** Null asks the adapter for the guided whole-shop source scope. */
         private ?array $clauses,
     ) {
         // THE FORMAT IS NOT A PREFERENCE. `TransferDecisionProposalPipeline`
@@ -246,8 +246,8 @@ final readonly class GuidedRunPlan
     }
 
     /**
-     * All supported commerce kinds, with the captured subscription mode made
-     * explicit so a later plugin activation cannot widen an in-flight run.
+     * Request the guided source scope while keeping subscription availability
+     * fixed so a later plugin activation cannot widen an in-flight run.
      *
      * @return array<string, string|true>
      */

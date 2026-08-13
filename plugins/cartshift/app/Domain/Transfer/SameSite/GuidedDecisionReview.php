@@ -18,7 +18,7 @@ final readonly class GuidedDecisionReview
         private GuidedCollisionDecisionBuilder $collisions = new GuidedCollisionDecisionBuilder(),
     ) {}
 
-    /** @param array<string, mixed> $proposal @return array{items:list<array<string,mixed>>,blockers:list<string>} */
+    /** @param array<string, mixed> $proposal @return array{items:list<array<string,mixed>>,blockers:list<string>,source_scope:?array<string,int>} */
     public function presentation(array $proposal): array
     {
         $items = [];
@@ -85,7 +85,11 @@ final readonly class GuidedDecisionReview
             ];
         }
 
-        return ['items' => $items, 'blockers' => $this->blockingMessages($proposal)];
+        return [
+            'items' => $items,
+            'blockers' => $this->blockingMessages($proposal),
+            'source_scope' => $this->sourceScope($proposal),
+        ];
     }
 
     /**
@@ -194,6 +198,10 @@ final readonly class GuidedDecisionReview
             && preg_match('/\A([^:]+):item:([^:]+)\z/D', $identity->sourceId, $parts) === 1) {
             return sprintf('Order %s, item %s', $parts[1], $parts[2]);
         }
+        if ($identity->entityType === 'product'
+            && preg_match('/\A([^:]+):/D', $identity->sourceId, $parts) === 1) {
+            return 'Product ' . $parts[1];
+        }
 
         return $kind . ' ' . $identity->sourceId;
     }
@@ -212,11 +220,19 @@ final readonly class GuidedDecisionReview
             ),
             'product_password_protection_unsupported' => 'Migrate the product without its unsupported password protection.',
             'order_note_visibility_decision_required' => $this->orderNoteSummary($row),
+            'order_item_parent_missing' => 'Skip this order because one of its historical line items is incomplete.',
+            'order_money_mismatch' => 'Skip this order because its historical totals cannot be reproduced safely.',
+            'product_lookup_stale' => 'Skip this product because WooCommerce cannot load a stable source record for it.',
+            'target_schema_unrepresentable' => 'Skip this record because FluentCart cannot represent its source data safely.',
+            'unrepresentable_product_dependency' => 'Skip this order because one of its products cannot be represented safely in FluentCart.',
+            'unsupported_product_dependency' => 'Skip this order because it contains a product type that FluentCart cannot migrate.',
+            'unsupported_product_type' => 'Skip this product because FluentCart cannot represent its WooCommerce product type.',
             default => match ($row['action'] ?? null) {
                 'activate_catalogue' => 'Migrate this published product and make it visible in FluentCart.',
                 'leave_catalogue_draft' => 'Migrate this product and keep it as a draft in FluentCart.',
                 'approve_mapping' => 'Migrate this record using the source-approved mapping and visibility.',
                 'approve_subscription_manual' => 'Migrate this subscription with manual renewal collection.',
+                'excluded_by_policy' => 'Leave this record in WooCommerce because it is outside the safe migration scope.',
                 default => throw new \RuntimeException('guided_decision_review_unsupported'),
             },
         };
@@ -353,7 +369,10 @@ final readonly class GuidedDecisionReview
      */
     private function migrationExceptions(array $proposal, array $answers): array
     {
-        $exceptions = [];
+        $exceptions = array_values(array_filter(
+            is_array($proposal['migration_exceptions'] ?? null) ? $proposal['migration_exceptions'] : [],
+            static fn (mixed $exception): bool => is_array($exception),
+        ));
         foreach ($this->products->questions($proposal) as $question) {
             $answer = $this->answerFor($answers, (string) $question['review_id']);
             $choice = array_values(array_filter(
@@ -380,6 +399,44 @@ final readonly class GuidedDecisionReview
         }
 
         return $exceptions;
+    }
+
+    /** @param array<string,mixed> $proposal @return ?array<string,int> */
+    private function sourceScope(array $proposal): ?array
+    {
+        if (!array_key_exists('source_scope', $proposal)) {
+            return null;
+        }
+        $scope = $proposal['source_scope'];
+        $keys = [
+            'included_subscriptions',
+            'omitted_subscriptions',
+            'included_registered_customers',
+            'omitted_wordpress_accounts',
+            'guest_order_profiles',
+            'unique_guest_emails',
+            'unlinked_order_profiles',
+        ];
+        if (!is_array($scope)) {
+            throw new \RuntimeException('guided_source_scope_invalid');
+        }
+        $actualKeys = array_keys($scope);
+        sort($actualKeys, SORT_STRING);
+        $expectedKeys = $keys;
+        sort($expectedKeys, SORT_STRING);
+        if ($actualKeys !== $expectedKeys) {
+            throw new \RuntimeException('guided_source_scope_invalid');
+        }
+        $presented = [];
+        foreach ($keys as $key) {
+            $value = $scope[$key];
+            if (!is_int($value) || $value < 0) {
+                throw new \RuntimeException('guided_source_scope_invalid');
+            }
+            $presented[$key] = $value;
+        }
+
+        return $presented;
     }
 
     /** @param array<string,mixed> $choice @return array{choice_id:string,label:string,description:string} */

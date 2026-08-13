@@ -222,8 +222,10 @@ final class LoadedWooSourceApi implements WooSourceApi
         foreach ((array) $order->get_items('line_item') as $item) {
             if (is_object($item) && method_exists($item, 'get_product_id')) {
                 $productId = (int) $item->get_product_id();
+                $productAvailable = !method_exists($item, 'get_product')
+                    || is_object($item->get_product());
 
-                if ($productId > 0) {
+                if ($productId > 0 && $productAvailable) {
                     $productIds[] = $productId;
                 } elseif (method_exists($item, 'get_id') && function_exists('wc_get_order_item_meta')) {
                     $lineId = (int) $item->get_id();

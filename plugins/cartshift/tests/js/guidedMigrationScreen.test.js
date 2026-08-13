@@ -420,19 +420,19 @@ describe('GuidedMigrationScreen', () => {
     const wrapper = mountScreen();
     await flushPromises();
 
-    expect(wrapper.find('[data-test="review-summary"]').text()).toContain('0 of 4 complete');
+    expect(wrapper.find('[data-test="review-summary"]').text()).toContain('0 of 2 review steps complete');
     expect(wrapper.findAll('.cartshift-review-group')).toHaveLength(2);
     expect(wrapper.find('[data-test="review-group-orders"]').text()).toContain('3 items');
 
     await wrapper.find('[data-test="review-group-orders"] [data-test="approve-group"]').trigger('click');
 
     expect(wrapper.findAll('[data-test="review-group-orders"] input:checked')).toHaveLength(3);
-    expect(wrapper.find('[data-test="review-summary"]').text()).toContain('3 of 4 complete');
+    expect(wrapper.find('[data-test="review-summary"]').text()).toContain('1 of 2 review steps complete');
     expect(wrapper.find('[data-test="accept-run-decisions"]').attributes('disabled')).toBeDefined();
     expect(wrapper.find('[data-test="review-group-products"] input:checked').exists()).toBe(false);
 
     await wrapper.find('[data-test="review-group-products"] input').setValue(true);
-    expect(wrapper.find('[data-test="accept-run-decisions"]').text()).toContain('Confirm 4 decisions');
+    expect(wrapper.find('[data-test="accept-run-decisions"]').text()).toContain('Confirm review');
     await wrapper.find('[data-test="accept-run-decisions"]').trigger('click');
     await flushPromises();
 
@@ -894,6 +894,76 @@ describe('GuidedMigrationScreen', () => {
 
     expect(wrapper.find('[data-test="review-decision"] input').element.checked).toBe(false);
     expect(wrapper.find('[data-test="accept-run-decisions"]').attributes('disabled')).toBeDefined();
+  });
+
+  it('explains the narrow customer, guest and subscription scope before approval', async () => {
+    serve(
+      status({
+        run: {
+          phase: 'awaiting_decisions',
+          completed_steps: 3,
+          total_steps: 15,
+          last_step: 'Review migration decisions',
+          review: {
+            blockers: [],
+            source_scope: {
+              included_subscriptions: 13,
+              omitted_subscriptions: 17,
+              included_registered_customers: 361,
+              omitted_wordpress_accounts: 322,
+              guest_order_profiles: 7,
+              unique_guest_emails: 2,
+              unlinked_order_profiles: 0,
+            },
+            items: [{
+              review_id: 'decision-0123456789ab',
+              kind: 'migration_decision',
+              group: 'orders',
+              title: 'Order 116',
+              summary: 'Keep the reviewed note private.',
+            }],
+          },
+        },
+      })
+    );
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    const scope = wrapper.find('[data-test="source-scope-summary"]');
+    expect(scope.text()).toContain('17 ended subscriptions stay in WooCommerce');
+    expect(scope.text()).toContain('322 unrelated WordPress accounts stay untouched');
+    expect(scope.text()).toContain('7 guest checkouts move only with their orders');
+    expect(scope.text()).toContain('2 guest email addresses');
+    expect(scope.findAll('input')).toHaveLength(0);
+  });
+
+  it('keeps the same scope explanation in the migration follow-up', async () => {
+    serve(status({
+      run: {
+        phase: 'completed',
+        completed_steps: 15,
+        total_steps: 15,
+        migration_exceptions: [{
+          type: 'source_scope',
+          title: 'What stays in WooCommerce',
+          message: 'Historical subscriptions and unrelated WordPress accounts stay untouched.',
+          included_subscriptions: 13,
+          omitted_subscriptions: 17,
+          included_registered_customers: 361,
+          omitted_wordpress_accounts: 322,
+          guest_order_profiles: 7,
+          unique_guest_emails: 2,
+          unlinked_order_profiles: 0,
+        }],
+      },
+    }));
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    const report = wrapper.find('[data-test="migration-exceptions"]');
+    expect(report.text()).toContain('17 ended subscriptions stayed in WooCommerce');
+    expect(report.text()).toContain('322 unrelated WordPress accounts stayed untouched');
+    expect(report.text()).toContain('No WordPress accounts were created for guests');
   });
 
   it('keeps a changed subscription run visible but prevents stale approval', async () => {

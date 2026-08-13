@@ -76,6 +76,8 @@ final class LoadedWooRecordContractAttempts
                         'fulfilment_type' => HistoricalProductPlaceholder::FULFILMENT_TYPE,
                     ];
                 },
+                customerExists: static fn (int $customerId): bool => function_exists('get_userdata')
+                    && get_userdata($customerId) !== false,
             );
             foreach ($this->rootIds(RecordKind::Order, $selection) as $id) {
                 $identity = new SourceIdentity($selection->sourceKey, RecordKind::Order->value, (string) $id);

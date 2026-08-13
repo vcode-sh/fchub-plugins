@@ -37,6 +37,8 @@ final class GuidedCustomerDecisionBuilderTest extends PluginTestCase
         $questions = $builder->questions($enriched);
 
         self::assertArrayHasKey('customer_questions', $enriched);
+        self::assertSame('owner_review_required', $enriched['status']);
+        self::assertSame([], $enriched['blockers']);
         self::assertSame(
             ['attach_exact_same_site_user', 'allow_unlinked_downloads'],
             array_column($questions, 'action'),

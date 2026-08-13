@@ -201,6 +201,10 @@ final readonly class TransferDecisionSet
         SourceIdentity $identity,
         string $findingCode,
     ): bool {
+        if (($decision['action'] ?? null) === 'excluded_by_policy') {
+            return true;
+        }
+
         if ($findingCode === 'historical_product_missing') {
             try {
                 $placeholder = SourceIdentity::fromCanonical((string) ($decision['placeholder_identity'] ?? ''));

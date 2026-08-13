@@ -18,7 +18,6 @@ use CartShift\Domain\Transfer\Package\TransferPackageValidator;
 use CartShift\Domain\Transfer\RecordEnvelope;
 use CartShift\Domain\Transfer\RecordKind;
 use CartShift\Domain\Transfer\Runtime\TransferRuntimeProbe;
-use CartShift\Domain\Transfer\SelectionClause;
 use CartShift\Domain\Transfer\SourceIdentity;
 use CartShift\Domain\Transfer\TransferSelection;
 
@@ -118,6 +117,7 @@ final class GuidedRunner
         private readonly ?GuidedCollisionDecisionBuilder $collisionDecisions = null,
         private readonly ?\Closure $subscriptionSourceRelease = null,
         private readonly ?\Closure $sourceDependencyIndex = null,
+        private readonly ?\Closure $sourceScope = null,
     ) {
     }
 
@@ -331,7 +331,8 @@ final class GuidedRunner
      */
     private function runProposal(array $input): array
     {
-        $selection = $this->selectionFrom($input);
+        $scope = $this->sourceScopeFrom($input);
+        $selection = $scope->selection;
         $decisions = $this->decisionsFor($selection, $input);
         $proposal = $this->proposalPipeline !== null
             ? ($this->proposalPipeline)(
@@ -346,12 +347,17 @@ final class GuidedRunner
                 (string) $input['operator'],
                 (string) $input['decided_at'],
             );
+        $candidateRows = $proposal['decision_set']['decisions'] ?? null;
+        if (!is_array($candidateRows) || !array_is_list($candidateRows)) {
+            throw new \RuntimeException('guided_decision_proposal_invalid');
+        }
+        $candidateDecisions = TransferDecisionSet::fromArray($candidateRows);
 
         $index = null;
         if ($this->productDecisions === null || $this->customerDecisions === null || $this->collisionDecisions === null) {
             $index = $this->sourceDependencyIndex === null
-                ? GuidedSourceDependencyIndex::forLoadedSelection($selection, $decisions)
-                : ($this->sourceDependencyIndex)($selection, $decisions);
+                ? GuidedSourceDependencyIndex::forLoadedSelection($selection, $candidateDecisions)
+                : ($this->sourceDependencyIndex)($selection, $candidateDecisions);
             if (!$index instanceof GuidedSourceDependencyIndex) {
                 throw new \RuntimeException('guided_source_dependency_index_invalid');
             }
@@ -367,10 +373,22 @@ final class GuidedRunner
             sourceRecords: static fn (): iterable => $index->records(),
         );
 
-        return $collisions->enrich(
+        $result = $collisions->enrich(
             $customers->enrich($products->enrich($proposal, $selection), $selection),
             $selection,
         );
+        if (!$index instanceof GuidedSourceDependencyIndex) {
+            return $result;
+        }
+        $summary = $scope->summary($index->records());
+        $exceptions = is_array($result['migration_exceptions'] ?? null)
+            ? array_values($result['migration_exceptions'])
+            : [];
+
+        return array_replace($result, [
+            'source_scope' => $summary,
+            'migration_exceptions' => [...$exceptions, ['kind' => 'source_scope'] + $summary],
+        ]);
     }
 
     /**
@@ -456,12 +474,18 @@ final class GuidedRunner
     }
 
     /**
-     * The guided route selects every supported commerce kind. Subscription
-     * inclusion is captured at run creation and may only be `all` or `none`.
+     * Build the guided source scope once for this step. Customers follow the
+     * included commerce records and terminal subscriptions stay in WooCommerce.
      *
      * @param array<string, mixed> $input
      */
     private function selectionFrom(array $input): TransferSelection
+    {
+        return $this->sourceScopeFrom($input)->selection;
+    }
+
+    /** @param array<string, mixed> $input */
+    private function sourceScopeFrom(array $input): GuidedSourceScope
     {
         if (($input['all_kinds'] ?? null) !== true) {
             throw new \RuntimeException(
@@ -473,13 +497,17 @@ final class GuidedRunner
             throw new \RuntimeException('guided_subscription_selection_invalid');
         }
 
-        return new TransferSelection(
-            (string) $input['source_key'],
-            SelectionClause::all(),
-            SelectionClause::all(),
-            SelectionClause::all(),
-            $subscriptions === 'all' ? SelectionClause::all() : SelectionClause::none(),
-        );
+        $sourceKey = (string) $input['source_key'];
+        $scope = $this->sourceScope === null
+            ? GuidedSourceScope::read($sourceKey, $subscriptions === 'all')
+            : ($this->sourceScope)($sourceKey, $subscriptions === 'all');
+        if (!$scope instanceof GuidedSourceScope
+            || $scope->selection->sourceKey !== $sourceKey
+            || $scope->selection->customers->mode !== \CartShift\Domain\Transfer\SelectionMode::None) {
+            throw new \RuntimeException('guided_source_scope_invalid');
+        }
+
+        return $scope;
     }
 
     /**

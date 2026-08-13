@@ -57,6 +57,36 @@ final class OrderRecordFactoryTest extends PluginTestCase
         self::assertSame('lapka-web:customer:5001:guest', $record->customer?->canonical());
     }
 
+    public function testAnOrderWhoseWordPressCustomerWasDeletedUsesItsGuestSnapshotInstead(): void
+    {
+        $record = $this->factory(customerExists: static fn (): bool => false)
+            ->fromWooOrder(OrderLedgerFixture::simple(['customer_id' => 73]), 'lapka-web');
+
+        self::assertSame('lapka-web:customer:5001:guest', $record->customer?->canonical());
+    }
+
+    public function testAnInvalidGuestEmailDoesNotCreateACustomerDependency(): void
+    {
+        $order = OrderLedgerFixture::simple([
+            'customer_id' => 0,
+            'billing' => [
+                'first_name' => 'Historic',
+                'last_name' => 'Guest',
+                'company' => '',
+                'address_1' => '',
+                'address_2' => '',
+                'city' => '',
+                'state' => '',
+                'postcode' => '',
+                'country' => 'PL',
+                'email' => '.invalid@example.test',
+                'phone' => '',
+            ],
+        ]);
+
+        self::assertNull($this->factory()->fromWooOrder($order, 'lapka-web')->customer);
+    }
+
     public function testFullRefundKeepsGrossChargeAndSeparateRefund(): void
     {
         $record = $this->factory()->fromWooOrder(OrderLedgerFixture::fullyRefunded(), 'lapka-web');
@@ -368,6 +398,7 @@ final class OrderRecordFactoryTest extends PluginTestCase
         array $notes = [],
         ?callable $rateAdapter = null,
         ?callable $relationship = null,
+        ?callable $customerExists = null,
     ): OrderRecordFactory {
         return new OrderRecordFactory(
             sourceStoreCurrency: 'PLN',
@@ -376,6 +407,7 @@ final class OrderRecordFactoryTest extends PluginTestCase
             notesReader: static fn () => $notes,
             relationshipResolver: $relationship,
             currencyRateAdapter: $rateAdapter,
+            customerExists: $customerExists,
             approvedMetaKeys: ['_billing_vat_number'],
         );
     }

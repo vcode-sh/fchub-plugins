@@ -39,12 +39,13 @@ final class DecisionBoundSourceRepositoryTest extends PluginTestCase
         $roots = iterator_to_array($repository->roots(), false);
 
         self::assertSame(
-            ['shop-alpha:customer:7', 'shop-alpha:order:42'],
+            ['shop-alpha:customer:7'],
             array_map(static fn (RecordEnvelope $record): string => $record->identity->canonical(), $roots),
         );
-        self::assertSame(['shop-alpha:customer:7', 'shop-alpha:order:42'], $loads);
+        self::assertSame(['shop-alpha:customer:7'], $loads);
         self::assertNull($repository->lookup(new SourceIdentity('shop-alpha', 'order', '41')));
-        self::assertSame(['shop-alpha:customer:7', 'shop-alpha:order:42'], $loads);
+        self::assertNull($repository->lookup(new SourceIdentity('shop-alpha', 'order', '42')));
+        self::assertSame(['shop-alpha:customer:7'], $loads);
     }
 
     public function testDependencyLoaderCannotReturnARecordForAnotherIdentityOrNamespace(): void
