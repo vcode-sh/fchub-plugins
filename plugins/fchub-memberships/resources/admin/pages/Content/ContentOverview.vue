@@ -69,16 +69,13 @@
       :form="wizardForm"
       :category-cards="wizardCategoryCards"
       :category-types="wizardCategoryTypes"
-      :resource-loading="resourceSearchLoading"
-      :resource-error="resourceSearchError"
-      :resource-options="resourceOptions"
+      :special-pages="specialPages"
       :plan-options-loading="planOptionsLoading"
       :plan-options="planOptions"
       :plan-options-map="planOptionsMap"
       :resource-display-name="wizardResourceDisplayName"
       :can-advance="canAdvanceWizard"
       :saving="protectLoading"
-      :search-resources="searchResources"
       @close="wizardVisible = false; resetWizard()"
       @back="wizardStep--"
       @next="wizardStep++"
@@ -499,9 +496,7 @@ const {
   wizardVisible,
   wizardStep,
   protectLoading,
-  resourceSearchLoading,
-  resourceSearchError,
-  resourceOptions,
+  specialPages,
   wizardForm,
   wizardCategoryTypes,
   wizardResourceDisplayName,
@@ -510,7 +505,6 @@ const {
   selectWizardCategory,
   onWizardTypeChange,
   onCommentModeChange,
-  searchResources,
   submitProtect,
   resetWizard,
 } = useContentProtectionWizard({

@@ -26,14 +26,85 @@ final class GrantStatusService
     ) {
     }
 
+    /**
+     * Pause the membership the given grant belongs to.
+     *
+     * A plan writes one row per rule, so pausing a single row would suspend part
+     * of an access an administrator sees as one thing. Rows already paused are
+     * left alone rather than re-notified.
+     */
     public function pauseGrant(int $grantId, string $reason = ''): array
+    {
+        return $this->applyToMembership($grantId, 'paused', fn(array $grant): array => (
+            $this->pauseRow($grant, $reason)
+        ));
+    }
+
+    /** Resume the membership the given grant belongs to. */
+    public function resumeGrant(int $grantId): array
+    {
+        return $this->applyToMembership($grantId, 'active', fn(array $grant): array => $this->resumeRow($grant));
+    }
+
+    /**
+     * @param callable(array<string, mixed>): array<string, mixed> $transition
+     * @return array<string, mixed>
+     */
+    private function applyToMembership(int $grantId, string $targetStatus, callable $transition): array
     {
         $grant = $this->grants->find($grantId);
         if (!$grant) {
             return ['error' => 'Grant not found'];
         }
 
-        StatusTransitionValidator::assertTransition($grant['status'], 'paused');
+        StatusTransitionValidator::assertTransition($grant['status'], $targetStatus);
+
+        foreach ($this->membershipRows($grant, $targetStatus) as $row) {
+            $result = $transition($row);
+            if (empty($result['success'])) {
+                return $result;
+            }
+        }
+
+        return ['success' => true, 'grant_id' => $grantId];
+    }
+
+    /**
+     * Rows of the same membership that can legally make this transition.
+     *
+     * A plan-less grant is its own membership; a revoked or expired sibling is
+     * not dragged along.
+     *
+     * @param array<string, mixed> $grant
+     * @return list<array<string, mixed>>
+     */
+    private function membershipRows(array $grant, string $targetStatus): array
+    {
+        $planId = (int) ($grant['plan_id'] ?? 0);
+        $siblings = $planId > 0
+            ? $this->grants->getByUserId((int) $grant['user_id'], ['plan_id' => $planId])
+            : [];
+
+        $rows = [$grant];
+        foreach ($siblings as $sibling) {
+            if ((int) $sibling['id'] !== (int) $grant['id']) {
+                $rows[] = $sibling;
+            }
+        }
+
+        return array_values(array_filter($rows, static fn(array $row): bool => (
+            $row['status'] !== $targetStatus
+            && StatusTransitionValidator::isValid((string) $row['status'], $targetStatus)
+        )));
+    }
+
+    /**
+     * @param array<string, mixed> $grant
+     * @return array<string, mixed>
+     */
+    private function pauseRow(array $grant, string $reason): array
+    {
+        $grantId = (int) $grant['id'];
 
         $updated = $this->grants->update($grantId, [
             'status' => 'paused',
@@ -68,14 +139,13 @@ final class GrantStatusService
         return ['success' => true, 'grant_id' => $grantId];
     }
 
-    public function resumeGrant(int $grantId): array
+    /**
+     * @param array<string, mixed> $grant
+     * @return array<string, mixed>
+     */
+    private function resumeRow(array $grant): array
     {
-        $grant = $this->grants->find($grantId);
-        if (!$grant) {
-            return ['error' => 'Grant not found'];
-        }
-
-        StatusTransitionValidator::assertTransition($grant['status'], 'active');
+        $grantId = (int) $grant['id'];
 
         $updated = $this->grants->update($grantId, [
             'status' => 'active',

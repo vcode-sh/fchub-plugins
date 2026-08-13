@@ -1,124 +1,66 @@
 <template>
-	<section
-		class="profile-panel access-panel"
-		role="region"
-		aria-label="Current access"
-	>
+	<section class="profile-panel access-panel" role="region" aria-label="Memberships">
 		<header class="profile-panel-header">
 			<div>
 				<span class="profile-section-eyebrow">ACCESS</span>
-				<h2>Current access</h2>
-				<p>{{ accessState.description }}</p>
+				<h2>Memberships</h2>
+				<p>Every plan this member holds, current and ended.</p>
 			</div>
-			<el-tag
-				:type="accessState.hasAccess ? 'success' : 'info'"
-				effect="light"
-				>{{ accessState.title }}</el-tag
-			>
+			<el-tag :type="currentCount ? 'success' : 'info'" effect="light">{{
+				currentCount ? `${currentCount} current` : "None current"
+			}}</el-tag>
 		</header>
-		<div v-if="activeGrants.length" class="access-grant-list">
-			<article
-				v-for="grant in activeGrants"
-				:key="grant.id"
-				class="access-grant-card"
-			>
-				<div class="grant-card-heading">
-					<button
-						class="grant-plan-button"
-						type="button"
-						@click="$emit('open-drip', grant)"
-					>
-						{{ grant.plan_title }}
-					</button>
-					<div class="grant-card-status">
-						<el-tag :type="statusTagType(grant.status)" size="small">{{
-							normaliseSourceLabel(grant.status)
-						}}</el-tag>
-						<el-tag
-							v-if="
-								grant.trial_ends_at &&
-								new Date(grant.trial_ends_at) > new Date()
-							"
-							type="info"
-							size="small"
-							>Trial</el-tag
-						>
-					</div>
-				</div>
-				<dl class="grant-facts">
-					<div>
-						<dt>Granted</dt>
-						<dd>{{ formatDate(grant.created_at) }}</dd>
-					</div>
-					<div>
-						<dt>Access ends</dt>
-						<dd>
-							{{ grant.expires_at ? formatDate(grant.expires_at) : "Lifetime" }}
-						</dd>
-					</div>
-					<div>
-						<dt>Source</dt>
-						<dd>{{ normaliseSourceLabel(grant.source_type) }}</dd>
-					</div>
-				</dl>
-				<div class="grant-card-actions">
-					<el-button
-						v-if="grant.status === 'active'"
-						size="small"
-						plain
-						@click="$emit('pause', grant)"
-						>Pause</el-button
-					>
-					<el-button
-						v-if="grant.status === 'paused'"
-						size="small"
-						type="success"
-						plain
-						@click="$emit('resume', grant)"
-						>Resume</el-button
-					>
-					<el-button size="small" @click="$emit('extend', grant)"
-						>Extend</el-button
-					>
-					<el-popconfirm
-						title="Revoke this grant?"
-						confirm-button-text="Revoke"
-						confirm-button-type="danger"
-						@confirm="$emit('revoke', grant)"
-						><template #reference
-							><el-button size="small" type="danger" plain
-								>Revoke</el-button
-							></template
-						></el-popconfirm
-					>
-				</div>
-			</article>
+
+		<div v-if="memberships.length" class="membership-list">
+			<MembershipCard
+				v-for="membership in memberships"
+				:key="membership.key"
+				:membership="membership"
+				:expanded="expandedKeys.includes(membership.key)"
+				:drip="dripByKey[membership.key] || null"
+				:provider-state="providerStateByKey[membership.key] || null"
+				:provider-checking="providerCheckPending === membership.key"
+				:format-date="formatDate"
+				@toggle="$emit('toggle', $event)"
+				@pause="$emit('pause', $event)"
+				@resume="$emit('resume', $event)"
+				@extend="$emit('extend', $event)"
+				@revoke="$emit('revoke', $event)"
+				@check-providers="$emit('check-providers', $event)"
+			/>
 		</div>
+
 		<div v-else class="access-empty-state">
 			<span class="access-empty-icon" aria-hidden="true"
 				><el-icon><Key /></el-icon
 			></span>
 			<div>
-				<h3>No active access</h3>
+				<h3>No memberships</h3>
 				<p>This member cannot open plan-protected content yet.</p>
 			</div>
-			<el-button type="primary" plain @click="$emit('grant')"
-				>Grant access</el-button
-			>
+			<el-button type="primary" plain @click="$emit('grant')">Grant access</el-button>
 		</div>
 	</section>
 </template>
 
 <script setup>
+import { computed } from "vue";
 import { Key } from "@element-plus/icons-vue";
-defineProps({
-	activeGrants: { type: Array, required: true },
-	accessState: { type: Object, required: true },
+import MembershipCard from "./MembershipCard.vue";
+import { isCurrentMembership } from "@/pages/Members/memberProfileUi.js";
+
+const props = defineProps({
+	memberships: { type: Array, required: true },
+	expandedKeys: { type: Array, default: () => [] },
+	dripByKey: { type: Object, default: () => ({}) },
+	providerStateByKey: { type: Object, default: () => ({}) },
+	providerCheckPending: { type: String, default: "" },
 	formatDate: { type: Function, required: true },
-	statusTagType: { type: Function, required: true },
-	normaliseSourceLabel: { type: Function, required: true },
 });
-defineEmits(["grant", "pause", "resume", "extend", "revoke", "open-drip"]);
+
+defineEmits(["grant", "toggle", "pause", "resume", "extend", "revoke", "check-providers"]);
+
+const currentCount = computed(() => props.memberships.filter(isCurrentMembership).length);
 </script>
 
 <style scoped>
@@ -160,86 +102,9 @@ defineEmits(["grant", "pause", "resume", "extend", "revoke", "open-drip"]);
 	font-size: 12px;
 	line-height: 1.5;
 }
-.access-grant-list {
+.membership-list {
 	display: grid;
 	gap: 10px;
-}
-.access-grant-card {
-	padding: 16px;
-	border: 1px solid var(--fchub-border-color);
-	border-radius: 10px;
-	background: color-mix(
-		in srgb,
-		var(--fchub-card-bg) 98%,
-		var(--el-color-primary) 2%
-	);
-}
-.grant-card-heading,
-.grant-card-status,
-.grant-card-actions {
-	display: flex;
-	align-items: center;
-}
-.grant-card-heading {
-	justify-content: space-between;
-	gap: 12px;
-}
-.grant-card-status,
-.grant-card-actions {
-	flex-wrap: wrap;
-	gap: 6px;
-}
-.grant-plan-button {
-	min-width: 0;
-	margin: 0;
-	padding: 0;
-	border: 0;
-	color: var(--fchub-text-primary);
-	background: transparent;
-	font: inherit;
-	font-size: 15px;
-	font-weight: 700;
-	text-align: left;
-	cursor: pointer;
-}
-.grant-plan-button:hover,
-.grant-plan-button:focus-visible {
-	color: var(--el-color-primary);
-}
-.grant-facts {
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 12px;
-	margin: 14px 0;
-}
-.grant-facts div {
-	min-width: 0;
-}
-.grant-facts dt,
-.grant-facts dd {
-	margin: 0;
-}
-.grant-facts dt {
-	margin-bottom: 3px;
-	color: var(--fchub-text-secondary);
-	font-size: 10px;
-	font-weight: 700;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-}
-.grant-facts dd {
-	color: var(--fchub-text-primary);
-	font-size: 12px;
-	line-height: 1.4;
-	overflow-wrap: anywhere;
-}
-.grant-card-actions {
-	justify-content: flex-end;
-	padding-top: 12px;
-	border-top: 1px solid var(--fchub-border-color);
-}
-.grant-card-actions :deep(.el-button + .el-button) {
-	margin-left: 0;
 }
 .access-empty-state {
 	display: grid;
@@ -247,14 +112,9 @@ defineEmits(["grant", "pause", "resume", "extend", "revoke", "open-drip"]);
 	align-items: center;
 	gap: 14px;
 	padding: 18px;
-	border: 1px dashed
-		color-mix(in srgb, var(--el-color-primary) 25%, var(--fchub-border-color));
+	border: 1px dashed color-mix(in srgb, var(--el-color-primary) 25%, var(--fchub-border-color));
 	border-radius: 10px;
-	background: color-mix(
-		in srgb,
-		var(--fchub-card-bg) 96%,
-		var(--el-color-primary) 4%
-	);
+	background: color-mix(in srgb, var(--fchub-card-bg) 96%, var(--el-color-primary) 4%);
 }
 .access-empty-icon {
 	display: grid;
@@ -263,11 +123,7 @@ defineEmits(["grant", "pause", "resume", "extend", "revoke", "open-drip"]);
 	place-items: center;
 	border-radius: 12px;
 	color: var(--el-color-primary);
-	background: color-mix(
-		in srgb,
-		var(--el-color-primary) 10%,
-		var(--fchub-card-bg)
-	);
+	background: color-mix(in srgb, var(--el-color-primary) 10%, var(--fchub-card-bg));
 	font-size: 20px;
 }
 .access-empty-state h3 {
@@ -308,21 +164,6 @@ defineEmits(["grant", "pause", "resume", "extend", "revoke", "open-drip"]);
 	}
 	.profile-panel-header > .el-tag {
 		align-self: flex-start;
-	}
-	.grant-card-heading {
-		align-items: flex-start;
-	}
-	.grant-facts {
-		gap: 8px;
-	}
-	.grant-card-actions {
-		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-	}
-	.grant-card-actions :deep(.el-button) {
-		width: 100%;
-		margin-left: 0;
-		padding-inline: 7px;
 	}
 }
 </style>

@@ -877,7 +877,7 @@ class GrantRepository
                     g.source_type,
                     MAX(g.source_id) AS source_id,
                     MAX(g.feed_id) AS feed_id,
-                    MIN(g.status) AS status,
+                    " . $this->accessStatusCase() . " AS status,
                     MIN(g.created_at) AS created_at,
                     MAX(g.updated_at) AS updated_at,
                     MAX(g.expires_at) AS expires_at,
@@ -895,7 +895,9 @@ class GrantRepository
 
         $sql .= \FChubMemberships\Support\CustomTableDatabase::prepare(' LIMIT %d OFFSET %d', $perPage, $offset)->sql();
 
-        $query = \FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params);
+        // The derived status is selected before the WHERE clause, so its three
+        // current-time placeholders lead the bound parameters.
+        $query = \FChubMemberships\Support\CustomTableDatabase::prepare($sql, $now, $now, $now, ...$params);
 
         $rows = \FChubMemberships\Support\CustomTableDatabase::getResults($query, ARRAY_A);
 
@@ -926,9 +928,27 @@ class GrantRepository
     }
 
     /**
+     * The access status a member-plan assignment actually has, in the same
+     * precedence `MembershipGrouper` applies on the profile: access in force
+     * first, then access that has not started, then paused, revoked, expired.
+     *
+     * Both `%s` placeholders take the current time.
+     */
+    private function accessStatusCase(string $alias = 'g'): string
+    {
+        return "CASE
+                            WHEN SUM(CASE WHEN {$alias}.status = 'active' AND ({$alias}.starts_at IS NULL OR {$alias}.starts_at <= %s) AND ({$alias}.expires_at IS NULL OR {$alias}.expires_at > %s) THEN 1 ELSE 0 END) > 0 THEN 'active'
+                            WHEN SUM(CASE WHEN {$alias}.status = 'active' AND {$alias}.starts_at IS NOT NULL AND {$alias}.starts_at > %s THEN 1 ELSE 0 END) > 0 THEN 'scheduled'
+                            WHEN SUM(CASE WHEN {$alias}.status = 'paused' THEN 1 ELSE 0 END) > 0 THEN 'paused'
+                            WHEN SUM(CASE WHEN {$alias}.status = 'revoked' THEN 1 ELSE 0 END) > 0 THEN 'revoked'
+                            ELSE 'expired'
+                        END";
+    }
+
+    /**
      * Return unfiltered access-assignment health totals for the admin list.
      *
-     * @return array{active:int, expiring_soon:int, paused:int, ended:int}
+     * @return array{active:int, expiring_soon:int, scheduled:int, paused:int, ended:int}
      */
     public function getAdminSummary(int $expiringDays = 7): array
     {
@@ -939,28 +959,28 @@ class GrantRepository
         $sql = "SELECT
                     SUM(CASE WHEN access_status = 'active' THEN 1 ELSE 0 END) AS active,
                     SUM(CASE WHEN access_status = 'active' AND expires_at IS NOT NULL AND expires_at > %s AND expires_at <= %s THEN 1 ELSE 0 END) AS expiring_soon,
+                    SUM(CASE WHEN access_status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled,
                     SUM(CASE WHEN access_status = 'paused' THEN 1 ELSE 0 END) AS paused,
                     SUM(CASE WHEN access_status IN ('expired', 'revoked') THEN 1 ELSE 0 END) AS ended
                 FROM (
                     SELECT
                         g.user_id,
                         g.plan_id,
-                        CASE
-                            WHEN SUM(CASE WHEN g.status = 'active' AND (g.starts_at IS NULL OR g.starts_at <= %s) AND (g.expires_at IS NULL OR g.expires_at > %s) THEN 1 ELSE 0 END) > 0 THEN 'active'
-                            WHEN SUM(CASE WHEN g.status = 'paused' THEN 1 ELSE 0 END) > 0 THEN 'paused'
-                            WHEN SUM(CASE WHEN g.status = 'revoked' THEN 1 ELSE 0 END) > 0 THEN 'revoked'
-                            ELSE 'expired'
-                        END AS access_status,
+                        " . $this->accessStatusCase() . " AS access_status,
                         MAX(g.expires_at) AS expires_at
                     FROM {$this->table} g
                     GROUP BY g.user_id, g.plan_id
                 ) access_rows";
 
-        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare($sql, $now, $future, $now, $now), ARRAY_A) ?: [];
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(
+            \FChubMemberships\Support\CustomTableDatabase::prepare($sql, $now, $future, $now, $now, $now),
+            ARRAY_A
+        ) ?: [];
 
         return [
             'active' => (int) ($row['active'] ?? 0),
             'expiring_soon' => (int) ($row['expiring_soon'] ?? 0),
+            'scheduled' => (int) ($row['scheduled'] ?? 0),
             'paused' => (int) ($row['paused'] ?? 0),
             'ended' => (int) ($row['ended'] ?? 0),
         ];
@@ -980,6 +1000,9 @@ class GrantRepository
             if ($filters['status'] === 'active') {
                 $where[] = "g.status = 'active' AND (g.starts_at IS NULL OR g.starts_at <= %s) AND (g.expires_at IS NULL OR g.expires_at > %s)";
                 $params[] = $now;
+                $params[] = $now;
+            } elseif ($filters['status'] === 'scheduled') {
+                $where[] = "g.status = 'active' AND g.starts_at IS NOT NULL AND g.starts_at > %s";
                 $params[] = $now;
             } elseif ($filters['status'] === 'paused') {
                 $where[] = "g.status = 'paused'";

@@ -1,5 +1,53 @@
 # Changelog
 
+## Unreleased
+
+The member profile used to show database rows and call them memberships. A plan
+writes one row per rule, so one membership could appear as six cards, each with
+its own Pause button, and pausing one of them left the rest wide open. That is
+now fixed rather than documented.
+
+- **One card per membership.** The profile groups grant rows by plan, matching
+  the member list instead of contradicting it. The rows survive as "what this
+  plan unlocks", inside the card, where they belong.
+- **Pause and resume act on the whole membership.** `POST /admin/members/pause`
+  and `/resume` keep their request shape and still accept `grant_id`, but now
+  resolve it to its membership. Half-paused access is no longer reachable.
+- **A verdict instead of three counters.** The header answers the question
+  people arrive with, including whether a subscription is still going to renew.
+- **Provenance you can follow.** Order and subscription sources link into
+  FluentCart, and a source that cannot be resolved shows its identifier without
+  a link that leads nowhere.
+- **Provider state per membership, on request.** Checking calls the providers,
+  so it happens when asked and never on page load. WordPress reports as local
+  and uncertified providers say so, rather than displaying a reassuring tick.
+- **One history.** Grant history and activity merged into a single timeline with
+  descriptions written for a reader. Revocations and pauses now appear at all —
+  they were read from fields that never existed.
+- **Extensions are recorded and presettable.** Extending writes an audit record,
+  and `+1 month` / `+1 year` are measured from the current expiry, so extending
+  an unexpired membership cannot shorten it.
+- **An access check that refuses to guess.** Pick protected content and the real
+  evaluator answers, with its reason. It states plainly that URL patterns and
+  menu protection are decided at request time and not covered.
+- **Access that has not started is called scheduled.** The member list used to
+  file it under Ended, offer no filter that could find it, and label the row
+  Active — because the row status was an alphabetical minimum over a column.
+  Summary, filter, and row now derive the same status the profile does. The
+  Scheduled tile appears only when there is scheduled access to report.
+- **Picking an expiry date works again.** Every membership date picker emits
+  `YYYY-MM-DD` while the REST layer has only ever accepted `Y-m-d H:i:s`, so
+  extending, bulk-extending, and granting with an expiry all failed with
+  "Invalid parameter: expires_at" the moment anyone touched the calendar. A
+  picked day now becomes the last second of that day, so the member keeps the
+  whole of it.
+- **Bulk export writes one row per membership**, matching the filtered export
+  and the list instead of repeating a member once per protected resource. Both
+  exports now carry the same columns and the same derived status, and plan
+  titles are read in one query rather than one per grant.
+- Profile loading no longer issues a query per grant, and stopped shipping fifty
+  audit entries the admin app never read.
+
 ## 1.4.3 - 2026-08-06
 
 - Add every eligible Space from a FluentCommunity Space Group to a plan in one action.

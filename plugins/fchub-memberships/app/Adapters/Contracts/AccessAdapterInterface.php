@@ -38,7 +38,10 @@ interface AccessAdapterInterface
     /**
      * Search for resources of a given type.
      *
-     * @return array<int, array{id: string, label: string}>
+     * `status` and `type_label` are optional: providers that have no
+     * equivalent omit them, and the picker simply shows less.
+     *
+     * @return array<int, array{id: string, label: string, status?: string, type_label?: string}>
      */
     public function searchResources(string $query, string $resourceType, int $limit = 20): array;
 

@@ -520,6 +520,11 @@ namespace FChubMemberships\Tests\Unit\FluentCRM\Triggers {
                     return $this->grant;
                 }
 
+                public function getByUserId(int $userId, array $filters = []): array
+                {
+                    return [$this->grant];
+                }
+
                 public function update(int $id, array $data): bool
                 {
                     $this->grant = array_replace($this->grant, $data);

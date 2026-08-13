@@ -240,7 +240,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowRight } from '@element-plus/icons-vue'
 import { members as membersApi, plans } from '@/api/index.js'
-import { formatWpDate, wpDatePickerFormat } from '@/utils/wpDate.js'
+import { formatWpDate, toExpiryTimestamp, wpDatePickerFormat } from '@/utils/wpDate.js'
 import { useGrantAccessUserPicker } from '@/composables/members/useGrantAccessUserPicker.js'
 import MemberListToolbar from '@/components/members/MemberListToolbar.vue'
 import MemberBulkActionsBar from '@/components/members/MemberBulkActionsBar.vue'
@@ -260,7 +260,7 @@ const total = ref(0)
 const page = ref(1)
 const perPage = ref(20)
 const errorMessage = ref('')
-const summary = reactive({ active: 0, expiring_soon: 0, paused: 0, ended: 0 })
+const summary = reactive({ active: 0, expiring_soon: 0, scheduled: 0, paused: 0, ended: 0 })
 let requestSequence = 0
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage.value)))
@@ -270,6 +270,10 @@ const hasActiveFilters = computed(() => Boolean(
 const summaryItems = computed(() => [
   { label: 'Active access', value: summary.active, support: 'Member-plan assignments usable now', tone: 'success' },
   { label: 'Expiring in 7 days', value: summary.expiring_soon, support: 'Assignments needing a renewal decision', tone: 'warning' },
+  // Scheduled access is rare, so its tile appears only when there is some.
+  ...(summary.scheduled
+    ? [{ label: 'Scheduled access', value: summary.scheduled, support: 'Assignments that have not started yet' }]
+    : []),
   { label: 'Paused access', value: summary.paused, support: 'Recoverable assignments currently held' },
   { label: 'Ended access', value: summary.ended, support: 'Expired or revoked assignments' },
 ])
@@ -365,6 +369,7 @@ async function fetchMembers() {
     Object.assign(summary, {
       active: Number(response.summary?.active) || 0,
       expiring_soon: Number(response.summary?.expiring_soon) || 0,
+      scheduled: Number(response.summary?.scheduled) || 0,
       paused: Number(response.summary?.paused) || 0,
       ended: Number(response.summary?.ended) || 0,
     })
@@ -417,7 +422,7 @@ async function handleGrant() {
       user_id: grantForm.user_id,
       plan_id: grantForm.plan_id,
     }
-    if (grantForm.expires_at) payload.expires_at = grantForm.expires_at
+    if (grantForm.expires_at) payload.expires_at = toExpiryTimestamp(grantForm.expires_at)
     if (grantForm.reason) payload.reason = grantForm.reason
 
     await membersApi.grant(payload)
@@ -542,7 +547,7 @@ async function executeBulkExtend() {
     await membersApi.bulkExtend({
       user_ids: userIds,
       plan_id: bulkForm.plan_id,
-      expires_at: bulkForm.expires_at,
+      expires_at: toExpiryTimestamp(bulkForm.expires_at),
     })
     ElMessage.success(`Expiry extended for ${userIds.length} members`)
     bulkExtendDialogVisible.value = false
@@ -611,6 +616,7 @@ function resetGrantForm() {
 function statusTagType(status) {
   const map = {
     active: 'success',
+    scheduled: 'info',
     paused: 'warning',
     expired: 'warning',
     revoked: 'danger',

@@ -9,6 +9,12 @@ use FChubMemberships\Adapters\Contracts\BatchResourceLabelAdapterInterface;
 
 class WordPressContentAdapter implements AccessAdapterInterface, BatchResourceLabelAdapterInterface
 {
+    /**
+     * Admins protect content before it goes live, so the picker reads every
+     * status an editor can hold rather than published content alone.
+     */
+    private const SEARCHABLE_POST_STATUSES = ['publish', 'future', 'draft', 'pending', 'private'];
+
     public function supports(string $resourceType): bool
     {
         // Built-in aliases
@@ -263,7 +269,7 @@ class WordPressContentAdapter implements AccessAdapterInterface, BatchResourceLa
 
         $args = [
             'post_type'      => $postType,
-            'post_status'    => 'publish',
+            'post_status'    => self::SEARCHABLE_POST_STATUSES,
             'posts_per_page' => $limit,
             'orderby'        => $query === '' ? 'date' : 'relevance',
             'order'          => 'DESC',
@@ -283,6 +289,7 @@ class WordPressContentAdapter implements AccessAdapterInterface, BatchResourceLa
             $results[] = [
                 'id'         => (string) $post->ID,
                 'label'      => $post->post_title,
+                'status'     => (string) $post->post_status,
                 'type_label' => $typeLabel,
             ];
         }

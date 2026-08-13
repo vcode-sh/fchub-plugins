@@ -39,6 +39,12 @@ final class GrantMaintenanceService
             }
 
             $this->grants->update($grant['id'], $updateData);
+            AuditLogger::logGrantChange(
+                (int) $grant['id'],
+                'extended',
+                ['expires_at' => $grant['expires_at'] ?? null],
+                ['expires_at' => $newExpiresAt]
+            );
             $extended++;
         }
 

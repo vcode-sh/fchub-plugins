@@ -55,7 +55,7 @@ test('uses purpose-built mobile cards for operational lists', async ({ page }) =
 
   await openRoute(page, '/members', 'Members')
   await expect(page.locator('.mobile-member-list')).toContainText('Alice Example')
-  await expect(page.locator('.mobile-member-list').getByRole('link', { name: 'Manage profile' })).toBeVisible()
+  await expect(page.locator('.mobile-member-list').getByRole('link', { name: 'Manage profile' }).first()).toBeVisible()
 
   await openRoute(page, '/drip', 'Drip Content')
   await expect(page.locator('.mobile-drip-queue')).toContainText('Locked Lesson')

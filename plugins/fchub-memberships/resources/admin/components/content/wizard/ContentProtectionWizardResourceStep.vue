@@ -8,15 +8,6 @@
       <button type="button" @click="emit('select-step', 0)">Change content type</button>
     </div>
 
-    <el-alert
-      v-if="resourceError"
-      :title="resourceError"
-      type="error"
-      :closable="false"
-      show-icon
-      class="cpw-alert"
-    />
-
     <el-form label-position="top" class="cpw-form">
       <el-form-item v-if="!form.resource_type" label="Resource type" required>
         <el-select
@@ -40,23 +31,10 @@
             v-model="form.resource_id"
             placeholder="Choose a special page"
             class="cpw-control"
-            :loading="resourceLoading"
             no-data-text="No special pages are available"
+            @change="onSpecialPageChange"
           >
-            <el-option v-for="item in resourceOptions" :key="item.id" :label="item.label || item.title" :value="String(item.id)" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item v-else-if="form.resource_type === 'menu_item'" label="Menu item" required>
-          <el-select
-            v-model="form.resource_id"
-            placeholder="Choose a menu item"
-            class="cpw-control"
-            :loading="resourceLoading"
-            filterable
-            no-data-text="No menu items are available"
-          >
-            <el-option v-for="item in resourceOptions" :key="item.id" :label="item.label || item.title" :value="String(item.id)" />
+            <el-option v-for="item in specialPages" :key="item.id" :label="item.label" :value="String(item.id)" />
           </el-select>
         </el-form-item>
 
@@ -65,39 +43,24 @@
             <el-radio value="all" border>All protected content comments</el-radio>
             <el-radio value="specific" border>Comments on one post</el-radio>
           </el-radio-group>
-          <el-select
+          <ResourcePicker
             v-if="form.commentMode === 'specific'"
             v-model="form.resource_id"
-            filterable
-            remote
-            :remote-method="searchResources"
-            :loading="resourceLoading"
-            placeholder="Choose or search for a post"
-            class="cpw-control cpw-nested-control"
-            popper-class="cpw-resource-popper"
-            no-data-text="No matching posts"
-            @visible-change="onResourcePickerVisibility"
-          >
-            <el-option v-for="item in resourceOptions" :key="item.id" :label="item.label || item.title" :value="String(item.id)" />
-          </el-select>
+            v-model:label="form.resource_label"
+            resource-type="post"
+            type-label="Posts"
+            class="cpw-nested-control"
+          />
         </el-form-item>
 
         <el-form-item v-else label="Resource" required>
-          <el-select
+          <ResourcePicker
             v-model="form.resource_id"
-            filterable
-            remote
-            :remote-method="searchResources"
-            :loading="resourceLoading"
-            :placeholder="resourcePlaceholder"
-            class="cpw-control"
-            popper-class="cpw-resource-popper"
-            no-data-text="No matching content"
-            @visible-change="onResourcePickerVisibility"
-          >
-            <el-option v-for="item in resourceOptions" :key="item.id" :label="item.label || item.title" :value="String(item.id)" />
-          </el-select>
-          <p class="cpw-field-help">Browse recent resources or type at least 2 characters to search. Only the selected resource will be protected.</p>
+            v-model:label="form.resource_label"
+            :resource-type="form.resource_type"
+            :type-label="form.resource_type_label || 'content'"
+          />
+          <p class="cpw-field-help">Browse the most recent items or type to search. Only the selected resource will be protected.</p>
         </el-form-item>
       </template>
     </el-form>
@@ -105,23 +68,20 @@
 </template>
 
 <script setup>
+import ResourcePicker from '@/components/content/ResourcePicker.vue'
+
 const props = defineProps({
   form: { type: Object, required: true },
   categoryTypes: { type: Array, default: () => [] },
   categorySelectionLabel: { type: String, required: true },
-  resourceLoading: Boolean,
-  resourceError: { type: String, default: '' },
-  resourceOptions: { type: Array, default: () => [] },
-  resourcePlaceholder: { type: String, required: true },
-  searchResources: { type: Function, required: true },
+  specialPages: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['select-step', 'type-change', 'comment-mode-change'])
 
-function onResourcePickerVisibility(visible) {
-  if (visible) {
-    props.searchResources('')
-  }
+function onSpecialPageChange(id) {
+  const page = props.specialPages.find((item) => String(item.id) === String(id))
+  props.form.resource_label = page ? page.label : null
 }
 </script>
 
@@ -168,23 +128,6 @@ function onResourcePickerVisibility(visible) {
   background: var(--el-fill-color-light);
   padding: 1px 4px;
   border-radius: 4px;
-}
-
-.cpw-resource-popper {
-  max-width: calc(100vw - 16px);
-  box-sizing: border-box;
-}
-
-.cpw-resource-popper .el-select-dropdown,
-.cpw-resource-popper .el-select-dropdown__wrap,
-.cpw-resource-popper .el-select-dropdown__list {
-  max-width: 100%;
-}
-
-.cpw-resource-popper .el-select-dropdown__item {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .cpw-alert {

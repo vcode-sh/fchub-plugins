@@ -18,7 +18,7 @@ async function chooseMembersPost(page, dialog) {
   await dialog.getByRole('button', { name: 'Continue' }).click()
   await expect(dialog.getByRole('heading', { name: 'Choose a specific resource' })).toBeVisible()
   await dialog.getByRole('combobox', { name: /Resource/ }).fill('Members')
-  await page.getByRole('option', { name: 'Members Post' }).click()
+  await page.getByRole('option', { name: /Members Post/ }).click()
 }
 
 async function chooseGoldPlan(page, dialog) {
@@ -109,12 +109,34 @@ test('opens the resource combobox with browse results before typing', async ({ p
   await choosePost(dialog)
   await dialog.getByRole('button', { name: 'Continue' }).click()
 
-  const resourcePicker = dialog.getByRole('combobox', { name: /Resource/ })
-  await expect(dialog.getByText('Choose or search posts', { exact: true })).toBeVisible()
+  await expect(dialog.locator('.cpw-resource-step .el-select__placeholder')).toHaveText('Search Posts…')
   await dialog.locator('.cpw-resource-step .el-select').click()
 
-  await expect(page.getByRole('option', { name: 'Members Post' })).toBeVisible()
-  await expect(dialog.getByText('Browse recent resources or type at least 2 characters to search.')).toBeVisible()
+  await expect(page.getByRole('option', { name: /Members Post/ })).toBeVisible()
+  await expect(dialog.getByText('Browse the most recent items or type to search.')).toBeVisible()
+})
+
+test('keeps the chosen title on screen after the next search replaces the results', async ({ page }) => {
+  const dialog = await openWizard(page)
+  await choosePost(dialog)
+  await dialog.getByRole('button', { name: 'Continue' }).click()
+
+  const combobox = dialog.getByRole('combobox', { name: /Resource/ })
+  const selected = dialog.locator('.cpw-resource-step .el-select__placeholder')
+  await dialog.locator('.cpw-resource-step .el-select').click()
+  await page.getByRole('option', { name: /Members Post/ }).click()
+  await expect(selected).toHaveText('Members Post')
+
+  await combobox.fill('Mobile')
+  await expect(page.getByRole('option', { name: /Mobile-First Design/ })).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await expect(selected).toHaveText('Members Post')
+
+  await chooseGoldPlan(page, dialog)
+  await dialog.getByRole('button', { name: 'Review rule' }).click()
+  await expect(dialog.getByRole('heading', { name: 'Review the protection rule' })).toBeVisible()
+  await expect(dialog.getByText('Members Post')).toBeVisible()
 })
 
 test('keeps long resource titles inside the mobile viewport', async ({ page }) => {
@@ -123,9 +145,9 @@ test('keeps long resource titles inside the mobile viewport', async ({ page }) =
   await choosePost(dialog)
   await dialog.getByRole('button', { name: 'Continue' }).click()
   await dialog.locator('.cpw-resource-step .el-select').click()
-  await expect(page.getByRole('option', { name: 'Members Post' })).toBeVisible()
+  await expect(page.getByRole('option', { name: /Members Post/ })).toBeVisible()
 
-  const geometry = await page.locator('.el-popper.cpw-resource-popper').evaluate((popper) => {
+  const geometry = await page.locator('.el-popper.resource-picker-popper').evaluate((popper) => {
     const rect = popper.getBoundingClientRect()
     return {
       left: rect.left,
@@ -150,7 +172,7 @@ test('keeps the modal deliberate and exposes resource-search failures', async ({
 
   await page.evaluate(() => { window.__fchubSmokeFailResourceSearch = true })
   await dialog.getByRole('combobox', { name: /Resource/ }).fill('Unavailable')
-  await expect(dialog.getByText('Content search is temporarily unavailable')).toBeVisible()
+  await expect(page.locator('.resource-picker-popper').getByText('Content search is temporarily unavailable')).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Continue' })).toBeDisabled()
 })
 

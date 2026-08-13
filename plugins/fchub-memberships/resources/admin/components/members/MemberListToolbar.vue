@@ -61,6 +61,7 @@
         @change="$emit('filter-change')"
       >
         <el-option label="Active" value="active" />
+        <el-option label="Scheduled" value="scheduled" />
         <el-option label="Paused" value="paused" />
         <el-option label="Expired" value="expired" />
         <el-option label="Revoked" value="revoked" />

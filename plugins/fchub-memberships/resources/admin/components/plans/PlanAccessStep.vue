@@ -85,7 +85,7 @@
             v-model="rule.resource_type"
             placeholder="Type"
             :disabled="isPlanRuleControlLocked(form.rules, rule)"
-            @change="$emit('resource-type-change', index, rule)"
+            @change="$emit('resource-type-change', rule)"
           >
             <el-option-group v-for="group in resourceTypeGroups" :key="group.key" :label="group.label">
               <el-option v-for="type in group.types" :key="type.value" :label="type.displayLabel" :value="type.value">
@@ -111,25 +111,14 @@
             </el-select>
           </template>
           <template v-else>
-            <el-select
+            <ResourcePicker
               v-model="rule.resource_id"
-              filterable
-              remote
-              clearable
+              v-model:label="rule.resource_label"
+              :resource-type="rule.resource_type"
+              :type-label="getTypeConfig(rule.resource_type)?.label || rule.resource_type"
+              :allow-all="Boolean(getTypeConfig(rule.resource_type)?.allow_all)"
               :disabled="isPlanRuleControlLocked(form.rules, rule)"
-              :remote-method="(query) => $emit('search-resource', index, rule.resource_type, query)"
-              :loading="ruleResourceLoading[index]"
-              placeholder="Search by title..."
-              @clear="$emit('reset-resource', rule)"
-            >
-              <el-option v-if="getTypeConfig(rule.resource_type)?.allow_all" label="All of this type" value="0" />
-              <el-option
-                v-for="item in ruleResourceOptions[index]"
-                :key="item.id"
-                :label="item.label"
-                :value="String(item.id)"
-              />
-            </el-select>
+            />
             <el-icon
               v-if="rule.resource_id && rule.resource_id !== '0' && rule.resource_label === '(Deleted)'"
               class="rule-warning-icon"
@@ -183,6 +172,7 @@
 <script setup>
 import { Delete, Lock, Plus, WarningFilled } from '@element-plus/icons-vue'
 import { isPlanRuleControlLocked } from '@/utils/planRulePayload.js'
+import ResourcePicker from '@/components/content/ResourcePicker.vue'
 
 defineProps({
   form: { type: Object, required: true },
@@ -191,8 +181,6 @@ defineProps({
   spaceGroups: { type: Array, required: true },
   spaceGroupsLoading: { type: Boolean, required: true },
   resourceTypeGroups: { type: Array, required: true },
-  ruleResourceOptions: { type: Object, required: true },
-  ruleResourceLoading: { type: Object, required: true },
   specialPageOptions: { type: Array, required: true },
   getTypeConfig: { type: Function, required: true },
   resourceIdRules: { type: Function, required: true },
@@ -206,8 +194,6 @@ defineEmits([
   'add-rule',
   'remove-rule',
   'resource-type-change',
-  'search-resource',
-  'reset-resource',
   'drip-type-change',
 ])
 

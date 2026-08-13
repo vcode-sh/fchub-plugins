@@ -15,4 +15,5 @@ export const members = {
   bulkExport: (data) => apiClient.post('admin/members/bulk-export', data),
   activity: (userId, params) => apiClient.get(`admin/members/${userId}/activity`, params),
   dripTimeline: (userId, params) => apiClient.get(`admin/members/${userId}/drip-timeline`, params),
+  providerState: (userId) => apiClient.get(`admin/members/${userId}/provider-state`),
 }

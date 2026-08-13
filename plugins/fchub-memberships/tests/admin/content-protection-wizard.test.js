@@ -141,17 +141,17 @@ describe('content protection wizard state', () => {
     vi.spyOn(ElMessage, 'error').mockImplementation(() => undefined)
   })
 
-  it('requires a subtype for a multi-type category and resets stale resources', () => {
+  it('requires a subtype for a multi-type category and drops the stale selection', () => {
     const { wizard } = createWizard()
     wizard.wizardForm.resource_type = 'page'
     wizard.wizardForm.resource_id = '91'
-    wizard.resourceOptions.value = [{ id: '91', label: 'Old Page' }]
+    wizard.wizardForm.resource_label = 'Old Page'
 
     wizard.selectWizardCategory({ key: 'posts_pages', label: 'Posts & Pages' })
 
     expect(wizard.wizardForm.resource_type).toBe('')
     expect(wizard.wizardForm.resource_id).toBe('')
-    expect(wizard.resourceOptions.value).toEqual([])
+    expect(wizard.wizardForm.resource_label).toBeNull()
     expect(wizard.canAdvanceWizard.value).toBe(false)
 
     wizard.wizardForm.resource_type = 'post'
@@ -161,122 +161,55 @@ describe('content protection wizard state', () => {
     expect(wizard.canAdvanceWizard.value).toBe(true)
   })
 
-  it('ignores a stale resource response after a newer search wins', async () => {
-    vi.useFakeTimers()
-    const first = deferred()
-    const second = deferred()
-    const { wizard } = createWizard({
-      searchResources: vi.fn()
-        .mockReturnValueOnce(first.promise)
-        .mockReturnValueOnce(second.promise),
-    })
+  it('names the chosen resource on review instead of echoing its id', () => {
+    const { wizard } = createWizard()
     wizard.wizardForm.resource_type = 'post'
+    wizard.wizardForm.resource_id = '91'
 
-    const oldSearch = wizard.searchResources('old')
-    await vi.advanceTimersByTimeAsync(250)
-    const newSearch = wizard.searchResources('new')
-    await vi.advanceTimersByTimeAsync(250)
-    second.resolve({ data: [{ id: '2', label: 'New result' }] })
-    await newSearch
-    first.resolve({ data: [{ id: '1', label: 'Old result' }] })
-    await oldSearch
+    expect(wizard.wizardResourceDisplayName.value).toBe('91')
 
-    expect(wizard.resourceOptions.value).toEqual([{ id: '2', label: 'New result' }])
-    expect(wizard.resourceSearchLoading.value).toBe(false)
-    vi.useRealTimers()
+    wizard.wizardForm.resource_label = 'Getting Started'
+    expect(wizard.wizardResourceDisplayName.value).toBe('Getting Started')
   })
 
-  it('loads browse results and clears old errors for a blank query', async () => {
-    const browseResults = [{ id: '1', label: 'Recent result' }]
-    const { api, wizard } = createWizard({
-      searchResources: vi.fn().mockResolvedValue({ data: browseResults }),
+  it('reads a URL pattern straight from the field it was typed into', () => {
+    const { wizard } = createWizard()
+    wizard.wizardForm.resource_type = 'url_pattern'
+    wizard.wizardForm.resource_id = '/members/*'
+
+    expect(wizard.wizardResourceDisplayName.value).toBe('/members/*')
+  })
+
+  it('labels the comment wildcard and clears it when scoping to one post', () => {
+    const { wizard } = createWizard()
+    wizard.wizardForm.resource_type = 'comment'
+    wizard.wizardForm.commentMode = 'all'
+    wizard.onCommentModeChange()
+
+    expect(wizard.wizardForm.resource_id).toBe('*')
+    expect(wizard.wizardResourceDisplayName.value).toBe('All Protected Content Comments')
+
+    wizard.wizardForm.commentMode = 'specific'
+    wizard.onCommentModeChange()
+
+    expect(wizard.wizardForm.resource_id).toBe('')
+    expect(wizard.wizardForm.resource_label).toBeNull()
+  })
+
+  it('loads the fixed special-page list once the type is chosen', async () => {
+    const searchResources = vi.fn().mockResolvedValue({
+      data: [{ id: 'blog', label: 'Blog / Posts Page' }],
     })
-    wizard.wizardForm.resource_type = 'post'
-    wizard.resourceOptions.value = [{ id: '1', label: 'Old result' }]
-    wizard.resourceSearchError.value = 'Old failure'
+    const { wizard } = createWizard({ searchResources })
+    wizard.wizardForm.resource_type = 'special_page'
 
-    await wizard.searchResources('   ')
+    wizard.onWizardTypeChange()
+    await Promise.resolve()
 
-    expect(api.searchResources).toHaveBeenCalledWith({ type: 'post', query: '' })
-    expect(wizard.resourceOptions.value).toEqual(browseResults)
-    expect(wizard.resourceSearchError.value).toBe('')
+    expect(searchResources).toHaveBeenCalledWith({ type: 'special_page', query: '' })
+    expect(wizard.specialPages.value).toEqual([{ id: 'blog', label: 'Blog / Posts Page' }])
   })
 
-  it('debounces remote searches and reuses cached query results', async () => {
-    vi.useFakeTimers()
-    const results = [{ id: '2', label: 'Designing Forms' }]
-    const { api, wizard } = createWizard({
-      searchResources: vi.fn().mockResolvedValue({ data: results }),
-    })
-    wizard.wizardForm.resource_type = 'post'
-
-    const firstSearch = wizard.searchResources('design')
-    expect(api.searchResources).not.toHaveBeenCalled()
-
-    await vi.advanceTimersByTimeAsync(249)
-    expect(api.searchResources).not.toHaveBeenCalled()
-
-    await vi.advanceTimersByTimeAsync(1)
-    await firstSearch
-    expect(api.searchResources).toHaveBeenCalledTimes(1)
-    expect(api.searchResources).toHaveBeenCalledWith({ type: 'post', query: 'design' })
-
-    await wizard.searchResources('design')
-    expect(api.searchResources).toHaveBeenCalledTimes(1)
-    expect(wizard.resourceOptions.value).toEqual(results)
-    vi.useRealTimers()
-  })
-
-  it('keeps initial browse results for a one-character query', async () => {
-    const browseResults = [{ id: '3', label: 'Business' }]
-    const { api, wizard } = createWizard({
-      searchResources: vi.fn().mockResolvedValue({ data: browseResults }),
-    })
-    wizard.wizardForm.resource_type = 'category'
-
-    await wizard.searchResources('')
-    await wizard.searchResources('b')
-
-    expect(api.searchResources).toHaveBeenCalledTimes(1)
-    expect(api.searchResources).toHaveBeenCalledWith({ type: 'category', query: '' })
-    expect(wizard.resourceOptions.value).toEqual(browseResults)
-  })
-
-  it('preserves the selected resource while displaying new search results', async () => {
-    vi.useFakeTimers()
-    const { wizard } = createWizard({
-      searchResources: vi.fn().mockResolvedValue({
-        data: [{ id: '9', label: 'New result' }],
-      }),
-    })
-    wizard.wizardForm.resource_type = 'post'
-    wizard.wizardForm.resource_id = '5'
-    wizard.resourceOptions.value = [{ id: '5', label: 'Selected result' }]
-
-    const search = wizard.searchResources('new')
-    await vi.advanceTimersByTimeAsync(250)
-    await search
-
-    expect(wizard.resourceOptions.value).toEqual([
-      { id: '5', label: 'Selected result' },
-      { id: '9', label: 'New result' },
-    ])
-    vi.useRealTimers()
-  })
-
-  it('shows a useful search error without retaining stale results', async () => {
-    const { wizard } = createWizard({
-      searchResources: vi.fn().mockRejectedValue(new Error('Search service unavailable')),
-    })
-    wizard.wizardForm.resource_type = 'post'
-    wizard.resourceOptions.value = [{ id: '1', label: 'Old result' }]
-
-    await wizard.searchResources('members')
-
-    expect(wizard.resourceOptions.value).toEqual([])
-    expect(wizard.resourceSearchError.value).toBe('Search service unavailable')
-    expect(wizard.resourceSearchLoading.value).toBe(false)
-  })
 
   it('submits once during rapid duplicate actions and preserves the payload', async () => {
     const mutation = deferred()

@@ -2,9 +2,6 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { canAdvanceProtectionStep } from '@/components/content/contentProtectionWizardUi.js'
 
-const RESOURCE_SEARCH_DELAY = 250
-const MIN_RESOURCE_QUERY_LENGTH = 2
-
 export function useContentProtectionWizard({
   contentApi,
   fetchContent,
@@ -15,13 +12,7 @@ export function useContentProtectionWizard({
   const wizardVisible = ref(false)
   const wizardStep = ref(0)
   const protectLoading = ref(false)
-  const resourceSearchLoading = ref(false)
-  const resourceSearchError = ref('')
-  const resourceOptions = ref([])
-  const resourceResultCache = new Map()
-  const resourcePendingRequests = new Map()
-  let resourceRequestId = 0
-  let resourceSessionId = 0
+  const specialPages = ref([])
 
   const wizardForm = reactive({
     categoryKey: '',
@@ -29,6 +20,7 @@ export function useContentProtectionWizard({
     resource_type: '',
     resource_type_label: '',
     resource_id: '',
+    resource_label: null,
     plan_ids: [],
     show_teaser: 'no',
     restriction_message: '',
@@ -69,18 +61,12 @@ export function useContentProtectionWizard({
     wizardForm.resource_type = ''
     wizardForm.resource_type_label = ''
     wizardForm.resource_id = ''
+    wizardForm.resource_label = null
     wizardForm.plan_ids = []
     wizardForm.show_teaser = 'no'
     wizardForm.restriction_message = ''
     wizardForm.redirect_url = ''
     wizardForm.commentMode = 'all'
-    resourceRequestId += 1
-    resourceSessionId += 1
-    resourceResultCache.clear()
-    resourcePendingRequests.clear()
-    resourceOptions.value = []
-    resourceSearchError.value = ''
-    resourceSearchLoading.value = false
   }
 
   function openProtectWizard(categoryKey, categoryCards) {
@@ -97,11 +83,7 @@ export function useContentProtectionWizard({
     wizardForm.categoryLabel = card.label
     wizardForm.resource_type = ''
     wizardForm.resource_type_label = ''
-    wizardForm.resource_id = ''
-    resourceRequestId += 1
-    resourceOptions.value = []
-    resourceSearchError.value = ''
-    resourceSearchLoading.value = false
+    clearResourceSelection()
 
     const types = wizardCategoryTypes.value
     if (types.length === 1) {
@@ -112,132 +94,43 @@ export function useContentProtectionWizard({
   }
 
   function onWizardTypeChange() {
-    wizardForm.resource_id = ''
-    resourceRequestId += 1
-    resourceOptions.value = []
-    resourceSearchError.value = ''
-    resourceSearchLoading.value = false
+    clearResourceSelection()
     const typeObj = wizardCategoryTypes.value.find(t => t.value === wizardForm.resource_type)
     wizardForm.resource_type_label = typeObj ? typeObj.label : wizardForm.resource_type
     loadInitialResources()
   }
 
   function onCommentModeChange() {
-    wizardForm.resource_id = wizardForm.commentMode === 'all' ? '*' : ''
-  }
-
-  async function loadInitialResources() {
-    const type = wizardForm.resource_type
-    if (!type) return
-
-    if (type === 'special_page' || type === 'menu_item') {
-      await searchResources('')
-    }
-
-    if (type === 'comment') {
-      wizardForm.commentMode = 'all'
+    clearResourceSelection()
+    if (wizardForm.commentMode === 'all') {
       wizardForm.resource_id = '*'
+      wizardForm.resource_label = 'All Protected Content Comments'
     }
   }
 
-  function mergeSelectedResource(options) {
-    const selected = resourceOptions.value.find(
-      option => String(option.id) === String(wizardForm.resource_id),
-    )
-
-    if (!selected || options.some(option => String(option.id) === String(selected.id))) {
-      return options
-    }
-
-    return [selected, ...options]
+  function clearResourceSelection() {
+    wizardForm.resource_id = ''
+    wizardForm.resource_label = null
   }
 
-  function cacheKey(type, query) {
-    return `${type}:${query.toLowerCase()}`
-  }
-
-  async function fetchResourceOptions(type, query, requestId, sessionId) {
-    const key = cacheKey(type, query)
-
-    if (resourceResultCache.has(key)) {
-      if (requestId === resourceRequestId) {
-        resourceOptions.value = mergeSelectedResource(resourceResultCache.get(key))
-        resourceSearchLoading.value = false
-      }
-      return
+  // Special pages are a fixed six, so they load once instead of being searched.
+  async function loadInitialResources() {
+    if (wizardForm.resource_type === 'special_page') {
+      const response = await contentApi.searchResources({ type: 'special_page', query: '' })
+      specialPages.value = response.data ?? response ?? []
     }
 
-    let request = resourcePendingRequests.get(key)
-    if (!request) {
-      request = contentApi.searchResources({ type, query })
-        .then((res) => {
-          const options = res.data ?? res ?? []
-          if (sessionId === resourceSessionId) {
-            resourceResultCache.set(key, options)
-          }
-          return options
-        })
-      resourcePendingRequests.set(key, request)
-      const clearPendingRequest = () => {
-        if (resourcePendingRequests.get(key) === request) {
-          resourcePendingRequests.delete(key)
-        }
-      }
-      void request.then(clearPendingRequest, clearPendingRequest)
+    if (wizardForm.resource_type === 'comment') {
+      wizardForm.commentMode = 'all'
+      onCommentModeChange()
     }
-
-    try {
-      const options = await request
-      if (requestId === resourceRequestId) {
-        resourceOptions.value = mergeSelectedResource(options)
-      }
-    } catch (error) {
-      if (requestId === resourceRequestId) {
-        resourceOptions.value = mergeSelectedResource([])
-        resourceSearchError.value = error.message || 'Content search failed. Try again.'
-      }
-    } finally {
-      if (requestId === resourceRequestId) {
-        resourceSearchLoading.value = false
-      }
-    }
-  }
-
-  async function searchResources(query) {
-    const type = wizardForm.resource_type === 'comment' ? 'post' : wizardForm.resource_type
-    const normalizedQuery = String(query || '').trim()
-    if (!type) {
-      resourceRequestId += 1
-      resourceOptions.value = []
-      resourceSearchError.value = ''
-      resourceSearchLoading.value = false
-      return
-    }
-
-    const requestId = ++resourceRequestId
-    const sessionId = resourceSessionId
-    const effectiveQuery = normalizedQuery.length < MIN_RESOURCE_QUERY_LENGTH ? '' : normalizedQuery
-    const key = cacheKey(type, effectiveQuery)
-    resourceSearchLoading.value = true
-    resourceSearchError.value = ''
-
-    if (normalizedQuery.length >= MIN_RESOURCE_QUERY_LENGTH && !resourceResultCache.has(key)) {
-      await new Promise(resolve => setTimeout(resolve, RESOURCE_SEARCH_DELAY))
-      if (requestId !== resourceRequestId) return
-    }
-
-    await fetchResourceOptions(type, effectiveQuery, requestId, sessionId)
   }
 
   const wizardResourceDisplayName = computed(() => {
     if (wizardForm.resource_type === 'url_pattern') {
       return wizardForm.resource_id || '(not set)'
     }
-    if (wizardForm.resource_type === 'comment' && wizardForm.resource_id === '*') {
-      return 'All Protected Content Comments'
-    }
-    const opt = resourceOptions.value.find(o => String(o.id) === String(wizardForm.resource_id))
-    return opt ? (opt.label || opt.title) : wizardForm.resource_id || '(not set)'
+    return wizardForm.resource_label || wizardForm.resource_id || '(not set)'
   })
 
   const canAdvanceWizard = computed(() => canAdvanceProtectionStep(wizardStep.value, wizardForm))
@@ -270,9 +163,7 @@ export function useContentProtectionWizard({
     wizardVisible,
     wizardStep,
     protectLoading,
-    resourceSearchLoading,
-    resourceSearchError,
-    resourceOptions,
+    specialPages,
     wizardForm,
     wizardCategoryTypes,
     wizardResourceDisplayName,
@@ -283,7 +174,6 @@ export function useContentProtectionWizard({
     selectWizardCategory,
     onWizardTypeChange,
     onCommentModeChange,
-    searchResources,
     submitProtect,
     resetWizard,
   }

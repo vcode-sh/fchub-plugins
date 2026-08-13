@@ -1,6 +1,7 @@
 export { apiClient as default } from './client.js'
 export { plans } from './plans.js'
 export { members } from './members.js'
+export { accessCheck } from './accessCheck.js'
 export { content } from './content.js'
 export { drip } from './drip.js'
 export { reports } from './reports.js'

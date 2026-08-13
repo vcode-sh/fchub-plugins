@@ -134,9 +134,14 @@ final class GrantStatusServiceTest extends PluginTestCase
             {
                 return match ($id) {
                     10 => ['id' => 10, 'user_id' => 9, 'plan_id' => 5, 'status' => 'active', 'meta' => []],
-                    11 => ['id' => 11, 'user_id' => 9, 'plan_id' => 5, 'status' => 'paused', 'meta' => []],
+                    11 => ['id' => 11, 'user_id' => 9, 'plan_id' => 11, 'status' => 'paused', 'meta' => []],
                     default => null,
                 };
+            }
+
+            public function getByUserId(int $userId, array $filters = []): array
+            {
+                return [$this->find((int) $filters['plan_id'] === 5 ? 10 : 11)];
             }
 
             public function update(int $id, array $data): bool
@@ -188,6 +193,11 @@ final class GrantStatusServiceTest extends PluginTestCase
                     'status' => $this->initialStatus,
                     'meta' => [],
                 ];
+            }
+
+            public function getByUserId(int $userId, array $filters = []): array
+            {
+                return [$this->find(10)];
             }
 
             public function update(int $id, array $data): bool
@@ -246,6 +256,11 @@ final class Task7StatusGrantRepository extends GrantRepository
     public function find(int $id): ?array
     {
         return $this->grant;
+    }
+
+    public function getByUserId(int $userId, array $filters = []): array
+    {
+        return [$this->grant];
     }
 
     public function update(int $id, array $data): bool

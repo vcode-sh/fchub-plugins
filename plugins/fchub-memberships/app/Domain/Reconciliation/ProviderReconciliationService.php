@@ -212,6 +212,41 @@ final class ProviderReconciliationService
         return $summaries;
     }
 
+    /**
+     * Classify every resource one member holds, so a profile can say whether
+     * the providers agree with the membership it is showing.
+     *
+     * Resources are keyed by provider and identity, the same shape the repair
+     * route accepts, so a finding here is repairable without translation.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function classifyForUser(int $userId): array
+    {
+        $edges = $this->edges->getActiveByUser($userId);
+        if ($edges === []) {
+            return [];
+        }
+
+        $grouped = [];
+        foreach ($edges as $edge) {
+            $key = implode('|', [$edge['provider'], $edge['resource_type'], $edge['resource_id']]);
+            $grouped[$key][] = $edge;
+        }
+
+        $items = [];
+        foreach ($grouped as $resourceEdges) {
+            $resource = ProviderResource::fromArray($resourceEdges[0]);
+            $operation = $this->operations->findLatestForResource($resource->toArray());
+            $items[] = array_merge($resource->toArray(), [
+                'plan_id' => (int) ($resourceEdges[0]['plan_id'] ?? 0),
+                'edge_count' => count($resourceEdges),
+            ], $this->classify($resource, $resourceEdges, $operation));
+        }
+
+        return $items;
+    }
+
     /** @return array{items: list<array<string, mixed>>, next_cursor: ?string} */
     public function scanPage(?string $cursor = null, int $limit = 50): array
     {

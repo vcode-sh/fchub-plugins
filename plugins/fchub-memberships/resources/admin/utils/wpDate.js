@@ -292,5 +292,29 @@ export function getWeekdayNames() {
   })
 }
 
+/**
+ * Turn a picked day into the instant the membership REST layer accepts.
+ *
+ * `MembershipRestArguments::isoMysqlDate()` requires `Y-m-d H:i:s` exactly, and
+ * every date picker on these forms emits `YYYY-MM-DD`. A picked expiry day means
+ * access lasts through that day, so it becomes the last second of it.
+ */
+export function toExpiryTimestamp(value) {
+  const input = String(value ?? '').trim()
+  if (!input) {
+    return ''
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    return `${input} 23:59:59`
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}$/.test(input)) {
+    return `${input.replace('T', ' ')}:00`
+  }
+
+  return input.replace('T', ' ')
+}
+
 export const wpDatePickerFormat = wpToDayjsFormat(wpDateFormat)
 export const wpDateTimePickerFormat = wpToDayjsFormat(`${wpDateFormat} ${wpTimeFormat}`)

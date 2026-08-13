@@ -5,6 +5,11 @@ async function openCreatePlan(page) {
   await expect(page.getByRole('heading', { name: 'Create membership plan' })).toBeVisible()
 }
 
+// Each rule owns a picker, so scope option lookups to the dropdown on screen.
+function openOption(page, name) {
+  return page.locator('.resource-picker-popper:visible').getByRole('option', { name })
+}
+
 async function completeOffer(page, { name = 'Gold Membership', durationDays } = {}) {
   await page.getByLabel('Plan name').fill(name)
   await expect(page.getByLabel('Slug')).toHaveValue(name === 'Klub Przyjaciół Psów' ? 'klub-przyjaciol-psow' : name.toLowerCase().replaceAll(' ', '-'))
@@ -150,6 +155,52 @@ test.describe('Guided Plan Builder', () => {
     await expect(page.getByText('Day 1 after enrollment')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Preview scheduled access' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Linked Products' })).toHaveCount(0)
+  })
+
+  test('names the chosen resource everywhere instead of falling back to its id', async ({ page }) => {
+    await completeOffer(page)
+    await page.getByRole('button', { name: 'Add content access' }).click()
+
+    const picker = page.locator('.resource-picker')
+    await expect(picker.locator('.el-select__placeholder')).toHaveText('All of this type')
+    await picker.click()
+    await openOption(page, /Members Post/).click()
+
+    await expect(page.getByRole('heading', { name: /Posts · Members Post · immediately/ })).toBeVisible()
+
+    // A second search replaces the option list; the field must still name the pick.
+    await picker.getByRole('combobox').fill('Mobile')
+    await expect(openOption(page, /Mobile-First Design/)).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(picker.locator('.el-select__placeholder')).toHaveText('Members Post')
+
+    await page.locator('.el-form-item', { hasText: 'Access begins' }).locator('.el-select__wrapper').click()
+    await page.getByRole('option', { name: 'After a delay' }).click()
+    await expect(page.getByRole('heading', { name: 'Preview scheduled access' })).toBeVisible()
+    await expect(page.locator('.el-timeline-item').getByText('Members Post')).toBeVisible()
+    await expect(page.getByText('Post #55')).toHaveCount(0)
+  })
+
+  test('drops a rule without stealing the title of the rule below it', async ({ page }) => {
+    await completeOffer(page)
+    await page.getByRole('button', { name: 'Add content access' }).click()
+
+    const picker = (index) => page.locator('.rule-row').nth(index).locator('.resource-picker')
+    await picker(0).click()
+    await openOption(page, /Members Post/).click()
+    await expect(picker(0).locator('.el-select__placeholder')).toHaveText('Members Post')
+    await expect(page.locator('.resource-picker-popper:visible')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Add content access' }).click()
+    await picker(1).click()
+    await openOption(page, /Mobile-First Design/).click()
+    await expect(picker(1).locator('.el-select__placeholder')).toHaveText(/Mobile-First Design/)
+
+    await page.getByRole('button', { name: 'Remove rule 1' }).click()
+
+    await expect(page.locator('.rule-row')).toHaveCount(1)
+    await expect(picker(0).locator('.el-select__placeholder')).toHaveText(/Mobile-First Design/)
+    await expect(page.getByRole('heading', { name: /Posts · Mobile-First Design/ })).toBeVisible()
   })
 
   test('blocks Enter from starting a second save while the first request is pending', async ({ page }) => {

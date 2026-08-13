@@ -39,6 +39,27 @@ test('gives members explicit profile access, useful health filters, and premium 
   await expect(page.getByText('Each row is one member-plan access assignment.')).toBeVisible()
 })
 
+test('reports access that has not started as scheduled rather than active or ended', async ({ page }) => {
+  await openRoute(page, '/members', 'Members')
+
+  const summary = page.getByRole('region', { name: 'Access health' })
+  await expect(summary).toContainText('Scheduled access')
+  await expect(summary).toContainText('Assignments that have not started yet')
+
+  await expect(page.getByRole('link', { name: 'Open Frida Example profile' })).toBeVisible()
+  await expect(page.locator('.el-table__body').getByText('scheduled')).toBeVisible()
+})
+
+test('filters the list down to scheduled access', async ({ page }) => {
+  await openRoute(page, '/members', 'Members')
+
+  await page.locator('.el-select').filter({ has: page.getByRole('combobox', { name: 'Access status' }) }).click()
+  await page.getByRole('option', { name: 'Scheduled' }).click()
+
+  await expect(page.getByRole('link', { name: 'Open Frida Example profile' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open Alice Example profile' })).toHaveCount(0)
+})
+
 test('keeps selection and access management functional on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await openRoute(page, '/members', 'Members')

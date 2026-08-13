@@ -347,7 +347,21 @@ window.fetch = async (input, init = {}) => {
     }) }
   }
   if (url.includes('/admin/members/21/activity')) {
-    return { ok: true, status: 200, json: async () => ({ data: [{ type: 'grant_created', date: '2026-03-01 10:00:00', description: 'Access granted', metadata: { plan_title: 'Gold Plan' } }], total: 1 }) }
+    return { ok: true, status: 200, json: async () => ({
+      data: [
+        { type: 'extended', date: '2026-04-01 10:00:00', membership_key: 'plan:5', plan_title: 'Gold Plan', description: 'Gold Plan extended to 31 December 2026 by tomrobak', metadata: {} },
+        { type: 'granted', date: '2026-03-01 10:00:00', membership_key: 'plan:5', plan_title: 'Gold Plan', description: 'Gold Plan granted by tomrobak', metadata: {} },
+      ],
+      total: 2,
+    }) }
+  }
+  if (url.includes('/admin/members/21/provider-state')) {
+    return { ok: true, status: 200, json: async () => ({
+      data: [{ user_id: 21, provider: 'wordpress_core', resource_type: 'post', resource_id: '55', classification: 'local_only', repair_action: null }],
+    }) }
+  }
+  if (url.includes('/admin/members/21/drip-timeline')) {
+    return { ok: true, status: 200, json: async () => ({ data: [] }) }
   }
   if (url.includes('/admin/members/21')) {
     return {
@@ -362,9 +376,28 @@ window.fetch = async (input, init = {}) => {
             user_email: 'alice@example.com',
             registered_at: '2025-01-10 09:15:00',
             avatar_url: 'https://example.com/avatar/21',
+            edit_url: 'https://example.com/wp-admin/user-edit.php?user_id=21',
           },
-          plans: [{ plan_id: 5, plan_title: 'Gold Plan', grants: [{ id: 100, plan_id: 5, status: 'active', created_at: '2026-03-01 10:00:00', expires_at: null, source_type: 'manual' }], progress: { items: [] } }],
-          history: [{ id: 100, plan_id: 5, plan_title: 'Gold Plan', status: 'active', created_at: '2026-03-01 10:00:00', expires_at: null, source_type: 'manual' }],
+          memberships: [{
+            key: 'plan:5',
+            plan_id: 5,
+            plan_title: 'Gold Plan',
+            status: 'active',
+            created_at: '2026-03-01 10:00:00',
+            starts_at: null,
+            expires_at: null,
+            paused_at: null,
+            trial_ends_at: null,
+            source_type: 'manual',
+            source_id: 0,
+            renewal_count: 0,
+            grant_ids: [100, 101],
+            resources: [
+              { grant_id: 100, provider: 'wordpress_core', resource_type: 'post', resource_id: '55', status: 'active', drip_available_at: null },
+              { grant_id: 101, provider: 'wordpress_core', resource_type: 'category', resource_id: '0', status: 'active', drip_available_at: null },
+            ],
+            source: { type: 'manual', label: 'Manual grant', url: null, actor: 'tomrobak', granted_at: '2026-03-01 10:00:00', subscription: null },
+          }],
         },
       }),
     }
@@ -401,10 +434,16 @@ window.fetch = async (input, init = {}) => {
     }
   }
   if (url.includes('/admin/members')) {
+    const statusFilter = new URL(url, 'https://example.com').searchParams.get('status') || ''
+    const allRows = [
+      { user_id: 21, display_name: 'Alice Example', user_email: 'alice@example.com', plan_id: 5, plan_title: 'Gold Plan', status: 'active', created_at: '2026-03-01 10:00:00', expires_at: null, source_type: 'manual' },
+      { user_id: 27, display_name: 'Frida Example', user_email: 'frida@example.com', plan_id: 5, plan_title: 'Gold Plan', status: 'scheduled', created_at: '2026-08-01 10:00:00', starts_at: '2027-01-01 00:00:00', expires_at: null, source_type: 'order' },
+    ]
+    const rows = statusFilter ? allRows.filter((row) => row.status === statusFilter) : allRows
     return { ok: true, status: 200, json: async () => ({
-      data: [{ user_id: 21, display_name: 'Alice Example', user_email: 'alice@example.com', plan_id: 5, plan_title: 'Gold Plan', status: 'active', created_at: '2026-03-01 10:00:00', expires_at: null, source_type: 'manual' }],
-      total: 1,
-      summary: { active: 1, expiring_soon: 0, paused: 0, ended: 0 },
+      data: rows,
+      total: rows.length,
+      summary: { active: 1, expiring_soon: 0, scheduled: 1, paused: 0, ended: 0 },
     }) }
   }
   if (url.includes('/admin/content/resource-types')) {
@@ -470,7 +509,19 @@ window.fetch = async (input, init = {}) => {
     return { ok: true, status: 201, json: async () => ({ data: { id: 301 } }) }
   }
   if (url.includes('/admin/content')) {
-    return { ok: true, status: 200, json: async () => ({ data: [], total: 0 }) }
+    const search = (new URL(url, 'https://example.com').searchParams.get('search') || '').toLowerCase()
+    const rules = search
+      ? [{ id: 1, resource_type: 'post', resource_id: '55', title: 'Members Only Lesson' }]
+      : []
+    return { ok: true, status: 200, json: async () => ({ data: rules, total: rules.length }) }
+  }
+  if (url.includes('/check-access')) {
+    return { ok: true, status: 200, json: async () => ({
+      has_access: false,
+      reason: 'drip_locked',
+      drip_locked: true,
+      drip_available_at: '2026-09-20 00:00:00',
+    }) }
   }
   if (url.includes('/admin/drip/calendar')) {
     return { ok: true, status: 200, json: async () => ({ data: { '2026-03-20': 1 } }) }

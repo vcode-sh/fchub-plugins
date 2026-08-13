@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { appendCommunitySpaceRules } from '@/pages/Plans/planEditorUi.js'
 import { hasReadOnlyPlanRules } from '@/utils/planRulePayload.js'
@@ -21,17 +21,11 @@ export function usePlanAccessRules({
   contentApi,
   rules,
   messageApi = ElMessage,
-  setTimer = setTimeout,
-  clearTimer = clearTimeout,
-  searchDelay = 300,
 }) {
   const resourceTypeGroups = ref([])
-  const ruleResourceOptions = reactive({})
-  const ruleResourceLoading = reactive({})
   const spaceGroups = ref([])
   const spaceGroupsLoading = ref(false)
   const selectedSpaceGroupId = ref('')
-  const searchTimers = {}
 
   const currentRules = () => rules() || []
   const hasReadOnlyRules = computed(() => hasReadOnlyPlanRules(currentRules()))
@@ -96,10 +90,6 @@ export function usePlanAccessRules({
     }
 
     planRules.push(...result.rules.slice(previousRuleCount))
-    result.added.forEach((spaceId, offset) => {
-      const space = group.spaces.find((item) => String(item.id) === spaceId)
-      ruleResourceOptions[previousRuleCount + offset] = space ? [space] : []
-    })
     messageApi.success(`Added ${result.added.length} Space${result.added.length === 1 ? '' : 's'} from ${group.label}`)
   }
 
@@ -135,7 +125,7 @@ export function usePlanAccessRules({
       || 'Resource'
     const scope = !rule.resource_id || String(rule.resource_id) === '0'
       ? 'all of this type'
-      : 'selected resource'
+      : rule.resource_label || 'selected resource'
     const drip = rule.drip_type === 'delayed'
       ? `after ${rule.drip_delay_days || 1} day${Number(rule.drip_delay_days || 1) === 1 ? '' : 's'}`
       : rule.drip_type === 'fixed_date'
@@ -145,38 +135,13 @@ export function usePlanAccessRules({
     return `${type} · ${scope} · ${drip}`
   }
 
-  function onResourceTypeChange(index, rule) {
+  function onResourceTypeChange(rule) {
     if (hasReadOnlyRules.value) return
 
     rule.resource_id = rule.resource_type === 'url_pattern'
       ? ''
       : (getTypeConfig(rule.resource_type)?.allow_all ? '0' : '')
     rule.resource_label = null
-    delete ruleResourceOptions[index]
-  }
-
-  function resetRuleResource(rule) {
-    rule.resource_id = getTypeConfig(rule.resource_type)?.allow_all ? '0' : ''
-  }
-
-  async function searchRuleResources(index, resourceType, query) {
-    if (!query || query.length < 1) return
-
-    if (searchTimers[index]) clearTimer(searchTimers[index])
-    searchTimers[index] = setTimer(async () => {
-      ruleResourceLoading[index] = true
-      try {
-        const response = await contentApi.searchResources({ type: resourceType, query })
-        ruleResourceOptions[index] = (response.data ?? response).map((item) => ({
-          id: String(item.id),
-          label: item.label || item.title || `#${item.id}`,
-        }))
-      } catch {
-        ruleResourceOptions[index] = []
-      } finally {
-        ruleResourceLoading[index] = false
-      }
-    }, searchDelay)
   }
 
   async function loadResourceTypes() {
@@ -262,18 +227,6 @@ export function usePlanAccessRules({
     }
   }
 
-  function hydrateRuleOptions(planRules = currentRules()) {
-    for (const key of Object.keys(ruleResourceOptions)) {
-      delete ruleResourceOptions[key]
-    }
-
-    planRules.forEach((rule, index) => {
-      if (rule.resource_id && rule.resource_id !== '0' && rule.resource_label) {
-        ruleResourceOptions[index] = [{ id: String(rule.resource_id), label: rule.resource_label }]
-      }
-    })
-  }
-
   function isPastDate(date) {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -283,8 +236,6 @@ export function usePlanAccessRules({
   return {
     specialPageOptions: SPECIAL_PAGE_OPTIONS,
     resourceTypeGroups,
-    ruleResourceOptions,
-    ruleResourceLoading,
     spaceGroups,
     spaceGroupsLoading,
     selectedSpaceGroupId,
@@ -298,11 +249,8 @@ export function usePlanAccessRules({
     resourceIdRules,
     ruleSummary,
     onResourceTypeChange,
-    resetRuleResource,
-    searchRuleResources,
     loadResourceTypes,
     loadSpaceGroups,
-    hydrateRuleOptions,
     isPastDate,
   }
 }

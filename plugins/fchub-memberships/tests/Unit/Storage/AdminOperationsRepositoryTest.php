@@ -157,12 +157,15 @@ final class AdminOperationsRepositoryTest extends PluginTestCase
         $query = '';
         $GLOBALS['_fchub_test_wpdb_overrides']['get_row'] = static function (string $sql) use (&$query): array {
             $query = $sql;
-            return ['active' => '9', 'expiring_soon' => '2', 'paused' => '1', 'ended' => '4'];
+            return ['active' => '9', 'expiring_soon' => '2', 'scheduled' => '3', 'paused' => '1', 'ended' => '4'];
         };
 
         $summary = (new GrantRepository())->getAdminSummary(7);
 
-        self::assertSame(['active' => 9, 'expiring_soon' => 2, 'paused' => 1, 'ended' => 4], $summary);
+        self::assertSame(
+            ['active' => 9, 'expiring_soon' => 2, 'scheduled' => 3, 'paused' => 1, 'ended' => 4],
+            $summary
+        );
         self::assertStringContainsString('GROUP BY g.user_id, g.plan_id', $query);
         self::assertStringContainsString('AS expiring_soon', $query);
         self::assertStringContainsString("IN ('expired', 'revoked')", $query);

@@ -73,8 +73,6 @@
             :space-groups="spaceGroups"
             :space-groups-loading="spaceGroupsLoading"
             :resource-type-groups="resourceTypeGroups"
-            :rule-resource-options="ruleResourceOptions"
-            :rule-resource-loading="ruleResourceLoading"
             :special-page-options="specialPageOptions"
             :get-type-config="getTypeConfig"
             :resource-id-rules="resourceIdRules"
@@ -85,8 +83,6 @@
             @add-rule="addRule"
             @remove-rule="removeRule"
             @resource-type-change="onResourceTypeChange"
-            @search-resource="searchRuleResources"
-            @reset-resource="resetRuleResource"
             @drip-type-change="onDripTypeChange"
           />
 
@@ -236,8 +232,6 @@ const {
 const {
   specialPageOptions,
   resourceTypeGroups,
-  ruleResourceOptions,
-  ruleResourceLoading,
   spaceGroups,
   spaceGroupsLoading,
   selectedSpaceGroupId,
@@ -251,11 +245,8 @@ const {
   resourceIdRules,
   ruleSummary,
   onResourceTypeChange,
-  resetRuleResource,
-  searchRuleResources,
   loadResourceTypes,
   loadSpaceGroups,
-  hydrateRuleOptions,
   isPastDate,
 } = usePlanAccessRules({
   contentApi: content,
@@ -495,8 +486,6 @@ async function loadPlan(id) {
     advancedOpen.value = hasAdvancedPlanSettings(form)
 
     hydrateSchedule(plan)
-
-    hydrateRuleOptions(form.rules)
 
     markPersistedSlug()
   } catch (err) {

@@ -4,7 +4,6 @@ import { usePlanAccessRules } from '@/composables/plans/usePlanAccessRules.js'
 
 function setup({ contentApi = {}, initialRules = [] } = {}) {
   const form = reactive({ rules: initialRules })
-  const scheduled = []
   const messages = {
     info: vi.fn(),
     success: vi.fn(),
@@ -12,23 +11,14 @@ function setup({ contentApi = {}, initialRules = [] } = {}) {
   const access = usePlanAccessRules({
     contentApi: {
       resourceTypes: vi.fn().mockResolvedValue([]),
-      searchResources: vi.fn().mockResolvedValue([]),
       spaceGroups: vi.fn().mockResolvedValue([]),
       ...contentApi,
     },
     rules: () => form.rules,
     messageApi: messages,
-    setTimer: (callback) => {
-      scheduled.push(callback)
-      return callback
-    },
-    clearTimer: (callback) => {
-      const index = scheduled.indexOf(callback)
-      if (index >= 0) scheduled.splice(index, 1)
-    },
   })
 
-  return { access, form, messages, scheduled }
+  return { access, form, messages }
 }
 
 function validate(rule, value) {
@@ -158,13 +148,13 @@ describe('plan access rules', () => {
     }]
     const rule = { resource_type: 'post', resource_id: '7', resource_label: 'Old' }
 
-    access.onResourceTypeChange(0, rule)
+    access.onResourceTypeChange(rule)
     expect(rule).toMatchObject({ resource_id: '0', resource_label: null })
     rule.resource_type = 'course'
-    access.onResourceTypeChange(0, rule)
+    access.onResourceTypeChange(rule)
     expect(rule.resource_id).toBe('')
     rule.resource_type = 'url_pattern'
-    access.onResourceTypeChange(0, rule)
+    access.onResourceTypeChange(rule)
     expect(rule.resource_id).toBe('')
   })
 
@@ -184,41 +174,45 @@ describe('plan access rules', () => {
 
     expect(spaceGroups).toHaveBeenCalledWith({ search: '' })
     expect(form.rules.at(-1)).toMatchObject({ resource_type: 'fc_space', resource_id: '3', resource_label: 'News' })
-    expect(access.ruleResourceOptions[1]).toEqual([{ id: '3', label: 'News' }])
     expect(messages.success).toHaveBeenCalledWith('Added 1 Space from Community')
   })
 
-  it('debounces resource search and normalises labels', async () => {
-    const searchResources = vi.fn().mockResolvedValue({ data: [
-      { id: 5, title: 'Article' },
-      { id: 6 },
-    ] })
-    const { access, scheduled } = setup({ contentApi: { searchResources } })
+  it('leaves surviving rules holding their own titles when an earlier rule goes', () => {
+    const { access, form } = setup({
+      initialRules: [
+        { resource_type: 'post', resource_id: '7', resource_label: 'Checkout', drip_type: 'immediate' },
+        { resource_type: 'post', resource_id: '8', resource_label: 'Pricing', drip_type: 'immediate' },
+      ],
+    })
 
-    await access.searchRuleResources(2, 'post', 'art')
-    expect(scheduled).toHaveLength(1)
-    await scheduled.shift()()
+    access.removeRule(0)
 
-    expect(searchResources).toHaveBeenCalledWith({ type: 'post', query: 'art' })
-    expect(access.ruleResourceOptions[2]).toEqual([
-      { id: '5', label: 'Article' },
-      { id: '6', label: '#6' },
-    ])
-    expect(access.ruleResourceLoading[2]).toBe(false)
+    expect(form.rules).toHaveLength(1)
+    expect(form.rules[0]).toMatchObject({ resource_id: '8', resource_label: 'Pricing' })
+    expect(access.ruleSummary(form.rules[0])).toContain('Pricing')
   })
 
-  it('hydrates persisted labels for remote selects', () => {
+  it('summarises a rule by the title the member picked, not its id', () => {
     const { access } = setup()
-    access.hydrateRuleOptions([
-      { resource_id: '0', resource_label: 'All' },
-      { resource_id: '8', resource_label: 'Course 8' },
-      { resource_id: '9', resource_label: null },
-    ])
+    access.resourceTypeGroups.value = [{
+      key: 'content',
+      label: 'Content',
+      types: [{ value: 'post', label: 'Posts', displayLabel: 'Posts', allow_all: true }],
+    }]
 
-    expect(access.ruleResourceOptions).toMatchObject({
-      1: [{ id: '8', label: 'Course 8' }],
-    })
-    expect(access.ruleResourceOptions[0]).toBeUndefined()
-    expect(access.ruleResourceOptions[2]).toBeUndefined()
+    expect(access.ruleSummary({
+      resource_type: 'post',
+      resource_id: '7',
+      resource_label: 'Checkout',
+      drip_type: 'delayed',
+      drip_delay_days: 3,
+    })).toBe('Posts · Checkout · after 3 days')
+
+    expect(access.ruleSummary({
+      resource_type: 'post',
+      resource_id: '0',
+      resource_label: null,
+      drip_type: 'immediate',
+    })).toBe('Posts · all of this type · immediately')
   })
 })

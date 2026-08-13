@@ -6,8 +6,8 @@
       <MemberProfileHero
         :member="member"
         :initials="memberInitials"
-        :summary="profileSummary"
-        :access-state="accessState"
+        :verdict="verdict"
+        :can-revoke-all="canRevokeAll"
         :revoking-all="revokingAll"
         :format-date="formatDate"
         @grant="grantDialogVisible = true"
@@ -17,38 +17,42 @@
       <div class="profile-workspace">
         <main class="profile-main-column">
           <MemberProfileAccessPanel
-            :active-grants="activeGrants"
-            :access-state="accessState"
+            :memberships="memberships"
+            :expanded-keys="expandedKeys"
+            :drip-by-key="dripByKey"
+            :provider-state-by-key="providerStateByKey"
+            :provider-check-pending="providerCheckPending"
             :format-date="formatDate"
-            :status-tag-type="statusTagType"
-            :normalise-source-label="normaliseSourceLabel"
             @grant="grantDialogVisible = true"
+            @toggle="toggleExpanded"
             @pause="handlePause"
             @resume="handleResume"
             @extend="openExtendDialog"
             @revoke="handleRevoke"
-            @open-drip="openDripDrawer"
+            @check-providers="checkProviders"
           />
-          <MemberProfileDripSchedule :timeline="timeline" :format-date="formatDate" :drip-item-type="dripItemType" />
-          <MemberProfileGrantHistory
-            :grants="allGrants"
+          <MemberProfileTimeline
+            :events="activityEvents"
+            :total="activityTotal"
+            :filter="timelineFilter"
+            :loading="activityLoading"
+            :loading-more="activityLoadingMore"
             :format-date="formatDate"
-            :status-tag-type="statusTagType"
-            :normalise-source-label="normaliseSourceLabel"
+            @load-more="loadMoreActivity"
+            @update:filter="timelineFilter = $event"
           />
         </main>
 
         <aside class="profile-side-column">
-          <MemberProfileActivityPanel
-            :events="activityEvents"
-            :total="activityTotal"
-            :loading="activityLoading"
-            :loading-more="activityLoadingMore"
-            :format-date="formatDate"
-            :event-color="activityEventColor"
-            :event-label="activityEventLabel"
-            :normalise-source-label="normaliseSourceLabel"
-            @load-more="loadMoreActivity"
+          <MemberAccessCheckPanel
+            :options="accessCheck.options.value"
+            :selected="accessCheck.selected.value"
+            :result="accessCheck.result.value"
+            :searching="accessCheck.searching.value"
+            :checking="accessCheck.checking.value"
+            :search="accessCheck.search"
+            @check="accessCheck.check"
+            @update:selected="accessCheck.selected.value = $event"
           />
         </aside>
       </div>
@@ -72,96 +76,48 @@
     <MemberProfileExtendDialog
       :visible="extendDialogVisible"
       :date="extendDate"
+      :presets="extendPresets"
       :loading="extending"
       :date-picker-format="wpDatePickerFormat"
       @update:visible="extendDialogVisible = $event"
       @update:date="extendDate = $event"
       @confirm="handleExtend"
     />
-
-    <MemberProfileDripTimelineDrawer
-      :visible="dripDrawerVisible"
-      :plan="dripDrawerPlan"
-      :loading="dripDrawerLoading"
-      :items="dripDrawerData"
-      :detail-type="dripDetailType"
-      :detail-timestamp="dripDetailTimestamp"
-      @update:visible="dripDrawerVisible = $event"
-    />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { formatWpDate, wpDatePickerFormat } from '@/utils/wpDate.js'
 import GrantAccessDialog from '@/components/members/GrantAccessDialog.vue'
+import MemberAccessCheckPanel from '@/components/members/profile/MemberAccessCheckPanel.vue'
 import MemberProfileAccessPanel from '@/components/members/profile/MemberProfileAccessPanel.vue'
-import MemberProfileActivityPanel from '@/components/members/profile/MemberProfileActivityPanel.vue'
-import MemberProfileDripSchedule from '@/components/members/profile/MemberProfileDripSchedule.vue'
-import MemberProfileDripTimelineDrawer from '@/components/members/profile/MemberProfileDripTimelineDrawer.vue'
 import MemberProfileExtendDialog from '@/components/members/profile/MemberProfileExtendDialog.vue'
-import MemberProfileGrantHistory from '@/components/members/profile/MemberProfileGrantHistory.vue'
 import MemberProfileHero from '@/components/members/profile/MemberProfileHero.vue'
+import MemberProfileTimeline from '@/components/members/profile/MemberProfileTimeline.vue'
 import WorkspaceBackButton from '@/components/workspace/WorkspaceBackButton.vue'
+import { useMemberAccessCheck } from '@/composables/members/useMemberAccessCheck.js'
 import { useMemberActivity } from '@/composables/members/useMemberActivity.js'
 import { useMemberProfile } from '@/composables/members/useMemberProfile.js'
-import { buildMemberProfileSummary, normaliseSourceLabel } from './memberProfileUi.js'
 
 const route = useRoute()
 const userId = computed(() => route.params.id)
-const profile = useMemberProfile(userId)
-const activity = useMemberActivity(userId)
-const profileSummary = computed(() => buildMemberProfileSummary(profile.allGrants.value, activity.total.value))
+const timelineFilter = ref('')
+const accessCheck = useMemberAccessCheck(userId)
 
 const {
-  loading, member, allGrants, timeline, planOptions, revokingAll, grantDialogVisible, granting, grantForm,
-  extendDialogVisible, extending, extendDate, dripDrawerVisible, dripDrawerLoading, dripDrawerPlan, dripDrawerData,
-  activeGrants, memberInitials, accessState, fetchMember, fetchPlanOptions, handleRevoke, handleRevokeAll,
-  resetGrantForm, handleGrant, openExtendDialog, handleExtend, openDripDrawer, handlePause, handleResume,
-} = profile
+  loading, member, memberships, planOptions, revokingAll, canRevokeAll, grantDialogVisible,
+  granting, grantForm, extendDialogVisible, extending, extendDate, extendPresets, expandedKeys,
+  dripByKey, providerStateByKey, providerCheckPending, memberInitials, verdict, fetchMember,
+  fetchPlanOptions, handleRevoke, handleRevokeAll, resetGrantForm, handleGrant, openExtendDialog,
+  handleExtend, handlePause, handleResume, toggleExpanded, checkProviders,
+} = useMemberProfile(userId)
+
 const {
-  loading: activityLoading, loadingMore: activityLoadingMore, events: activityEvents, total: activityTotal,
-  fetchActivity, loadMoreActivity,
-} = activity
-
-function statusTagType(status) {
-  return { active: 'success', paused: 'warning', expired: 'warning', revoked: 'danger' }[status] || 'info'
-}
-
-function dripItemType(status) {
-  return { unlocked: 'success', upcoming: 'warning', locked: 'info' }[status] || 'info'
-}
-
-function dripDetailType(item) {
-  if (item.status === 'unlocked') return 'success'
-  if (item.status === 'scheduled') return 'warning'
-  return 'info'
-}
-
-function dripDetailTimestamp(item) {
-  if (item.status === 'unlocked' && (item.unlocked_at || item.unlock_date)) return `Unlocked ${formatDate(item.unlocked_at || item.unlock_date)}`
-  if (item.unlock_date) return `Unlocks ${formatDate(item.unlock_date)}`
-  return 'Locked'
-}
-
-function activityEventColor(type) {
-  return {
-    grant_created: 'success', grant_renewed: 'success', grant_revoked: 'danger', grant_paused: 'warning',
-    grant_expired: 'warning', trial_started: 'info', drip_sent: 'success', drip_scheduled: 'info',
-    drip_failed: 'danger', audit_created: 'success', audit_renewed: 'success', audit_revoked: 'danger',
-    audit_paused: 'warning', audit_resumed: 'success', audit_updated: 'info',
-  }[type] || 'info'
-}
-
-function activityEventLabel(type) {
-  return {
-    grant_created: 'Granted', grant_renewed: 'Renewed', grant_revoked: 'Revoked', grant_paused: 'Paused',
-    grant_expired: 'Expired', trial_started: 'Trial', drip_sent: 'Drip Sent', drip_scheduled: 'Drip Scheduled',
-    drip_failed: 'Drip Failed', audit_created: 'Created', audit_renewed: 'Renewed', audit_revoked: 'Revoked',
-    audit_paused: 'Paused', audit_resumed: 'Resumed', audit_updated: 'Updated',
-  }[type] || type.replace(/_/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase())
-}
+  loading: activityLoading, loadingMore: activityLoadingMore, events: activityEvents,
+  total: activityTotal, fetchActivity, loadMoreActivity,
+} = useMemberActivity(userId)
 
 function formatDate(value) {
   return formatWpDate(value)

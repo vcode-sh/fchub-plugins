@@ -109,11 +109,11 @@ below.
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/admin/members` | List members with grants (paginated) |
-| GET | `/admin/members/{user_id}` | Get a member's grants and details |
+| GET | `/admin/members/{user_id}` | Get a member's details and memberships |
 | POST | `/admin/members/grant` | Grant a plan; `user_id` and `plan_id` are in the JSON body |
 | POST | `/admin/members/revoke` | Revoke a plan; `user_id` and `plan_id` are in the JSON body |
-| POST | `/admin/members/pause` | Pause the body `grant_id` |
-| POST | `/admin/members/resume` | Resume the body `grant_id` |
+| POST | `/admin/members/pause` | Pause the membership containing the body `grant_id` |
+| POST | `/admin/members/resume` | Resume the membership containing the body `grant_id` |
 | POST | `/admin/members/extend` | Set `expires_at` for a user's plan |
 | POST | `/admin/members/bulk-grant` | Grant one plan to up to 100 users |
 | POST | `/admin/members/bulk-revoke` | Revoke one plan from up to 100 users |
@@ -123,11 +123,25 @@ below.
 | POST | `/admin/members/bulk-export` | Export selected members |
 | GET | `/admin/members/{user_id}/audit-log` | Get membership audit records |
 | GET | `/admin/members/{user_id}/activity` | Get recent membership activity |
+| GET | `/admin/members/{user_id}/provider-state` | Classify the member's provider assignments (read-only) |
 
 The grant, revoke, pause, resume, extend, bulk-grant, bulk-revoke, and
 bulk-extend mutation routes accept `manage_fchub_memberships` or
 `manage_options`. All other member administration routes require
 `manage_options`.
+
+A plan writes one grant row per rule, so a `grant_id` identifies a row, not a
+membership. Pause and resume therefore act on every row of the membership the
+given grant belongs to. The request shape is unchanged; a caller that pauses one
+row no longer leaves the rest of that membership active.
+
+`GET /admin/members/{user_id}` returns `user` and `memberships`. Each membership
+carries its derived status, term, resolved source, grant ids, and the resources
+it unlocks. Drip progress is read from `/admin/members/{user_id}/drip-timeline`
+and provider classification from `/admin/members/{user_id}/provider-state`;
+neither is embedded in the profile payload, because the first is only needed on
+demand and the second calls the providers themselves. Repairs continue to go
+through `POST /admin/provider-reconciliation/repair`.
 
 </Tab>
 <Tab value="Content">

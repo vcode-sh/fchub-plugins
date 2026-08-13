@@ -35,6 +35,32 @@ class AuditLogRepository
     }
 
     /**
+     * Get audit log entries for many entities of one type in a single query.
+     *
+     * @param list<int> $entityIds
+     * @return list<array<string, mixed>>
+     */
+    public function getByEntityIds(string $entityType, array $entityIds, int $limit = 200): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $entityIds))));
+        if ($ids === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '%d'));
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
+            "SELECT * FROM {$this->table}
+             WHERE entity_type = %s AND entity_id IN ({$placeholders})
+             ORDER BY created_at DESC
+             LIMIT %d",
+            $entityType,
+            ...[...$ids, $limit]
+        ), ARRAY_A);
+
+        return array_map([$this, 'hydrate'], $rows ?: []);
+    }
+
+    /**
      * Get audit log entries by actor.
      */
     public function getByActor(int $actorId, string $actorType = 'admin', int $limit = 50): array

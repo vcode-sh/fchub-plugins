@@ -1,9 +1,12 @@
 import { computed, ref, unref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { members, plans } from '@/api/index.js'
+import { toExpiryTimestamp } from '@/utils/wpDate.js'
 import {
-  getMemberAccessState,
+  buildExtensionPresets,
+  buildMemberVerdict,
   getMemberInitials,
+  isCurrentMembership,
 } from '@/pages/Members/memberProfileUi.js'
 
 function profileUserId(userId) {
@@ -17,32 +20,28 @@ export function useMemberProfile(userId, {
 } = {}) {
   const loading = ref(false)
   const member = ref(null)
-  const allGrants = ref([])
-  const timeline = ref([])
+  const memberships = ref([])
   const planOptions = ref([])
   const revokingAll = ref(false)
   const grantDialogVisible = ref(false)
   const granting = ref(false)
-  const grantForm = ref({
-    user_id: profileUserId(userId),
-    plan_id: '',
-    expires_at: '',
-    reason: '',
-  })
+  const grantForm = ref(emptyGrantForm(userId))
   const extendDialogVisible = ref(false)
   const extending = ref(false)
   const extendDate = ref('')
-  const extendingGrant = ref(null)
-  const dripDrawerVisible = ref(false)
-  const dripDrawerLoading = ref(false)
-  const dripDrawerPlan = ref(null)
-  const dripDrawerData = ref([])
+  const extendingMembership = ref(null)
+  const expandedKeys = ref([])
+  const dripByKey = ref({})
+  const providerStateByKey = ref({})
+  const providerCheckPending = ref('')
 
-  const activeGrants = computed(() => (
-    allGrants.value.filter((grant) => grant.status === 'active' || grant.status === 'paused')
-  ))
+  const currentMemberships = computed(() => memberships.value.filter(isCurrentMembership))
   const memberInitials = computed(() => getMemberInitials(member.value || {}))
-  const accessState = computed(() => getMemberAccessState(activeGrants.value))
+  const verdict = computed(() => buildMemberVerdict(memberships.value))
+  const canRevokeAll = computed(() => currentMemberships.value.length > 0)
+  const extendPresets = computed(() => (
+    extendingMembership.value ? buildExtensionPresets(extendingMembership.value) : []
+  ))
 
   async function fetchMember() {
     loading.value = true
@@ -50,23 +49,7 @@ export function useMemberProfile(userId, {
       const response = await membersApi.get(unref(userId))
       const data = response.data ?? response
       member.value = data.user || data
-      const planGroups = data.plans || []
-      const grants = []
-      planGroups.forEach((planGroup) => {
-        const planGrants = planGroup.grants || []
-        planGrants.forEach((grant) => {
-          grants.push({ ...grant, plan_title: planGroup.plan_title || '' })
-        })
-      })
-      allGrants.value = (data.history || []).map((grant) => ({
-        ...grant,
-        plan_title: grant.plan_title || grants.find((item) => item.id === grant.id)?.plan_title || '',
-      }))
-      timeline.value = planGroups.filter((planGroup) => planGroup.progress).map((planGroup) => ({
-        plan_id: planGroup.plan_id,
-        plan_title: planGroup.plan_title,
-        items: planGroup.progress?.items || [],
-      }))
+      memberships.value = data.memberships || []
     } catch (error) {
       notify.error(error.message || 'Failed to load member data')
     } finally {
@@ -87,142 +70,167 @@ export function useMemberProfile(userId, {
     }
   }
 
-  async function handleRevoke(grant) {
+  async function mutate(operation, successMessage, failureMessage) {
     try {
-      await membersApi.revoke({ user_id: profileUserId(userId), plan_id: grant.plan_id })
-      notify.success('Grant revoked')
-      fetchMember()
+      await operation()
+      notify.success(successMessage)
+      await fetchMember()
+      return true
     } catch (error) {
-      notify.error(error.message || 'Failed to revoke grant')
+      notify.error(error.message || failureMessage)
+      return false
     }
+  }
+
+  function handleRevoke(membership) {
+    return mutate(
+      () => membersApi.revoke({ user_id: profileUserId(userId), plan_id: membership.plan_id }),
+      'Membership revoked',
+      'Failed to revoke membership',
+    )
   }
 
   async function handleRevokeAll() {
     revokingAll.value = true
     try {
-      const planIds = [...new Set(activeGrants.value.map((grant) => grant.plan_id).filter(Boolean))]
+      const planIds = [...new Set(currentMemberships.value.map((item) => item.plan_id).filter(Boolean))]
       await Promise.all(planIds.map((planId) => (
         membersApi.revoke({ user_id: profileUserId(userId), plan_id: planId })
       )))
-      notify.success('All active grants revoked')
-      fetchMember()
+      notify.success('All current memberships revoked')
+      await fetchMember()
     } catch (error) {
-      notify.error(error.message || 'Failed to revoke grants')
+      notify.error(error.message || 'Failed to revoke memberships')
     } finally {
       revokingAll.value = false
     }
   }
 
   function resetGrantForm() {
-    grantForm.value = {
-      user_id: profileUserId(userId),
-      plan_id: '',
-      expires_at: '',
-      reason: '',
-    }
+    grantForm.value = emptyGrantForm(userId)
   }
 
   async function handleGrant() {
     granting.value = true
-    try {
-      const payload = { user_id: profileUserId(userId), plan_id: grantForm.value.plan_id }
-      if (grantForm.value.expires_at) payload.expires_at = grantForm.value.expires_at
-      if (grantForm.value.reason) payload.reason = grantForm.value.reason
-      await membersApi.grant(payload)
-      notify.success('Access granted successfully')
+    const payload = { user_id: profileUserId(userId), plan_id: grantForm.value.plan_id }
+    if (grantForm.value.expires_at) payload.expires_at = toExpiryTimestamp(grantForm.value.expires_at)
+    if (grantForm.value.reason) payload.reason = grantForm.value.reason
+
+    const granted = await mutate(
+      () => membersApi.grant(payload),
+      'Access granted successfully',
+      'Failed to grant access',
+    )
+    if (granted) {
       grantDialogVisible.value = false
       resetGrantForm()
-      fetchMember()
-    } catch (error) {
-      notify.error(error.message || 'Failed to grant access')
-    } finally {
-      granting.value = false
     }
+    granting.value = false
   }
 
-  function openExtendDialog(grant) {
-    extendingGrant.value = grant
-    extendDate.value = grant.expires_at || ''
+  function openExtendDialog(membership) {
+    extendingMembership.value = membership
+    extendDate.value = membership.expires_at ? membership.expires_at.slice(0, 10) : ''
     extendDialogVisible.value = true
   }
 
   async function handleExtend() {
-    if (!extendingGrant.value) return
+    if (!extendingMembership.value) return
     extending.value = true
-    try {
-      await membersApi.extend({
+
+    const extended = await mutate(
+      () => membersApi.extend({
         user_id: profileUserId(userId),
-        plan_id: extendingGrant.value.plan_id,
-        expires_at: extendDate.value,
-      })
-      notify.success('Grant extended successfully')
+        plan_id: extendingMembership.value.plan_id,
+        expires_at: toExpiryTimestamp(extendDate.value),
+      }),
+      'Membership extended successfully',
+      'Failed to extend membership',
+    )
+    if (extended) {
       extendDialogVisible.value = false
-      extendingGrant.value = null
+      extendingMembership.value = null
       extendDate.value = ''
-      fetchMember()
-    } catch (error) {
-      notify.error(error.message || 'Failed to extend grant')
-    } finally {
-      extending.value = false
     }
+    extending.value = false
   }
 
-  async function openDripDrawer(grant) {
-    dripDrawerPlan.value = grant
-    dripDrawerVisible.value = true
-    dripDrawerLoading.value = true
-    dripDrawerData.value = []
+  function handlePause(membership) {
+    return mutate(
+      () => membersApi.pause({ grant_id: membership.grant_ids[0] }),
+      'Membership paused',
+      'Failed to pause membership',
+    )
+  }
+
+  function handleResume(membership) {
+    return mutate(
+      () => membersApi.resume({ grant_id: membership.grant_ids[0] }),
+      'Membership resumed',
+      'Failed to resume membership',
+    )
+  }
+
+  /**
+   * Drip and provider state are loaded when a card is opened, never on page
+   * load: provider classification calls the providers themselves.
+   */
+  async function toggleExpanded(membership) {
+    const key = membership.key
+    if (expandedKeys.value.includes(key)) {
+      expandedKeys.value = expandedKeys.value.filter((item) => item !== key)
+      return
+    }
+
+    expandedKeys.value = [...expandedKeys.value, key]
+    if (!membership.plan_id || dripByKey.value[key]) return
+
     try {
-      const response = await membersApi.dripTimeline(unref(userId), { plan_id: grant.plan_id })
+      const response = await membersApi.dripTimeline(unref(userId), { plan_id: membership.plan_id })
       const data = response.data ?? response
-      dripDrawerData.value = Array.isArray(data) ? data : (data.items ?? data.timeline ?? [])
+      dripByKey.value = {
+        ...dripByKey.value,
+        [key]: Array.isArray(data) ? data : (data.items ?? data.timeline ?? []),
+      }
     } catch {
-      dripDrawerData.value = []
+      dripByKey.value = { ...dripByKey.value, [key]: [] }
+    }
+  }
+
+  async function checkProviders(membership) {
+    providerCheckPending.value = membership.key
+    try {
+      const response = await membersApi.providerState(unref(userId))
+      const data = response.data ?? response
+      providerStateByKey.value = { ...providerStateByKey.value, [membership.key]: data }
+    } catch (error) {
+      notify.error(error.message || 'Failed to read provider state')
     } finally {
-      dripDrawerLoading.value = false
-    }
-  }
-
-  async function handlePause(grant) {
-    try {
-      await membersApi.pause({ grant_id: grant.id })
-      notify.success('Membership paused')
-      fetchMember()
-    } catch (error) {
-      notify.error(error.message || 'Failed to pause')
-    }
-  }
-
-  async function handleResume(grant) {
-    try {
-      await membersApi.resume({ grant_id: grant.id })
-      notify.success('Membership resumed')
-      fetchMember()
-    } catch (error) {
-      notify.error(error.message || 'Failed to resume')
+      providerCheckPending.value = ''
     }
   }
 
   return {
     loading,
     member,
-    allGrants,
-    timeline,
+    memberships,
+    currentMemberships,
     planOptions,
     revokingAll,
+    canRevokeAll,
     grantDialogVisible,
     granting,
     grantForm,
     extendDialogVisible,
     extending,
     extendDate,
-    dripDrawerVisible,
-    dripDrawerLoading,
-    dripDrawerPlan,
-    dripDrawerData,
-    activeGrants,
+    extendPresets,
+    expandedKeys,
+    dripByKey,
+    providerStateByKey,
+    providerCheckPending,
     memberInitials,
-    accessState,
+    verdict,
     fetchMember,
     fetchPlanOptions,
     handleRevoke,
@@ -231,8 +239,18 @@ export function useMemberProfile(userId, {
     handleGrant,
     openExtendDialog,
     handleExtend,
-    openDripDrawer,
     handlePause,
     handleResume,
+    toggleExpanded,
+    checkProviders,
+  }
+}
+
+function emptyGrantForm(userId) {
+  return {
+    user_id: profileUserId(userId),
+    plan_id: '',
+    expires_at: '',
+    reason: '',
   }
 }

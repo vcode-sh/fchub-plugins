@@ -37,6 +37,7 @@ if (!class_exists('WP_Post')) {
         public string $post_type = '';
         public string $post_title = '';
         public string $post_excerpt = '';
+        public string $post_status = 'publish';
     }
 }
 
@@ -1135,6 +1136,13 @@ if (!function_exists('get_avatar_url')) {
     function get_avatar_url(int $userId, array $args = []): string
     {
         return 'https://example.com/avatar/' . $userId;
+    }
+}
+
+if (!function_exists('get_edit_user_link')) {
+    function get_edit_user_link(int $userId): string
+    {
+        return 'https://example.com/wp-admin/user-edit.php?user_id=' . $userId;
     }
 }
 

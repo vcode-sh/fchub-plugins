@@ -35,11 +35,7 @@
           :form="form"
           :category-types="categoryTypes"
           :category-selection-label="categorySelectionLabel"
-          :resource-loading="resourceLoading"
-          :resource-error="resourceError"
-          :resource-options="resourceOptions"
-          :resource-placeholder="resourcePlaceholder"
-          :search-resources="searchResources"
+          :special-pages="specialPages"
           @select-step="selectStep"
           @type-change="emit('type-change')"
           @comment-mode-change="emit('comment-mode-change')"
@@ -97,16 +93,13 @@ const props = defineProps({
   form: { type: Object, required: true },
   categoryCards: { type: Array, default: () => [] },
   categoryTypes: { type: Array, default: () => [] },
-  resourceLoading: Boolean,
-  resourceError: { type: String, default: '' },
-  resourceOptions: { type: Array, default: () => [] },
+  specialPages: { type: Array, default: () => [] },
   planOptionsLoading: Boolean,
   planOptions: { type: Array, default: () => [] },
   planOptionsMap: { type: Object, required: true },
   resourceDisplayName: { type: String, required: true },
   canAdvance: Boolean,
   saving: Boolean,
-  searchResources: { type: Function, required: true },
 })
 
 const emit = defineEmits([
@@ -125,11 +118,6 @@ const categorySelectionLabel = computed(() => {
   const type = props.categoryTypes.find(({ value }) => value === props.form.resource_type)
   return type ? `${props.form.categoryLabel} · ${type.label}` : props.form.categoryLabel
 })
-const resourcePlaceholder = computed(() => {
-  const label = String(props.form.resource_type_label || 'content').toLowerCase()
-  return `Choose or search ${label}`
-})
-
 function selectStep(targetStep) {
   if (targetStep < props.step) {
     emit('select-step', targetStep)

@@ -26,7 +26,8 @@ defineProps({
 <style scoped>
 .operations-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Fits four tiles as before, and absorbs a fifth when a workspace has one. */
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 10px;
   margin-bottom: 16px;
 }

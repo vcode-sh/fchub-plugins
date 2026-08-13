@@ -77,140 +77,147 @@ final class MemberControllerContractTest extends PluginTestCase
         self::assertFalse($searchArgs['count_total']);
     }
 
-    public function test_show_returns_profile_shape_and_enriched_history(): void
+    public function test_show_returns_one_membership_per_plan_rather_than_one_per_rule_row(): void
     {
-        $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static function (string $query): array {
-            if (str_contains($query, 'wp_fchub_membership_grants') && str_contains($query, "status = 'active'")) {
-                return [[
-                    'id' => 101,
-                    'user_id' => 21,
-                    'plan_id' => 5,
-                    'provider' => 'wordpress_core',
-                    'resource_type' => 'post',
-                    'resource_id' => '55',
-                    'source_type' => 'manual',
-                    'source_id' => 0,
-                    'feed_id' => null,
-                    'grant_key' => 'grant-101',
-                    'status' => 'active',
-                    'starts_at' => null,
-                    'expires_at' => null,
-                    'drip_available_at' => null,
-                    'trial_ends_at' => null,
-                    'cancellation_requested_at' => null,
-                    'cancellation_effective_at' => null,
-                    'cancellation_reason' => null,
-                    'renewal_count' => 0,
-                    'source_ids' => '[]',
-                    'meta' => '{}',
-                    'created_at' => '2026-03-10 10:00:00',
-                    'updated_at' => '2026-03-10 10:00:00',
-                ]];
-            }
+        $this->stubMemberReads();
 
-            if (str_contains($query, 'wp_fchub_membership_grants') && str_contains($query, 'ORDER BY created_at DESC')) {
-                return [
-                    [
-                        'id' => 101,
-                        'user_id' => 21,
-                        'plan_id' => 5,
-                        'provider' => 'wordpress_core',
-                        'resource_type' => 'post',
-                        'resource_id' => '55',
-                        'source_type' => 'manual',
-                        'source_id' => 0,
-                        'feed_id' => null,
-                        'grant_key' => 'grant-101',
-                        'status' => 'active',
-                        'starts_at' => null,
-                        'expires_at' => null,
-                        'drip_available_at' => null,
-                        'trial_ends_at' => null,
-                        'cancellation_requested_at' => null,
-                        'cancellation_effective_at' => null,
-                        'cancellation_reason' => null,
-                        'renewal_count' => 0,
-                        'source_ids' => '[]',
-                        'meta' => '{}',
-                        'created_at' => '2026-03-10 10:00:00',
-                        'updated_at' => '2026-03-10 10:00:00',
-                    ],
-                    [
-                        'id' => 102,
-                        'user_id' => 21,
-                        'plan_id' => 5,
-                        'provider' => 'wordpress_core',
-                        'resource_type' => 'post',
-                        'resource_id' => '55',
-                        'source_type' => 'manual',
-                        'source_id' => 0,
-                        'feed_id' => null,
-                        'grant_key' => 'grant-102',
-                        'status' => 'revoked',
-                        'starts_at' => null,
-                        'expires_at' => '2026-03-12 10:00:00',
-                        'drip_available_at' => null,
-                        'trial_ends_at' => null,
-                        'cancellation_requested_at' => null,
-                        'cancellation_effective_at' => null,
-                        'cancellation_reason' => null,
-                        'renewal_count' => 0,
-                        'source_ids' => '[]',
-                        'meta' => '{}',
-                        'created_at' => '2026-03-01 10:00:00',
-                        'updated_at' => '2026-03-12 10:00:00',
-                        'revoked_at' => '2026-03-12 10:00:00',
-                    ],
-                ];
-            }
-
-            if (str_contains($query, 'wp_fchub_membership_audit_logs')) {
-                return [];
-            }
-
-            return [];
-        };
-
-        $GLOBALS['_fchub_test_wpdb_overrides']['get_row'] = static function (string $query): ?array {
-            if (str_contains($query, 'wp_fchub_membership_plans')) {
-                return [
-                    'id' => 5,
-                    'title' => 'Gold Plan',
-                    'slug' => 'gold-plan',
-                    'description' => '',
-                    'status' => 'active',
-                    'level' => 0,
-                    'includes_plan_ids' => '[]',
-                    'restriction_message' => '',
-                    'redirect_url' => '',
-                    'settings' => '{}',
-                    'meta' => '{}',
-                    'duration_type' => 'lifetime',
-                    'duration_days' => null,
-                    'trial_days' => 0,
-                    'grace_period_days' => 0,
-                    'scheduled_status' => null,
-                    'scheduled_at' => null,
-                    'created_at' => '2026-01-01 00:00:00',
-                    'updated_at' => '2026-01-01 00:00:00',
-                ];
-            }
-
-            return null;
-        };
-
-        $request = new \WP_REST_Request('GET', '/fchub-memberships/v1/admin/members/21', [
+        $response = MemberController::show(new \WP_REST_Request('GET', '/fchub-memberships/v1/admin/members/21', [
             'user_id' => 21,
-        ]);
-
-        $response = MemberController::show($request);
+        ]));
         $data = $response->get_data()['data'];
 
-        $this->assertSame('alice@example.com', $data['user']['email']);
-        $this->assertSame('alice@example.com', $data['user']['user_email']);
-        $this->assertSame('2025-01-10 09:15:00', $data['user']['registered_at']);
-        $this->assertCount(2, $data['history']);
-        $this->assertSame('Gold Plan', $data['history'][0]['plan_title']);
-        $this->assertSame('Gold Plan', $data['history'][1]['plan_title']);
+        self::assertSame('alice@example.com', $data['user']['email']);
+        self::assertSame('2025-01-10 09:15:00', $data['user']['registered_at']);
+        self::assertSame('https://example.com/wp-admin/user-edit.php?user_id=21', $data['user']['edit_url']);
+        self::assertCount(1, $data['memberships']);
+        self::assertSame('Gold Plan', $data['memberships'][0]['plan_title']);
+        self::assertSame([101, 102], $data['memberships'][0]['grant_ids']);
+        self::assertCount(2, $data['memberships'][0]['resources']);
+    }
+
+    public function test_show_no_longer_carries_the_payload_the_admin_app_never_read(): void
+    {
+        $this->stubMemberReads();
+
+        $data = MemberController::show(new \WP_REST_Request('GET', '/fchub-memberships/v1/admin/members/21', [
+            'user_id' => 21,
+        ]))->get_data()['data'];
+
+        self::assertArrayNotHasKey('audit_log', $data);
+        self::assertArrayNotHasKey('history', $data);
+        self::assertArrayNotHasKey('plans', $data);
+    }
+
+    public function test_show_reads_a_fixed_number_of_tables_however_many_rules_the_plan_has(): void
+    {
+        $this->stubMemberReads(ruleRows: 12);
+
+        MemberController::show(new \WP_REST_Request('GET', '/fchub-memberships/v1/admin/members/21', [
+            'user_id' => 21,
+        ]));
+
+        $reads = array_values(array_filter(
+            $GLOBALS['_fchub_test_queries'],
+            static fn(array $entry): bool => $entry[0] === 'get_results'
+        ));
+
+        self::assertCount(3, $reads);
+    }
+
+    public function test_show_names_the_administrator_behind_a_manual_grant(): void
+    {
+        $GLOBALS['_fchub_test_users'][9] = (object) ['ID' => 9, 'display_name' => 'tomrobak'];
+        $this->stubMemberReads(auditRows: [[
+            'id' => 1,
+            'entity_type' => 'grant',
+            'entity_id' => 101,
+            'action' => 'created',
+            'actor_type' => 'admin',
+            'actor_id' => 9,
+            'context' => '',
+            'old_value' => '{}',
+            'new_value' => '{}',
+            'created_at' => '2026-03-10 10:00:00',
+        ]]);
+
+        $data = MemberController::show(new \WP_REST_Request('GET', '/fchub-memberships/v1/admin/members/21', [
+            'user_id' => 21,
+        ]))->get_data()['data'];
+
+        self::assertSame('Manual grant', $data['memberships'][0]['source']['label']);
+        self::assertSame('tomrobak', $data['memberships'][0]['source']['actor']);
+        self::assertNull($data['memberships'][0]['source']['url']);
+    }
+
+    /** @param list<array<string, mixed>> $auditRows */
+    private function stubMemberReads(int $ruleRows = 2, array $auditRows = []): void
+    {
+        $grantRows = [];
+        for ($index = 0; $index < $ruleRows; $index++) {
+            $grantRows[] = $this->grantRow(101 + $index, (string) (55 + $index));
+        }
+
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = fn(string $query): array => match (true) {
+            str_contains($query, 'FROM wp_fchub_membership_grants') => $grantRows,
+            str_contains($query, 'FROM wp_fchub_membership_plans') => [$this->planRow()],
+            str_contains($query, 'FROM wp_fchub_membership_audit_log') => $auditRows,
+            default => [],
+        };
+    }
+
+    /** @return array<string, mixed> */
+    private function grantRow(int $id, string $resourceId): array
+    {
+        return [
+            'id' => $id,
+            'user_id' => 21,
+            'plan_id' => 5,
+            'provider' => 'wordpress_core',
+            'resource_type' => 'post',
+            'resource_id' => $resourceId,
+            'source_type' => 'manual',
+            'source_id' => 0,
+            'feed_id' => null,
+            'grant_key' => 'grant-' . $id,
+            'status' => 'active',
+            'starts_at' => null,
+            'expires_at' => null,
+            'drip_available_at' => null,
+            'trial_ends_at' => null,
+            'cancellation_requested_at' => null,
+            'cancellation_effective_at' => null,
+            'cancellation_reason' => null,
+            'renewal_count' => 0,
+            'source_ids' => '[]',
+            'meta' => '{}',
+            'created_at' => '2026-03-10 10:00:00',
+            'updated_at' => '2026-03-10 10:00:00',
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function planRow(): array
+    {
+        return [
+            'id' => 5,
+            'title' => 'Gold Plan',
+            'slug' => 'gold-plan',
+            'description' => '',
+            'status' => 'active',
+            'level' => 0,
+            'includes_plan_ids' => '[]',
+            'restriction_message' => '',
+            'redirect_url' => '',
+            'settings' => '{}',
+            'meta' => '{}',
+            'duration_type' => 'lifetime',
+            'duration_days' => null,
+            'trial_days' => 0,
+            'grace_period_days' => 0,
+            'scheduled_status' => null,
+            'scheduled_at' => null,
+            'created_at' => '2026-01-01 00:00:00',
+            'updated_at' => '2026-01-01 00:00:00',
+        ];
     }
 }

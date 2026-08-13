@@ -244,6 +244,31 @@ class EntitlementEdgeRepository
         return array_map([$this, 'hydrate'], $rows);
     }
 
+    /**
+     * Every active edge a member holds, across providers.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getActiveByUser(int $userId): array
+    {
+        if ($userId <= 0) {
+            throw new \InvalidArgumentException('Entitlement user is required.');
+        }
+
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
+            "SELECT * FROM {$this->table}
+             WHERE user_id = %d
+               AND lifecycle = 'active'
+             ORDER BY provider ASC, resource_type ASC, resource_id ASC, id ASC",
+            $userId
+        ), ARRAY_A);
+        if (!is_array($rows) || $this->databaseHasError()) {
+            throw new \RuntimeException('Unable to read active entitlement edges for member.');
+        }
+
+        return array_map([$this, 'hydrate'], $rows);
+    }
+
     /** @param list<int> $edgeIds */
     public function setAccessStatusByIds(array $edgeIds, string $accessStatus, string $updatedAt): int
     {
