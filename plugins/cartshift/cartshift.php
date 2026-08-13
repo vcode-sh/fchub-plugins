@@ -4,7 +4,7 @@
  * Plugin Name: CartShift
  * Plugin URI: https://fchub.co
  * Description: Migrate WooCommerce data (products, customers, orders, subscriptions, coupons) to FluentCart.
- * Version: 1.5.1
+ * Version: 1.5.2
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -40,7 +40,7 @@
 
 defined('ABSPATH') or die;
 
-define('CARTSHIFT_VERSION', '1.5.1');
+define('CARTSHIFT_VERSION', '1.5.2');
 define('CARTSHIFT_DB_VERSION', '8');
 define('CARTSHIFT_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('CARTSHIFT_PLUGIN_URL', plugin_dir_url(__FILE__));
