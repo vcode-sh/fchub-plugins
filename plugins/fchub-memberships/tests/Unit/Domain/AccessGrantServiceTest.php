@@ -51,6 +51,41 @@ final class AccessGrantServiceTest extends PluginTestCase
         self::assertStringContainsString('Provider unavailable', $result['errors'][0]);
     }
 
+    public function test_bulk_grant_separates_granted_blocked_and_failed_users(): void
+    {
+        $service = new class extends AccessGrantService {
+            public function __construct()
+            {
+            }
+
+            public function grantPlan(int $userId, int $planId, array $context = []): array
+            {
+                return match ($userId) {
+                    9 => ['created' => 1, 'updated' => 0, 'total' => 1],
+                    // A membership-mode refusal creates nothing, so counting it
+                    // as granted would report success for access nobody has.
+                    10 => ['created' => 0, 'updated' => 0, 'total' => 0, 'blocked' => true],
+                    11 => [
+                        'created' => 0,
+                        'updated' => 0,
+                        'failed' => 1,
+                        'errors' => [['message' => 'Provider unavailable']],
+                    ],
+                    default => throw new \RuntimeException('Storage went away'),
+                };
+            }
+        };
+
+        $result = $service->bulkGrant([9, 10, 11, 12], 5, []);
+
+        self::assertSame(1, $result['granted']);
+        self::assertSame(3, $result['failed']);
+        self::assertCount(3, $result['errors']);
+        self::assertStringContainsString('Provider unavailable', $result['errors'][1]);
+        // One user throwing must not abandon the users after them.
+        self::assertStringContainsString('Storage went away', $result['errors'][2]);
+    }
+
     public function test_service_covers_plan_bulk_maintenance_and_lock_wrappers(): void
     {
         $lockPayloads = [];

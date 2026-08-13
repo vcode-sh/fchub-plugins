@@ -64,6 +64,27 @@ final class MembershipGrouperTest extends PluginTestCase
         self::assertSame('scheduled', $memberships[0]['status']);
     }
 
+    public function test_access_in_force_outranks_access_that_has_not_started(): void
+    {
+        $memberships = $this->group([
+            self::row(3, 1, ['status' => 'active', 'starts_at' => '2027-01-01 00:00:00']),
+            self::row(4, 1, ['status' => 'active']),
+        ]);
+
+        self::assertSame('active', $memberships[0]['status']);
+    }
+
+    public function test_scheduled_outranks_paused_revoked_and_expired(): void
+    {
+        $memberships = $this->group([
+            self::row(3, 1, ['status' => 'paused']),
+            self::row(4, 1, ['status' => 'active', 'starts_at' => '2027-01-01 00:00:00']),
+            self::row(5, 1, ['status' => 'revoked']),
+        ]);
+
+        self::assertSame('scheduled', $memberships[0]['status']);
+    }
+
     public function test_paused_outranks_revoked_and_expired(): void
     {
         $memberships = $this->group([
@@ -148,6 +169,47 @@ final class MembershipGrouperTest extends PluginTestCase
         ], [1 => 'Old', 2 => 'Current']);
 
         self::assertSame(['Current', 'Old'], array_column($memberships, 'plan_title'));
+    }
+
+    public function test_it_orders_an_active_membership_above_one_that_has_not_started(): void
+    {
+        $memberships = $this->group([
+            self::row(3, 1, ['status' => 'active', 'starts_at' => '2027-01-01 00:00:00']),
+            self::row(4, 2, ['status' => 'active']),
+        ], [1 => 'Upcoming', 2 => 'Current']);
+
+        self::assertSame(['Current', 'Upcoming'], array_column($memberships, 'plan_title'));
+    }
+
+    public function test_it_reports_the_pause_date_of_a_paused_row(): void
+    {
+        $memberships = $this->group([
+            self::row(3, 1, ['status' => 'paused', 'meta' => ['paused_at' => '2026-05-01 09:00:00']]),
+        ]);
+
+        self::assertSame('2026-05-01 09:00:00', $memberships[0]['paused_at']);
+    }
+
+    public function test_a_row_that_is_no_longer_paused_does_not_date_the_membership(): void
+    {
+        // Resuming leaves the old paused_at behind in meta; a running
+        // membership must not report it as a current pause.
+        $memberships = $this->group([
+            self::row(3, 1, ['status' => 'active', 'meta' => ['paused_at' => '2026-05-01 09:00:00']]),
+        ]);
+
+        self::assertSame('active', $memberships[0]['status']);
+        self::assertNull($memberships[0]['paused_at']);
+    }
+
+    public function test_the_pause_date_ignores_a_stale_one_left_on_a_resumed_row(): void
+    {
+        $memberships = $this->group([
+            self::row(3, 1, ['status' => 'active', 'meta' => ['paused_at' => '2026-07-01 09:00:00']]),
+            self::row(4, 1, ['status' => 'paused', 'meta' => ['paused_at' => '2026-05-01 09:00:00']]),
+        ]);
+
+        self::assertSame('2026-05-01 09:00:00', $memberships[0]['paused_at']);
     }
 
     /**

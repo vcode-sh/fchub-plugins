@@ -65,6 +65,24 @@ final class GrantSourceResolverTest extends PluginTestCase
         self::assertNull($source['url']);
     }
 
+    public function test_a_subscription_keeps_its_renewal_facts_when_the_parent_order_is_gone(): void
+    {
+        $source = $this->resolve(
+            ['source_type' => 'subscription', 'source_id' => 55],
+            subscriptions: [55 => [
+                'id' => 55,
+                'status' => 'active',
+                'next_billing_date' => '2026-09-12 00:00:00',
+                'canceled_at' => null,
+                'parent_order_id' => 7,
+            ]]
+        );
+
+        self::assertNull($source['url']);
+        self::assertSame('active', $source['subscription']['status']);
+        self::assertSame('2026-09-12 00:00:00', $source['subscription']['next_billing_date']);
+    }
+
     public function test_a_missing_subscription_reports_no_renewal_facts(): void
     {
         $source = $this->resolve(['source_type' => 'subscription', 'source_id' => 55]);

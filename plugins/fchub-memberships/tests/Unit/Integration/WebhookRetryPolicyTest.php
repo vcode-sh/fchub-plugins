@@ -24,7 +24,14 @@ final class WebhookRetryPolicyTest extends PluginTestCase
     {
         $policy = new WebhookRetryPolicy();
 
-        foreach (WebhookRetryPolicy::DELAYS as $offset => $delay) {
+        // Spelled out rather than read from WebhookRetryPolicy::DELAYS. An
+        // expectation sourced from the subject cannot fail when the subject
+        // changes: flattening the schedule to six equal delays kept the
+        // original loop green.
+        $expected = [60, 300, 1800, 7200, 21600, 86400];
+        self::assertSame($expected, WebhookRetryPolicy::DELAYS, 'The backoff must escalate.');
+
+        foreach ($expected as $offset => $delay) {
             $attempt = $offset + 1;
             foreach ([400, 429, 500, 503] as $code) {
                 $result = $policy->classify($attempt, $this->response($code), 1_000);
@@ -36,6 +43,25 @@ final class WebhookRetryPolicyTest extends PluginTestCase
             self::assertSame('retry', $transport['outcome']);
             self::assertSame(1_000 + $delay, $transport['next_timestamp']);
         }
+    }
+
+    public function test_refuses_to_classify_an_attempt_outside_the_schedule(): void
+    {
+        $policy = new WebhookRetryPolicy();
+
+        // An attempt past the schedule would index DELAYS out of bounds, and a
+        // negative clock would schedule a retry in the past.
+        foreach ([0, -1, WebhookRetryPolicy::MAX_ATTEMPTS + 1] as $attempt) {
+            try {
+                $policy->classify($attempt, $this->response(500), 1_000);
+                self::fail("Attempt {$attempt} should not be classifiable.");
+            } catch (\InvalidArgumentException) {
+                self::assertTrue(true);
+            }
+        }
+
+        $this->expectException(\InvalidArgumentException::class);
+        $policy->classify(1, $this->response(500), -1);
     }
 
     public function test_honours_only_strict_retry_after_values_for_429_and_503_and_caps_them(): void

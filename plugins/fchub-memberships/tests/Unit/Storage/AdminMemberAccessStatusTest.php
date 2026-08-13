@@ -72,6 +72,40 @@ final class AdminMemberAccessStatusTest extends PluginTestCase
         self::assertStringContainsString("THEN 'scheduled'", $query);
     }
 
+    public function test_the_derived_status_calls_a_membership_active_only_while_access_is_in_force(): void
+    {
+        $expression = $this->derivedStatusExpression($this->captureMembersQuery(), 'status');
+
+        self::assertStringContainsString(
+            "g.starts_at IS NULL OR g.starts_at <= '2026-08-13 12:00:00'",
+            $expression
+        );
+        self::assertStringContainsString(
+            "g.expires_at IS NULL OR g.expires_at > '2026-08-13 12:00:00'",
+            $expression
+        );
+    }
+
+    public function test_the_derived_status_calls_a_membership_scheduled_only_when_its_start_is_ahead(): void
+    {
+        $expression = $this->derivedStatusExpression($this->captureMembersQuery(), 'status');
+        $scheduled = substr($expression, 0, (int) strpos($expression, "THEN 'scheduled'"));
+
+        self::assertStringContainsString('g.starts_at IS NOT NULL', $scheduled);
+        self::assertStringContainsString("g.starts_at > '2026-08-13 12:00:00'", $scheduled);
+    }
+
+    public function test_the_derived_status_ranks_paused_above_revoked(): void
+    {
+        $expression = $this->derivedStatusExpression($this->captureMembersQuery(), 'status');
+
+        self::assertLessThan(
+            strpos($expression, "THEN 'revoked'"),
+            strpos($expression, "THEN 'paused'"),
+            'A paused membership can be resumed; a revoked one cannot, so paused is reported first.'
+        );
+    }
+
     public function test_the_status_filter_can_reach_a_scheduled_membership(): void
     {
         $where = $this->whereClauseOf($this->captureMembersQuery(['status' => 'scheduled']));
@@ -116,6 +150,29 @@ final class AdminMemberAccessStatusTest extends PluginTestCase
         $end = strpos($query, 'GROUP BY', (int) $start);
 
         return substr($query, (int) $start, $end === false ? null : $end - (int) $start);
+    }
+
+    /**
+     * The derived-status expression nests a CASE inside each SUM(), and the
+     * same date comparisons appear again in the WHERE clause and in the
+     * summary's expiring_soon column. Anchor on the outer CASE — the only one
+     * an aggregate follows — so a branch assertion reads that branch alone.
+     */
+    private function derivedStatusExpression(string $query, string $alias): string
+    {
+        $end = strpos($query, ' AS ' . $alias);
+        self::assertNotFalse($end, "The query has no {$alias} column.");
+
+        $matched = preg_match_all(
+            '/CASE\s+WHEN SUM\(/',
+            substr($query, 0, (int) $end),
+            $matches,
+            PREG_OFFSET_CAPTURE
+        );
+        self::assertGreaterThan(0, $matched, 'The query has no derived-status expression.');
+        $start = (int) end($matches[0])[1];
+
+        return substr($query, $start, (int) $end - $start);
     }
 
     private function repository(): GrantRepository

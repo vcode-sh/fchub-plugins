@@ -325,6 +325,45 @@ final class IdempotentMutationTest extends PluginTestCase
         self::assertSame(['data' => ['reclaimed' => true]], $response->get_data());
     }
 
+    public function test_rejects_an_oversized_key_before_running_the_mutation(): void
+    {
+        // The storage column holds 191 characters; a longer key has to be
+        // refused rather than silently truncated into a collision.
+        $runs = 0;
+
+        $response = (new IdempotentMutation())->execute(
+            $this->request(str_repeat('k', 192), ['user_id' => 8, 'plan_id' => 2]),
+            'grant',
+            static function () use (&$runs): \WP_REST_Response {
+                $runs++;
+                return new \WP_REST_Response(['data' => []]);
+            }
+        );
+
+        self::assertSame(0, $runs);
+        self::assertSame(400, $response->get_status());
+        self::assertSame('fchub_idempotency_key_invalid', $response->get_data()['code']);
+    }
+
+    public function test_accepts_a_key_of_exactly_the_stored_length(): void
+    {
+        $this->persistentRows();
+        $GLOBALS['_fchub_test_current_user_id'] = 44;
+        $runs = 0;
+
+        $response = (new IdempotentMutation())->execute(
+            $this->request(str_repeat('k', 191), ['user_id' => 8, 'plan_id' => 2]),
+            'grant',
+            static function () use (&$runs): \WP_REST_Response {
+                $runs++;
+                return new \WP_REST_Response(['data' => []]);
+            }
+        );
+
+        self::assertSame(1, $runs);
+        self::assertSame(200, $response->get_status());
+    }
+
     private function persistentRows(?callable $updatePolicy = null): void
     {
         $rows = [];

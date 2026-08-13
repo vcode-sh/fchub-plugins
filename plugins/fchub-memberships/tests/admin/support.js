@@ -46,7 +46,7 @@ function apiPayload(url) {
     return { data: { most_accessed: [{ title: 'Members Post', resource_type: 'post', member_count: 1 }] } }
   }
   if (url.includes('/admin/reports/expiring-soon')) {
-    return { data: [{ user_name: 'Alice Example', user_email: 'alice@example.com', plan_title: 'Gold Plan', expires_at: '2026-03-20' }] }
+    return { data: [{ user_name: 'Alice Example', user_email: 'alice@example.com', plan_title: 'Gold Plan', expires_at: '2026-03-20 23:59:59' }] }
   }
   if (url.includes('/admin/reports/renewal-rate')) {
     return { data: { overall_rate: 100, renewed_members: 1, avg_renewals_per_member: 1, by_plan: [], over_time: [{ month: '2026-03', total_renewals: 1 }] } }
