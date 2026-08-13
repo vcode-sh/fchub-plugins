@@ -125,12 +125,46 @@ rather than spread thin across its callers. Removing an abstraction requires
 the same three facts as removing a control. `Reuse And Package Discipline` and
 `Component Structure` own the mechanics.
 
+### PHP Size And Decomposition
+
+PHP carries more per file than TypeScript, so the TypeScript caps do not
+transfer and never applied here. No PSR sets a file or class length: PSR-12 and
+PER Coding Style 3.0, which replaces it, govern formatting only. Use the
+thresholds the PHP tooling already agrees on, and treat them as a backstop
+rather than a target. The median file in these plugins is around 150 lines, and
+that is the shape worth keeping.
+
+| Signal | Limit | Where it comes from |
+| --- | --- | --- |
+| File or class length | 1000 lines | PHPMD `ExcessiveClassLength`, SonarQube S104 |
+| Method length | 100 lines | PHPMD `ExcessiveMethodLength` |
+| Public methods per class | 10 | PHPMD `TooManyPublicMethods` |
+| Total methods per class | 25 | PHPMD `TooManyMethods` |
+| Properties per class | 15 | PHPMD `TooManyFields` |
+| Cyclomatic complexity | 10 | PHPMD `CyclomaticComplexity` |
+
+Public-method count is the decomposition signal, the way five props is in
+TypeScript. A class past ten public methods is usually answering more than one
+question, and its length is only the symptom. Fix the surface and the line
+count follows.
+
+Split by the question a caller is asking. Never by line count, and never by a
+mechanical read-versus-write cut, which leaves one half as incoherent as the
+original. State in one sentence what each resulting class answers; if that
+sentence needs an "and", the split is wrong. Whatever both halves genuinely
+share — a table identifier, a clock, row hydration — moves to one named owner
+instead of being copied into each.
+
+Cover the behaviour before you move it, so the refactor can prove it changed
+nothing.
+
 ### Non-Goals
 
 - This is not a mandate to cut capability, features, or product scope.
 - It does not authorize redesigning surfaces outside the active task.
-- It adds no numeric lint rule. TypeScript rules: The 280-line file cap, the 80-line function
-  cap, and the five-prop decomposition signal already govern mechanical size.
+- It adds no numeric lint rule. Mechanical size is already governed per language:
+  in TypeScript by the 280-line file cap, the 80-line function cap, and the
+  five-prop decomposition signal; in PHP by `PHP Size And Decomposition` above.
 - It does not reopen accepted Social Core or other completed contracts.
 
 ## Goal-Driven Execution
