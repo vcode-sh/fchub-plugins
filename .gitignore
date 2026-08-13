@@ -2,6 +2,7 @@
 node_modules/
 vendor/
 .phpunit.cache/
+.phpunit.result.cache
 
 # Build output - memberships assets/dist/ IS tracked
 # (assets/dist/ is committed so plugin works without build step locally)
@@ -28,6 +29,14 @@ Thumbs.db
 .next/
 .source/
 
+# Playwright — local run state and failure artifacts.
+# test-results/wporg/ at the root is tracked release evidence and stays tracked.
+/plugins/*/test-results/
+/plugins/*/playwright-report/
+/plugins/*/blob-report/
+/fluentcart-mcp/test-results/
+/.playwright-cli/
+
 # Debug
 *.log
 
@@ -37,5 +46,6 @@ Thumbs.db
 # Local
 .claude/
 voice-tone.md
-.mcp.json
+# Anchored: fluentcart-mcp/openai-plugin/.mcp.json is a shipped, tracked file.
+/.mcp.json
 CLAUDE.md
