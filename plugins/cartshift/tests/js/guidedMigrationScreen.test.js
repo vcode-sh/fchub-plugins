@@ -388,51 +388,140 @@ describe('GuidedMigrationScreen', () => {
     ]);
   });
 
-  it('approves a group of routine order decisions without choosing a mapping for the member', async () => {
-    const orderItems = [116, 117, 118].map((order) => ({
+  it('turns the review into a short commerce story with safe batches and only genuine choices', async () => {
+    const safeItems = [116, 117].map((order, index) => ({
       review_id: `decision-order-${order}`,
       kind: 'migration_decision',
       group: 'orders',
-      title: `Order ${order}`,
+      section: 'safe_plan',
+      title: index === 0 ? 'Ada Lovelace' : 'Grace Hopper',
       summary: 'Keep the reviewed historical notes private.',
+      story: {
+        kind: 'order',
+        customer_name: index === 0 ? 'Ada Lovelace' : 'Grace Hopper',
+        created_utc: '2025-01-20 11:12:13',
+        status: 'completed',
+        currency: 'PLN',
+        gross_total: 2400,
+        items: [{ name: 'Store membership', quantity: 1 }],
+        item_count: 1,
+      },
+    }));
+    const customerItems = ['Ada Lovelace', 'Grace Hopper'].map((name, index) => ({
+      review_id: `customer-${index}`,
+      kind: 'customer_match',
+      group: 'customers',
+      section: 'choices',
+      title: name,
+      summary: 'A matching FluentCart customer was found.',
+      recommended_choice_id: `reuse-${index}`,
+      story: {
+        kind: 'customer',
+        name,
+        email: `${name.split(' ')[0].toLowerCase()}@example.test`,
+        classification: 'registered',
+        dependent_orders: 3,
+        dependent_subscriptions: 0,
+        purchases: ['Store membership'],
+      },
+      choices: [
+        { choice_id: `reuse-${index}`, label: 'Use this FluentCart customer', description: 'Orders will be attached to the existing customer.' },
+        { choice_id: `create-${index}`, label: 'Create a separate customer', description: 'Keep both customer records.' },
+      ],
     }));
     const productItem = {
       review_id: 'product-0123456789ab',
       kind: 'product_conflict',
       group: 'products',
+      section: 'choices',
       title: 'Store membership',
       summary: 'A likely match already exists in FluentCart.',
+      recommended_choice_id: 'choice-111111111111',
+      story: {
+        kind: 'product',
+        name: 'Store membership',
+        sku: 'MEMBERSHIP',
+        status: 'publish',
+        product_type: 'simple',
+        dependent_orders: 12,
+        dependent_subscriptions: 0,
+      },
       choices: [{
         choice_id: 'choice-111111111111',
         label: 'Use existing product',
         description: 'Use the existing FluentCart product without changing it.',
+      }, {
+        choice_id: 'choice-222222222222',
+        label: 'Skip this product',
+        description: 'Leave this product and its related history in WooCommerce.',
       }],
     };
+    const collisionItem = {
+      review_id: 'collision-0123456789ab',
+      kind: 'record_collision',
+      group: 'orders',
+      section: 'stays_behind',
+      title: 'Ada Lovelace',
+      summary: 'An equivalent order already exists in FluentCart.',
+      recommended_choice_id: 'skip-0123456789ab',
+      story: safeItems[0].story,
+      target_story: safeItems[0].story,
+      choices: [{
+        choice_id: 'skip-0123456789ab',
+        label: 'Skip this WooCommerce copy',
+        description: 'Keep the FluentCart order unchanged.',
+      }],
+    };
+    const groupedSkipItems = [9101, 8602].map((order) => ({
+      review_id: `skip-order-${order}`,
+      kind: 'migration_decision',
+      group: 'orders',
+      section: 'stays_behind',
+      title: `Order ${order}`,
+      summary: 'Skip this order because its historical totals cannot be reproduced safely.',
+    }));
     serve(status({
       run: {
         phase: 'awaiting_decisions',
         completed_steps: 3,
         total_steps: 12,
         last_step: 'Review migration decisions',
-        review: { blockers: [], items: [...orderItems, productItem], proposal_counts: {} },
+        review: { blockers: [], items: [...safeItems, ...customerItems, productItem, collisionItem, ...groupedSkipItems], proposal_counts: {} },
       },
     }));
     const wrapper = mountScreen();
     await flushPromises();
 
-    expect(wrapper.find('[data-test="review-summary"]').text()).toContain('0 of 2 review steps complete');
-    expect(wrapper.findAll('.cartshift-review-group')).toHaveLength(2);
-    expect(wrapper.find('[data-test="review-group-orders"]').text()).toContain('3 items');
+    expect(wrapper.find('[data-test="review-summary"]').text()).toContain('0 of 4 steps complete');
+    expect(wrapper.find('[data-test="review-safe-plan"]').text()).toContain('Ready to move');
+    expect(wrapper.find('[data-test="review-choices"]').text()).toContain('Needs your choice');
+    expect(wrapper.find('[data-test="review-stays-behind"]').text()).toContain('Stays in WooCommerce');
+    expect(wrapper.text()).not.toContain('Order 116');
+    expect(wrapper.text()).toContain('Ada Lovelace');
+    expect(wrapper.text()).toContain('Store membership');
+    expect(wrapper.text()).toContain('12 related orders');
+    expect(wrapper.text()).toContain('PLN');
+    expect(wrapper.text()).toContain('24.00');
+    expect(wrapper.text()).toContain('Already in FluentCart');
+    expect(wrapper.text()).not.toContain('Equivalent records');
+    expect(wrapper.text()).toContain('2 orders');
+    expect(wrapper.text()).not.toContain('Order 9101');
+    expect(wrapper.text()).not.toContain('Order 8602');
 
-    await wrapper.find('[data-test="review-group-orders"] [data-test="approve-group"]').trigger('click');
+    await wrapper.find('[data-test="approve-safe-plan"]').trigger('click');
+    await wrapper.find('[data-test="apply-suggested-customer-matches"]').trigger('click');
+    const customerCards = wrapper.findAll('.cartshift-review-recommendations [data-test="review-decision"]');
+    await customerCards[1].findAll('input')[1].setValue(true);
 
-    expect(wrapper.findAll('[data-test="review-group-orders"] input:checked')).toHaveLength(3);
-    expect(wrapper.find('[data-test="review-summary"]').text()).toContain('1 of 2 review steps complete');
+    expect(wrapper.find('[data-test="review-summary"]').text()).toContain('2 of 4 steps complete');
     expect(wrapper.find('[data-test="accept-run-decisions"]').attributes('disabled')).toBeDefined();
-    expect(wrapper.find('[data-test="review-group-products"] input:checked').exists()).toBe(false);
 
-    await wrapper.find('[data-test="review-group-products"] input').setValue(true);
+    await wrapper.find('[data-test="explicit-choice-product-0123456789ab"] input').setValue(true);
+    await wrapper.find('[data-test="acknowledge-stays-behind"]').trigger('click');
+
+    expect(wrapper.find('[data-test="review-summary"]').text()).toContain('4 of 4 steps complete');
     expect(wrapper.find('[data-test="accept-run-decisions"]').text()).toContain('Confirm review');
+    expect(wrapper.findAll('.button-primary')).toHaveLength(1);
     await wrapper.find('[data-test="accept-run-decisions"]').trigger('click');
     await flushPromises();
 
@@ -440,10 +529,49 @@ describe('GuidedMigrationScreen', () => {
       'POST',
       'migration/decisions',
       {
-        approved_reviews: [...orderItems.map(({ review_id }) => review_id), productItem.review_id],
-        review_answers: [{ review_id: productItem.review_id, choice_id: 'choice-111111111111' }],
+        approved_reviews: [
+          ...safeItems.map(({ review_id }) => review_id),
+          ...customerItems.map(({ review_id }) => review_id),
+          productItem.review_id,
+          collisionItem.review_id,
+          ...groupedSkipItems.map(({ review_id }) => review_id),
+        ],
+        review_answers: [
+          { review_id: customerItems[0].review_id, choice_id: 'reuse-0' },
+          { review_id: customerItems[1].review_id, choice_id: 'create-1' },
+          { review_id: productItem.review_id, choice_id: 'choice-111111111111' },
+          { review_id: collisionItem.review_id, choice_id: 'skip-0123456789ab' },
+        ],
       },
     ]);
+  });
+
+  it('keeps a large routine review out of the DOM until requested and reveals 20 rows at a time', async () => {
+    const items = Array.from({ length: 1599 }, (_, index) => ({
+      review_id: `decision-${String(index).padStart(12, '0')}`,
+      kind: 'migration_decision',
+      group: 'orders',
+      section: 'safe_plan',
+      title: `Customer ${index + 1}`,
+      summary: 'Keep the reviewed historical notes private.',
+    }));
+    serve(status({
+      run: {
+        phase: 'awaiting_decisions',
+        completed_steps: 3,
+        total_steps: 12,
+        last_step: 'Review migration decisions',
+        review: { blockers: [], items, proposal_counts: {} },
+      },
+    }));
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-test="review-decision"]')).toHaveLength(0);
+    await wrapper.get('[data-test="review-safe-plan"] summary').trigger('click');
+    expect(wrapper.findAll('[data-test="review-decision"]')).toHaveLength(20);
+    await wrapper.get('[data-test="show-more-safe_plan"]').trigger('click');
+    expect(wrapper.findAll('[data-test="review-decision"]')).toHaveLength(40);
   });
 
   it('requires one clear product choice and never offers overwrite', async () => {
@@ -887,7 +1015,7 @@ describe('GuidedMigrationScreen', () => {
     await flushPromises();
 
     await wrapper.find('[data-test="review-decision"] input').setValue(true);
-    await wrapper.find('[data-test="run-review"] .button:not(.button-primary)').trigger('click');
+    await wrapper.find('[data-test="cancel-review"]').trigger('click');
     await flushPromises();
     await wrapper.find('[data-test="start"]').trigger('click');
     await flushPromises();

@@ -24,7 +24,7 @@ final readonly class GuidedCollisionDecisionBuilder
     /** @var \Closure(TransferSelection,TransferDecisionSet):iterable<RecordEnvelope> */
     private \Closure $sourceRecords;
 
-    /** @var \Closure(RecordEnvelope,array<string,string>):list<array{target_id:int,target_fingerprint:string}> */
+    /** @var \Closure(RecordEnvelope,array<string,string>):list<array<string,mixed>> */
     private \Closure $targetCandidates;
 
     /** @var \Closure(RecordEnvelope):?MappingRecord */
@@ -35,7 +35,7 @@ final readonly class GuidedCollisionDecisionBuilder
 
     /**
      * @param (callable(TransferSelection,TransferDecisionSet):iterable<RecordEnvelope>)|null $sourceRecords
-     * @param (callable(RecordEnvelope,array<string,string>):list<array{target_id:int,target_fingerprint:string}>)|null $targetCandidates
+     * @param (callable(RecordEnvelope,array<string,string>):list<array<string,mixed>>)|null $targetCandidates
      * @param (callable(RecordEnvelope):?MappingRecord)|null $checkedMapping
      * @param (callable(string,int):?string)|null $currentTargetFingerprint
      */
@@ -116,6 +116,9 @@ final readonly class GuidedCollisionDecisionBuilder
                 'target_fingerprint' => $target['target_fingerprint'],
                 'closure' => $closureFacts,
             ];
+            if (array_key_exists('target_story', $target)) {
+                $facts['target_story'] = $this->targetStory($target['target_story'], $record->identity->kind());
+            }
             $reviewId = 'collision-' . substr(CanonicalJson::fingerprint($facts), 0, 12);
             $choiceFacts = ['review_id' => $reviewId, 'action' => 'skip', 'evidence' => $facts];
             $questions[] = $facts + [
@@ -318,7 +321,7 @@ final readonly class GuidedCollisionDecisionBuilder
         }
     }
 
-    /** @param list<array{target_id:int,target_fingerprint:string}> $candidates */
+    /** @param list<array<string,mixed>> $candidates */
     private function assertCandidates(array $candidates): void
     {
         if (!array_is_list($candidates)) {
@@ -336,6 +339,43 @@ final readonly class GuidedCollisionDecisionBuilder
             }
             $ids[$candidate['target_id']] = true;
         }
+    }
+
+    /** @return array<string,mixed> */
+    private function targetStory(mixed $story, RecordKind $kind): array
+    {
+        if (!is_array($story)) {
+            throw new \RuntimeException('guided_collision_target_read_failed');
+        }
+        if ($kind === RecordKind::Order) {
+            $items = is_array($story['items'] ?? null) && array_is_list($story['items']) ? $story['items'] : [];
+            return [
+                'kind' => 'order',
+                'customer_name' => trim((string) ($story['customer_name'] ?? '')),
+                'created_utc' => trim((string) ($story['created_utc'] ?? '')),
+                'status' => trim((string) ($story['status'] ?? '')),
+                'currency' => trim((string) ($story['currency'] ?? '')),
+                'gross_total' => (int) ($story['gross_total'] ?? 0),
+                'items' => array_map(static fn (mixed $item): array => is_array($item) ? [
+                    'name' => trim((string) ($item['name'] ?? '')),
+                    'quantity' => max(0, (int) ($item['quantity'] ?? 0)),
+                ] : ['name' => '', 'quantity' => 0], $items),
+                'item_count' => max(0, (int) ($story['item_count'] ?? count($items))),
+            ];
+        }
+        if ($kind === RecordKind::Subscription) {
+            return [
+                'kind' => 'subscription',
+                'status' => trim((string) ($story['status'] ?? '')),
+                'recurring_total' => (int) ($story['recurring_total'] ?? 0),
+                'next_payment_utc' => is_string($story['next_payment_utc'] ?? null)
+                    ? $story['next_payment_utc']
+                    : null,
+                'item_name' => trim((string) ($story['item_name'] ?? '')),
+                'quantity' => max(0, (int) ($story['quantity'] ?? 0)),
+            ];
+        }
+        throw new \RuntimeException('guided_collision_source_invalid');
     }
 
     /** @param list<RecordEnvelope> $closure */
@@ -425,8 +465,48 @@ final readonly class GuidedCollisionDecisionBuilder
             $candidates[] = [
                 'target_id' => $targetId,
                 'target_fingerprint' => CanonicalJson::fingerprint($snapshot),
+                'target_story' => self::loadedTargetStory($record->identity->kind(), $snapshot),
             ];
         }
         return $candidates;
+    }
+
+    /** @param array<string,mixed> $snapshot @return array<string,mixed> */
+    private static function loadedTargetStory(RecordKind $kind, array $snapshot): array
+    {
+        if ($kind === RecordKind::Order) {
+            $order = is_array($snapshot['order'] ?? null) ? $snapshot['order'] : [];
+            $addresses = is_array($snapshot['addresses'] ?? null) ? $snapshot['addresses'] : [];
+            $billing = array_values(array_filter(
+                $addresses,
+                static fn (mixed $address): bool => is_array($address) && ($address['type'] ?? null) === 'billing',
+            ))[0] ?? [];
+            $rows = is_array($snapshot['items'] ?? null) && array_is_list($snapshot['items']) ? $snapshot['items'] : [];
+            $items = array_map(static fn (mixed $item): array => is_array($item) ? [
+                'name' => trim((string) ($item['title'] ?? $item['post_title'] ?? '')),
+                'quantity' => max(0, (int) ($item['quantity'] ?? 0)),
+            ] : ['name' => '', 'quantity' => 0], $rows);
+            return [
+                'kind' => 'order',
+                'customer_name' => trim((string) ($billing['name'] ?? '')),
+                'created_utc' => trim((string) ($order['created_at'] ?? '')),
+                'status' => trim((string) ($order['status'] ?? '')),
+                'currency' => trim((string) ($order['currency'] ?? '')),
+                'gross_total' => (int) ($order['total_amount'] ?? 0),
+                'items' => $items,
+                'item_count' => count($items),
+            ];
+        }
+        $subscription = is_array($snapshot['subscription'] ?? null) ? $snapshot['subscription'] : [];
+        return [
+            'kind' => 'subscription',
+            'status' => trim((string) ($subscription['status'] ?? '')),
+            'recurring_total' => (int) ($subscription['recurring_total'] ?? 0),
+            'next_payment_utc' => is_string($subscription['next_billing_date'] ?? null)
+                ? $subscription['next_billing_date']
+                : null,
+            'item_name' => trim((string) ($subscription['item_name'] ?? '')),
+            'quantity' => max(0, (int) ($subscription['quantity'] ?? 0)),
+        ];
     }
 }

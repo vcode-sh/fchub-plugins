@@ -16,6 +16,7 @@ final readonly class GuidedDecisionReview
         private GuidedCustomerDecisionBuilder $customers = new GuidedCustomerDecisionBuilder(),
         private GuidedProductDecisionBuilder $products = new GuidedProductDecisionBuilder(),
         private GuidedCollisionDecisionBuilder $collisions = new GuidedCollisionDecisionBuilder(),
+        private GuidedReviewStoryPresenter $stories = new GuidedReviewStoryPresenter(),
     ) {}
 
     /** @param array<string, mixed> $proposal @return array{items:list<array<string,mixed>>,blockers:list<string>,source_scope:?array<string,int>} */
@@ -24,23 +25,31 @@ final readonly class GuidedDecisionReview
         $items = [];
         foreach ($this->proposalRows($proposal) as $row) {
             $identity = SourceIdentity::fromCanonical((string) $row['identity']);
-            $items[] = [
+            $story = $this->stories->source($proposal, $identity);
+            $item = [
                 'review_id' => $this->decisionReviewId($row),
                 'kind' => 'migration_decision',
                 'group' => $identity->entityType . 's',
-                'title' => $this->title($identity),
+                'section' => ($row['action'] ?? null) === 'excluded_by_policy' ? 'stays_behind' : 'safe_plan',
+                'title' => $this->stories->title($story) ?? $this->stories->fallbackTitle($identity),
                 'summary' => $this->decisionSummary($row, $this->isRenewal($proposal, $row)),
             ];
+            if ($story !== null) {
+                $item['story'] = $story;
+            }
+            $items[] = $item;
         }
         foreach ($this->products->questions($proposal) as $question) {
             $choices = array_map(fn (array $choice): array => $this->productChoice($choice), $question['choices']);
             $onlySkip = count($question['choices']) === 1
                 && ($question['choices'][0]['action'] ?? null) === 'skip';
-            $items[] = [
+            $story = $this->stories->source($proposal, SourceIdentity::fromCanonical((string) $question['identity']));
+            $item = [
                 'review_id' => (string) $question['review_id'],
                 'kind' => 'product_conflict',
                 'group' => 'products',
-                'title' => (string) $question['product_name'],
+                'section' => count($choices) > 1 ? 'choices' : ($onlySkip ? 'stays_behind' : 'safe_plan'),
+                'title' => $this->stories->title($story) ?? (string) $question['product_name'],
                 'summary' => $onlySkip
                     ? $this->productCascadeSkipSummary($question)
                     : (array_filter(
@@ -51,29 +60,49 @@ final readonly class GuidedDecisionReview
                     : 'A likely FluentCart match already exists. Choose what CartShift should do.'),
                 'choices' => $choices,
             ];
+            $recommended = $this->recommendedProductChoice($question['choices']);
+            if ($recommended !== null) {
+                $item['recommended_choice_id'] = $recommended;
+            }
+            if ($story !== null) {
+                $item['story'] = $story;
+            }
+            $items[] = $item;
         }
         foreach ($this->customers->questions($proposal) as $question) {
             $name = trim((string) ($question['name'] ?? ''));
             $email = trim((string) ($question['email'] ?? ''));
             $choices = array_map(fn (array $choice): array => $this->customerChoice($choice), $question['choices'] ?? []);
-            $items[] = [
+            $story = $this->stories->source($proposal, SourceIdentity::fromCanonical((string) $question['identity']));
+            $item = [
                 'review_id' => (string) $question['review_id'],
                 'kind' => $choices === [] ? 'customer_ownership' : 'customer_match',
                 'group' => 'customers',
-                'title' => $name !== '' ? $name : ($email !== '' ? $email : 'Guest customer'),
+                'section' => $choices === [] ? 'safe_plan' : 'choices',
+                'title' => $this->stories->title($story) ?? ($name !== '' ? $name : ($email !== '' ? $email : 'Guest customer')),
                 'summary' => $choices === []
                     ? $this->customerSummary($question)
                     : 'A FluentCart customer may already represent this person. Choose whether to reuse it or create a separate customer.',
                 ...($choices === [] ? [] : ['choices' => $choices]),
             ];
+            $recommended = $this->recommendedCustomerChoice($question['choices'] ?? []);
+            if ($recommended !== null) {
+                $item['recommended_choice_id'] = $recommended;
+            }
+            if ($story !== null) {
+                $item['story'] = $story;
+            }
+            $items[] = $item;
         }
         foreach ($this->collisions->questions($proposal) as $question) {
             $kind = (string) ($question['record_kind'] ?? '');
-            $items[] = [
+            $story = $this->stories->source($proposal, SourceIdentity::fromCanonical((string) $question['identity']));
+            $item = [
                 'review_id' => (string) $question['review_id'],
                 'kind' => 'record_collision',
                 'group' => $kind === 'subscription' ? 'subscriptions' : 'orders',
-                'title' => $kind === 'subscription' ? 'Existing subscription' : 'Existing order',
+                'section' => 'stays_behind',
+                'title' => $this->stories->title($story) ?? ($kind === 'subscription' ? 'Existing subscription' : 'Existing order'),
                 'summary' => $this->collisionSummary($question),
                 'choices' => [[
                     'choice_id' => (string) $question['choices'][0]['choice_id'],
@@ -82,7 +111,16 @@ final readonly class GuidedDecisionReview
                         ? 'Keep the FluentCart subscription unchanged. This WooCommerce subscription will stay managed in WooCommerce.'
                         : 'Keep the FluentCart order unchanged. CartShift will not create a duplicate WooCommerce copy.',
                 ]],
+                'recommended_choice_id' => (string) $question['choices'][0]['choice_id'],
             ];
+            if ($story !== null) {
+                $item['story'] = $story;
+            }
+            $targetStory = $this->stories->target($question['target_story'] ?? null, $kind);
+            if ($targetStory !== null) {
+                $item['target_story'] = $targetStory;
+            }
+            $items[] = $item;
         }
 
         return [
@@ -184,26 +222,37 @@ final readonly class GuidedDecisionReview
         return 'decision-' . substr(CanonicalJson::fingerprint($row), 0, 12);
     }
 
-    private function title(SourceIdentity $identity): string
+    /** @param list<array<string,mixed>> $choices */
+    private function recommendedProductChoice(array $choices): ?string
     {
-        $kind = match ($identity->entityType) {
-            'product' => 'Product',
-            'order' => 'Order',
-            'subscription' => 'Subscription',
-            'customer' => 'Customer',
-            default => throw new \RuntimeException('guided_decision_review_unsupported'),
-        };
-
-        if ($identity->entityType === 'order'
-            && preg_match('/\A([^:]+):item:([^:]+)\z/D', $identity->sourceId, $parts) === 1) {
-            return sprintf('Order %s, item %s', $parts[1], $parts[2]);
+        if (count($choices) === 1) {
+            return is_string($choices[0]['choice_id'] ?? null) ? $choices[0]['choice_id'] : null;
         }
-        if ($identity->entityType === 'product'
-            && preg_match('/\A([^:]+):/D', $identity->sourceId, $parts) === 1) {
-            return 'Product ' . $parts[1];
+        foreach (['link', 'create'] as $action) {
+            $matches = array_values(array_filter(
+                $choices,
+                static fn (array $choice): bool => ($choice['action'] ?? null) === $action,
+            ));
+            if (count($matches) === 1 && is_string($matches[0]['choice_id'] ?? null)) {
+                return $matches[0]['choice_id'];
+            }
+            if ($matches !== []) {
+                return null;
+            }
         }
+        return null;
+    }
 
-        return $kind . ' ' . $identity->sourceId;
+    /** @param list<array<string,mixed>> $choices */
+    private function recommendedCustomerChoice(array $choices): ?string
+    {
+        $reuse = array_values(array_filter(
+            $choices,
+            static fn (array $choice): bool => ($choice['action'] ?? null) === 'reuse',
+        ));
+        return count($reuse) === 1 && is_string($reuse[0]['choice_id'] ?? null)
+            ? $reuse[0]['choice_id']
+            : null;
     }
 
     /** @param array<string,mixed> $row */
@@ -320,11 +369,13 @@ final readonly class GuidedDecisionReview
         $orders = (int) ($question['dependent_orders'] ?? 0);
         $subscriptions = (int) ($question['dependent_subscriptions'] ?? 0);
         if ($orders === 0 && $subscriptions === 0) {
-            return 'FluentCart already has this record. CartShift will keep it unchanged and can skip the WooCommerce copy.';
+            return 'A FluentCart record already uses the migration identity CartShift would need. '
+                . 'It will remain unchanged; skipping this WooCommerce copy prevents an identity collision.';
         }
 
         return sprintf(
-            'FluentCart already has this record. Skipping it will also skip %d related order%s and %d related subscription%s.',
+            'A FluentCart record already uses the migration identity CartShift would need. '
+                . 'Skipping this WooCommerce copy will also skip %d related order%s and %d related subscription%s.',
             $orders,
             $orders === 1 ? '' : 's',
             $subscriptions,

@@ -40,6 +40,138 @@ final class GuidedDecisionReviewTest extends PluginTestCase
         self::assertDoesNotMatchRegularExpression('/[a-f0-9]{64}/', $encoded);
     }
 
+    public function testPresentationTurnsAnOrderIdentityIntoAHumanCommerceStory(): void
+    {
+        $proposal = $this->proposal();
+        $proposal['review_context'] = [
+            'shop-alpha:order:42' => [
+                'kind' => 'order',
+                'customer_name' => 'Ada Lovelace',
+                'customer_email' => 'ada@example.test',
+                'created_utc' => '2025-01-20T11:12:13Z',
+                'status' => 'completed',
+                'currency' => 'PLN',
+                'gross_total' => 2400,
+                'items' => [['name' => 'Store membership', 'sku' => 'MEMBERSHIP', 'quantity' => 1]],
+                'item_count' => 1,
+            ],
+            'shop-alpha:product:10' => [
+                'kind' => 'product',
+                'name' => 'Store membership',
+                'sku' => 'MEMBERSHIP',
+                'status' => 'publish',
+                'product_type' => 'simple',
+                'dependent_orders' => 1,
+                'dependent_subscriptions' => 0,
+            ],
+        ];
+
+        $presentation = (new GuidedDecisionReview($this->customerBuilder()))->presentation($proposal);
+        $order = array_values(array_filter(
+            $presentation['items'],
+            static fn (array $item): bool => $item['group'] === 'orders',
+        ))[0];
+
+        self::assertSame('Ada Lovelace', $order['title']);
+        self::assertSame('safe_plan', $order['section']);
+        self::assertSame([
+            'kind' => 'order',
+            'customer_name' => 'Ada Lovelace',
+            'customer_email' => 'ada@example.test',
+            'created_utc' => '2025-01-20T11:12:13Z',
+            'status' => 'completed',
+            'currency' => 'PLN',
+            'gross_total' => 2400,
+            'items' => [['name' => 'Store membership', 'sku' => 'MEMBERSHIP', 'quantity' => 1]],
+            'item_count' => 1,
+        ], $order['story']);
+
+        $encoded = json_encode($presentation, JSON_THROW_ON_ERROR);
+        self::assertStringNotContainsString('shop-alpha', $encoded);
+        self::assertStringNotContainsString('source_fingerprint', $encoded);
+    }
+
+    public function testPresentationSeparatesDeterministicOutcomesFromGenuineChoices(): void
+    {
+        $proposal = $this->proposal();
+        $proposal['product_questions'] = [
+            $this->productQuestion('product-create', '11', [['choice_id' => 'create-11', 'action' => 'create']]),
+            $this->productQuestion('product-skip', '12', [['choice_id' => 'skip-12', 'action' => 'skip']]),
+            $this->productQuestion('product-choice', '13', [
+                ['choice_id' => 'create-13', 'action' => 'create'],
+                ['choice_id' => 'skip-13', 'action' => 'skip'],
+            ]),
+        ];
+        $proposal['customer_questions'] = [[
+            'review_id' => 'customer-safe',
+            'identity' => 'shop-alpha:customer:7',
+            'name' => 'Ada Lovelace',
+            'email' => 'ada@example.test',
+            'classification' => 'registered',
+            'action' => 'attach_exact_same_site_user',
+            'has_downloads' => false,
+        ], [
+            'review_id' => 'customer-choice',
+            'identity' => 'shop-alpha:customer:8',
+            'name' => 'Grace Hopper',
+            'email' => 'grace@example.test',
+            'classification' => 'registered',
+            'choices' => [[
+                'choice_id' => 'reuse-8',
+                'action' => 'reuse',
+                'target_label' => 'Grace Hopper (grace@example.test)',
+            ], [
+                'choice_id' => 'create-8',
+                'action' => 'create',
+            ]],
+        ]];
+        $proposal['collision_questions'] = [[
+            'review_id' => 'collision-42',
+            'identity' => 'shop-alpha:order:42',
+            'record_kind' => 'order',
+            'source_fingerprint' => str_repeat('c', 64),
+            'target_id' => 901,
+            'target_fingerprint' => str_repeat('d', 64),
+            'closure' => [[
+                'identity' => 'shop-alpha:order:42',
+                'source_fingerprint' => str_repeat('c', 64),
+            ]],
+            'dependent_orders' => 0,
+            'dependent_subscriptions' => 0,
+            'target_story' => [
+                'kind' => 'order',
+                'customer_name' => 'Ada Lovelace',
+                'created_utc' => '2025-01-20 11:12:13',
+                'status' => 'completed',
+                'currency' => 'PLN',
+                'gross_total' => 2400,
+                'items' => [['name' => 'Store membership', 'quantity' => 1]],
+                'item_count' => 1,
+            ],
+            'choices' => [['choice_id' => 'skip-42', 'action' => 'skip']],
+        ]];
+
+        $items = (new GuidedDecisionReview($this->customerBuilder(), $this->productBuilder()))
+            ->presentation($proposal)['items'];
+        $byReview = array_column($items, null, 'review_id');
+
+        self::assertSame('safe_plan', $byReview['product-create']['section']);
+        self::assertSame('create-11', $byReview['product-create']['recommended_choice_id']);
+        self::assertSame('stays_behind', $byReview['product-skip']['section']);
+        self::assertSame('skip-12', $byReview['product-skip']['recommended_choice_id']);
+        self::assertSame('choices', $byReview['product-choice']['section']);
+        self::assertSame('create-13', $byReview['product-choice']['recommended_choice_id']);
+        self::assertSame('safe_plan', $byReview['customer-safe']['section']);
+        self::assertSame('choices', $byReview['customer-choice']['section']);
+        self::assertSame('reuse-8', $byReview['customer-choice']['recommended_choice_id']);
+        self::assertSame('stays_behind', $byReview['collision-42']['section']);
+        self::assertSame('skip-42', $byReview['collision-42']['recommended_choice_id']);
+        self::assertStringContainsString('uses the migration identity', $byReview['collision-42']['summary']);
+        self::assertStringNotContainsString('already has this record', $byReview['collision-42']['summary']);
+        self::assertSame('Ada Lovelace', $byReview['collision-42']['target_story']['customer_name']);
+        self::assertStringNotContainsString('901', json_encode($byReview['collision-42']['target_story'], JSON_THROW_ON_ERROR));
+    }
+
     public function testPresentationExplainsTheDeliberatelyNarrowSourceScopeAndApprovalKeepsItForTheReport(): void
     {
         $proposal = $this->proposal();
@@ -390,6 +522,20 @@ final class GuidedDecisionReviewTest extends PluginTestCase
             static fn (): array => [],
             static fn (): array => ['orders' => 0, 'subscriptions' => 0],
         );
+    }
+
+    /** @param list<array<string,string>> $choices @return array<string,mixed> */
+    private function productQuestion(string $reviewId, string $sourceId, array $choices): array
+    {
+        return [
+            'review_id' => $reviewId,
+            'identity' => 'shop-alpha:product:' . $sourceId,
+            'product_name' => 'Product ' . $sourceId,
+            'source_fingerprint' => str_repeat($sourceId[0], 64),
+            'dependent_orders' => $reviewId === 'product-skip' ? 2 : 0,
+            'dependent_subscriptions' => 0,
+            'choices' => $choices,
+        ];
     }
 
     /** @return array<string, mixed> */

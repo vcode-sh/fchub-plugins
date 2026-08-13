@@ -380,6 +380,7 @@ final class GuidedRunner
         if (!$index instanceof GuidedSourceDependencyIndex) {
             return $result;
         }
+        $result = (new GuidedReviewContextBuilder())->enrich($result, $index);
         $summary = $scope->summary($index->records());
         $exceptions = is_array($result['migration_exceptions'] ?? null)
             ? array_values($result['migration_exceptions'])

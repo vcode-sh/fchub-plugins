@@ -51,7 +51,6 @@
           :blocked="blockingChecks.length > 0 || Boolean(data.plan_blocked)"
           :notice="state.reviewNotice"
           @toggle="toggleReview"
-          @bulk-toggle="toggleReviewGroup"
           @accept="acceptRunDecisions"
           @cancel="cancelRun"
         />
@@ -127,12 +126,6 @@ function clearReviewApprovals() {
 
 function toggleReview(reviewId, answer) {
   reviewApprovals[reviewId] = answer;
-}
-
-function toggleReviewGroup(reviewIds, approved) {
-  reviewIds.forEach((reviewId) => {
-    reviewApprovals[reviewId] = approved;
-  });
 }
 
 async function refresh() {

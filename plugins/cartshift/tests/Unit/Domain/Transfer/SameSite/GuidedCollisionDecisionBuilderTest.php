@@ -168,6 +168,34 @@ final class GuidedCollisionDecisionBuilderTest extends PluginTestCase
         );
     }
 
+    public function testCollisionQuestionBindsTheAllowlistedTargetStory(): void
+    {
+        $order = $this->record('order', '30');
+        $story = [
+            'kind' => 'order',
+            'customer_name' => 'Ada Lovelace',
+            'created_utc' => '2025-01-20 11:12:13',
+            'status' => 'completed',
+            'currency' => 'PLN',
+            'gross_total' => 2400,
+            'items' => [['name' => 'Store membership', 'quantity' => 1]],
+            'item_count' => 1,
+        ];
+        $builder = new GuidedCollisionDecisionBuilder(
+            static fn (): iterable => [$order],
+            static fn (): array => [[
+                'target_id' => 700,
+                'target_fingerprint' => hash('sha256', 'target-order-700'),
+                'target_story' => $story,
+            ]],
+        );
+
+        $question = $builder->questions($builder->enrich($this->proposal([$order]), $this->selection()))[0];
+
+        self::assertSame($story, $question['target_story']);
+        self::assertStringNotContainsString('target_id', json_encode($question['target_story'], JSON_THROW_ON_ERROR));
+    }
+
     public function testAProductCascadeSkipOwnsItsDependantsWithoutDuplicateCollisionQuestions(): void
     {
         $product = $this->record('product', '10');

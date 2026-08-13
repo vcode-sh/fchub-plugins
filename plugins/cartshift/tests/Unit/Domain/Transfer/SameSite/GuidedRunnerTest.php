@@ -237,6 +237,15 @@ final class GuidedRunnerTest extends PluginTestCase
 
     public function testProposalEnrichmentUsesTheCandidateDecisionSetItPresents(): void
     {
+        $order = RecordEnvelope::forPayload(2, new SourceIdentity(self::SOURCE_KEY, 'order', '42'), [
+            'dependencies' => [],
+            'customer' => null,
+            'created_utc' => '2025-01-20T11:12:13Z',
+            'source_status' => 'completed',
+            'currency' => 'PLN',
+            'gross_total' => 2400,
+            'product_lines' => [],
+        ]);
         $skip = [
             'identity' => self::SOURCE_KEY . ':order:42',
             'scope' => 'audit_finding',
@@ -258,19 +267,21 @@ final class GuidedRunnerTest extends PluginTestCase
         $seen = null;
         $runner = $this->runner(
             proposalPipeline: static fn (): array => $proposal,
-            sourceDependencyIndex: static function (TransferSelection $selection, TransferDecisionSet $decisions) use (&$seen): GuidedSourceDependencyIndex {
+            sourceDependencyIndex: static function (TransferSelection $selection, TransferDecisionSet $decisions) use (&$seen, $order): GuidedSourceDependencyIndex {
                 $seen = $decisions;
-                return new GuidedSourceDependencyIndex([]);
+                return new GuidedSourceDependencyIndex([$order]);
             },
         );
 
-        $runner->run($this->stepFor('propose-decisions', GuidedEvidence::none()));
+        $result = $runner->run($this->stepFor('propose-decisions', GuidedEvidence::none()));
 
         self::assertInstanceOf(TransferDecisionSet::class, $seen);
         self::assertSame(
             'excluded_by_policy',
             $seen->forAuditFinding(self::SOURCE_KEY . ':order:42', 'order_money_mismatch')['action'] ?? null,
         );
+        self::assertSame('order', $result['review_context'][$order->identity->canonical()]['kind']);
+        self::assertSame(2400, $result['review_context'][$order->identity->canonical()]['gross_total']);
     }
 
     // ──────────────────────────────────────────────
