@@ -204,6 +204,7 @@ final class ProductReconcilerTest extends PluginTestCase
             targetShippingClasses: ['none' => 0],
         ));
         $gateway = new InMemoryProductTargetGateway();
+        $gateway->stockManagementActive = false;
         $maps = new InMemoryCheckedMappingStore();
         $writer = new FluentCartProductWriter($gateway, $maps, new ProductReconciler($gateway, $maps));
 
@@ -214,6 +215,7 @@ final class ProductReconcilerTest extends PluginTestCase
         self::assertIsInt($sharedId);
         self::assertIsInt($ordinaryId);
         self::assertSame(1, $plan->detailFields['manage_stock']);
+        self::assertSame('inactive', $gateway->variations[$sharedId]['item_status']);
         self::assertSame('out-of-stock', $gateway->variations[$sharedId]['stock_status']);
         self::assertSame(0, $gateway->variations[$sharedId]['available']);
         self::assertArrayHasKey('stock_migration_exception', $gateway->variations[$sharedId]['other_info']);
@@ -234,10 +236,16 @@ final class ProductReconcilerTest extends PluginTestCase
         $gateway->cartableOverride = null;
         $gateway->checkoutOverride = null;
         $gateway->details[$result->targetId]['manage_stock'] = 0;
+        self::assertNotContains(
+            $sharedId,
+            $gateway->behaviour($result->targetId, $result->variationIds)['cartable_variation_ids'],
+            'The inactive variation must remain unavailable when FluentCart stock management is disabled.',
+        );
+        $gateway->variations[$sharedId]['item_status'] = 'active';
         self::assertContains(
             $sharedId,
             $gateway->behaviour($result->targetId, $result->variationIds)['cartable_variation_ids'],
-            'The test gateway must model FluentCart requiring product-level stock management.',
+            'The test must prove that activating the variation without stock management would reintroduce overselling.',
         );
     }
 

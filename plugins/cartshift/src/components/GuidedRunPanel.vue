@@ -62,12 +62,12 @@
     </div>
 
     <section v-if="run.migration_exceptions?.length" class="cartshift-stock-report" data-test="migration-exceptions">
-      <header><span class="dashicons dashicons-archive" aria-hidden="true"></span><div><h3>Migration follow-up</h3><p>CartShift lists anything that stayed in WooCommerce or needs manual setup.</p></div></header>
+      <header><span class="dashicons dashicons-archive" aria-hidden="true"></span><div><h3>Migration follow-up</h3><p>Review anything that still needs your attention after migration.</p></div></header>
       <article v-for="(item, itemIndex) in run.migration_exceptions" :key="itemIndex">
         <h4>{{ item.title }}</h4>
         <p>{{ item.message }}</p>
         <template v-if="item.type === 'shared_stock'">
-          <p><strong>Shared stock needs manual setup. Affected variations stay unavailable, preventing accidental overselling.</strong></p>
+          <p><strong>Shared stock needs manual setup. Affected variations stay inactive and unavailable, preventing accidental overselling.</strong></p>
           <p v-if="item.target_state === 'confirmed'"><strong>CartShift verified the safe unavailable state in FluentCart.</strong></p>
           <p v-else-if="item.target_state === 'needs_review'"><strong>Keep these variations unavailable and inspect them before selling.</strong></p>
           <p v-if="item.source_quantity_state === 'known'">Original product-wide shared quantity: {{ item.source_quantity }}.</p>
@@ -75,6 +75,28 @@
           <p v-else>WooCommerce did not provide a shared quantity. Count physical stock before enabling it.</p>
           <ul><li v-for="(variation, variationIndex) in item.variations" :key="variationIndex">{{ variation.title }}<template v-if="variation.sku"> — SKU {{ variation.sku }}</template></li></ul>
           <ul class="cartshift-suggestions"><li v-for="suggestion in item.suggestions" :key="suggestion">{{ suggestion }}</li></ul>
+        </template>
+        <template v-else-if="item.type === 'sku_change'">
+          <p><strong>All variations were kept. Only their FluentCart SKUs changed.</strong></p>
+          <ul>
+            <li v-for="(variation, variationIndex) in item.variations" :key="variationIndex">
+              {{ variation.title }} — {{ variation.source_sku }} → {{ variation.target_sku }}
+            </li>
+          </ul>
+          <ul class="cartshift-suggestions"><li v-for="suggestion in item.suggestions" :key="suggestion">{{ suggestion }}</li></ul>
+        </template>
+        <template v-else-if="item.type === 'fulfilment_summary'">
+          <p><strong>{{ item.order_count }} {{ item.order_count === 1 ? 'order reviewed' : 'orders reviewed' }} together.</strong></p>
+          <ul>
+            <li>{{ item.delivered_count }} marked delivered from completed WooCommerce orders</li>
+            <li>{{ item.unshipped_count }} kept unshipped because they were not completed</li>
+            <li v-if="item.mixed_count">{{ item.mixed_count }} mixed physical and digital {{ item.mixed_count === 1 ? 'order keeps' : 'orders keep' }} digital items fulfilled</li>
+          </ul>
+        </template>
+        <template v-else-if="item.type === 'historical_line_summary'">
+          <p v-if="item.line_count === 1"><strong>1 order item kept with its name, price and product link.</strong></p>
+          <p v-else><strong>{{ item.line_count }} order items kept with their names, prices and product links.</strong></p>
+          <p>No replacement variation was guessed. The historical order remains accurate even though its old variation is gone.</p>
         </template>
       </article>
     </section>

@@ -91,6 +91,30 @@ final class GuidedRunProjectionTest extends PluginTestCase
         );
     }
 
+    public function testVerifiedStockFollowUpUsesPastTenseAfterMigration(): void
+    {
+        $state = GuidedRunState::start(
+            'site-0123456789abcdef',
+            'wp-user:1',
+            '2026-08-12T12:00:00Z',
+        )->afterFailure('complete', new GuidedRunFailure('target_failed', [
+            'migration_exceptions' => [[
+                'kind' => 'shared_parent_stock',
+                'product_name' => 'Trail harness',
+                'variation_name' => 'Large',
+                'source_owner' => 'site-0123456789abcdef:product:42',
+                'source_quantity' => 11,
+                'target_verified' => true,
+            ]],
+        ]));
+
+        $report = (new GuidedRunProjection())->run($state)['migration_exceptions'][0];
+
+        self::assertSame('confirmed', $report['target_state']);
+        self::assertStringContainsString('CartShift migrated the affected variations', $report['message']);
+        self::assertStringNotContainsString('will migrate', $report['message']);
+    }
+
     public function testCompletedMigrationIsPresentedAsFinishedInsteadOfUnsafeRehearsal(): void
     {
         $state = GuidedRunState::fromArray([
@@ -214,6 +238,107 @@ final class GuidedRunProjectionTest extends PluginTestCase
         self::assertSame('skipped_record', $report['type']);
         self::assertSame('Store membership', $report['title']);
         self::assertStringContainsString('1 related order and 2 related subscriptions', $report['message']);
+        self::assertStringNotContainsString('site-0123456789abcdef', json_encode($report, JSON_THROW_ON_ERROR));
+    }
+
+    public function testDuplicateSkuChangesBecomeOnePlainProductFollowUp(): void
+    {
+        $state = GuidedRunState::start(
+            'site-0123456789abcdef',
+            'wp-user:1',
+            '2026-08-12T12:00:00Z',
+        )->afterFailure('stage', new GuidedRunFailure('target_failed', [
+            'migration_exceptions' => [
+                [
+                    'kind' => 'duplicate_variation_sku',
+                    'product_name' => 'Trail harness',
+                    'variation_name' => 'Size: Small',
+                    'source_variation' => 'site-0123456789abcdef:product:42:variation:101',
+                    'source_sku' => 'HARNESS',
+                    'target_sku' => 'CS-11111111111111111111',
+                ],
+                [
+                    'kind' => 'duplicate_variation_sku',
+                    'product_name' => 'Trail harness',
+                    'variation_name' => 'Size: Large',
+                    'source_variation' => 'site-0123456789abcdef:product:42:variation:102',
+                    'source_sku' => 'HARNESS',
+                    'target_sku' => 'CS-22222222222222222222',
+                ],
+            ],
+        ]));
+
+        $report = (new GuidedRunProjection())->run($state)['migration_exceptions'][0];
+
+        self::assertSame('sku_change', $report['type']);
+        self::assertSame('Trail harness', $report['title']);
+        self::assertCount(2, $report['variations']);
+        self::assertStringContainsString('unique FluentCart SKU', $report['message']);
+        self::assertStringNotContainsString('site-0123456789abcdef', json_encode($report, JSON_THROW_ON_ERROR));
+    }
+
+    public function testPhysicalOrderFulfilmentBecomesOneSummaryInsteadOfAnOrderByOrderList(): void
+    {
+        $state = GuidedRunState::start(
+            'site-0123456789abcdef',
+            'wp-user:1',
+            '2026-08-12T12:00:00Z',
+        )->afterFailure('stage', new GuidedRunFailure('target_failed', [
+            'migration_exceptions' => [
+                [
+                    'kind' => 'physical_order_fulfilment',
+                    'source_order' => 'site-0123456789abcdef:order:116',
+                    'projection' => 'delivered',
+                    'mixed' => false,
+                ],
+                [
+                    'kind' => 'physical_order_fulfilment',
+                    'source_order' => 'site-0123456789abcdef:order:118',
+                    'projection' => 'unshipped',
+                    'mixed' => true,
+                ],
+            ],
+        ]));
+
+        $report = (new GuidedRunProjection())->run($state)['migration_exceptions'][0];
+
+        self::assertSame('fulfilment_summary', $report['type']);
+        self::assertSame(2, $report['order_count']);
+        self::assertSame(1, $report['delivered_count']);
+        self::assertSame(1, $report['unshipped_count']);
+        self::assertSame(1, $report['mixed_count']);
+        self::assertStringNotContainsString('Order 116', json_encode($report, JSON_THROW_ON_ERROR));
+        self::assertStringNotContainsString('site-0123456789abcdef', json_encode($report, JSON_THROW_ON_ERROR));
+    }
+
+    public function testMissingHistoricalVariationsBecomeOnePlainFollowUp(): void
+    {
+        $state = GuidedRunState::start(
+            'site-0123456789abcdef',
+            'wp-user:1',
+            '2026-08-12T12:00:00Z',
+        )->afterFailure('stage', new GuidedRunFailure('target_failed', [
+            'migration_exceptions' => [
+                [
+                    'kind' => 'historical_order_variation_unlinked',
+                    'source_order' => 'site-0123456789abcdef:order:119',
+                    'source_line' => 'site-0123456789abcdef:order:119:item:11',
+                    'line_name' => 'Historical shirt',
+                ],
+                [
+                    'kind' => 'historical_order_variation_unlinked',
+                    'source_order' => 'site-0123456789abcdef:order:119',
+                    'source_line' => 'site-0123456789abcdef:order:119:item:12',
+                    'line_name' => 'Historical shirt',
+                ],
+            ],
+        ]));
+
+        $report = (new GuidedRunProjection())->run($state)['migration_exceptions'][0];
+
+        self::assertSame('historical_line_summary', $report['type']);
+        self::assertSame(2, $report['line_count']);
+        self::assertStringContainsString('product history', $report['message']);
         self::assertStringNotContainsString('site-0123456789abcdef', json_encode($report, JSON_THROW_ON_ERROR));
     }
 }

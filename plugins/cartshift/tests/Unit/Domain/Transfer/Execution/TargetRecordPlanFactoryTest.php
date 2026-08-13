@@ -12,6 +12,7 @@ use CartShift\Domain\Transfer\Identity\CheckedMappingStore;
 use CartShift\Domain\Transfer\Identity\MapState;
 use CartShift\Domain\Transfer\Identity\MappingRecord;
 use CartShift\Domain\Transfer\Order\OrderRecord;
+use CartShift\Domain\Transfer\Order\OrderLineRecord;
 use CartShift\Domain\Transfer\Product\LinkedProductPlan;
 use CartShift\Domain\Transfer\Product\ProductStagePlan;
 use CartShift\Domain\Transfer\Product\ProductTargetFingerprint;
@@ -284,6 +285,52 @@ final class TargetRecordPlanFactoryTest extends PluginTestCase
         $this->factory([$record->envelope()], TransferDecisionSet::empty())->order($record->envelope());
     }
 
+    public function testHistoricalOrderLineCanKeepItsProductWithoutInventingAMissingVariation(): void
+    {
+        $productIdentity = ProductAssessmentFixture::identity('101');
+        $product = ProductAssessmentFixture::product([
+            'identity' => $productIdentity,
+            'productType' => 'variable',
+            'variations' => [ProductAssessmentFixture::variation(
+                $productIdentity,
+                ['identity' => ProductAssessmentFixture::identity('101:variation:102')],
+            )],
+        ]);
+        $orderIdentity = new SourceIdentity('lapka-web', 'order', '119');
+        $line = new OrderLineRecord(
+            new SourceIdentity('lapka-web', 'order', '119:item:11'),
+            11,
+            $product->identity,
+            ProductAssessmentFixture::identity('101:variation:101'),
+            'Historical shirt', '', [], 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            'unavailable', 0, '1', '2026-01-01T10:00:00Z', [],
+            ['source_fulfilment_type' => 'physical'],
+            [],
+        );
+        $order = new OrderRecord(
+            $orderIdentity, null, null, 'checkout', 'completed', 'PLN', 'PLN', 'PLN', '1',
+            'source_currency_equals_target', false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            '2026-01-01T10:00:00Z', null, null, '2026-01-01T10:00:00Z', null,
+            [$line], [], [], [], [], [], [], [], [],
+        );
+        $maps = new StaticCheckedMappingStore([
+            $product->identity->canonical() => 501,
+        ]);
+        $factory = $this->factory(
+            [$product->envelope(), $order->envelope()],
+            TransferDecisionSet::empty(),
+            maps: $maps,
+        );
+
+        $plan = $factory->order($order->envelope());
+        $item = $plan->money->productItems[0];
+
+        self::assertSame(501, $item['post_id']);
+        self::assertSame(0, $item['object_id']);
+        self::assertTrue($item['other_info']['historical_variation_unlinked']);
+        self::assertSame('physical', $item['fulfillment_type']);
+    }
+
     /** @param list<array<string,mixed>> $rows */
     private function decisions(array $rows): TransferDecisionSet
     {
@@ -299,11 +346,12 @@ final class TargetRecordPlanFactoryTest extends PluginTestCase
         array $records,
         TransferDecisionSet $decisions,
         ?callable $productTargetSnapshot = null,
+        ?CheckedMappingStore $maps = null,
     ): TargetRecordPlanFactory
     {
         return new TargetRecordPlanFactory(
             $decisions,
-            new EmptyCheckedMappingStore(),
+            $maps ?? new EmptyCheckedMappingStore(),
             $this->package,
             $records,
             [],
@@ -336,6 +384,25 @@ final class TargetRecordPlanFactoryTest extends PluginTestCase
             productTargetSnapshot: $productTargetSnapshot,
         );
     }
+}
+
+final class StaticCheckedMappingStore implements CheckedMappingStore
+{
+    /** @param array<string,int> $targets */
+    public function __construct(private array $targets) {}
+    public function get(SourceIdentity $identity): ?MappingRecord
+    {
+        $target = $this->targets[$identity->canonical()] ?? null;
+        return is_int($target) ? new MappingRecord(
+            $identity,
+            $target,
+            str_repeat('a', 64),
+            str_repeat('b', 64),
+            MapState::Reconciled,
+        ) : null;
+    }
+    public function storeOrThrow(SourceIdentity $identity, int $targetId, string $migrationId, string $sourceFingerprint, string $targetFingerprint, MapState $state, bool $createdByMigration, int $generation = 1): MappingRecord { throw new \LogicException('unused'); }
+    public function transitionOrThrow(SourceIdentity $identity, MapState $expected, MapState $next, string $expectedTargetFingerprint, string $nextTargetFingerprint): MappingRecord { throw new \LogicException('unused'); }
 }
 
 final class EmptyCheckedMappingStore implements CheckedMappingStore

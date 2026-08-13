@@ -8,6 +8,7 @@ use CartShift\Domain\Transfer\Execution\LoadedCatalogueActivator;
 use CartShift\Domain\Transfer\Execution\TransferReceipt;
 use CartShift\Domain\Transfer\Product\ProductTargetFingerprint;
 use CartShift\Domain\Transfer\Product\ProductTargetGateway;
+use CartShift\Support\CanonicalJson;
 use CartShift\Tests\Unit\PluginTestCase;
 
 final class LoadedCatalogueActivatorTest extends PluginTestCase
@@ -69,12 +70,70 @@ final class LoadedCatalogueActivatorTest extends PluginTestCase
         self::assertSame('publish', $change->afterStatus);
         self::assertSame('publish', $status);
     }
+
+    public function testFinalStorefrontCheckKeepsSharedStockExceptionsUncartable(): void
+    {
+        $source = 'shop-alpha:product:42';
+        $shared = $source . ':variation:101';
+        $ordinary = $source . ':variation:102';
+        $targetIds = [
+            'primary' => 902,
+            $source => 902,
+            $shared => 201,
+            $ordinary => 202,
+        ];
+        $snapshot = [
+            'product' => ['post_status' => 'publish'],
+            'detail' => [],
+            'variations' => [
+                ['id' => 201, 'other_info' => ['stock_migration_exception' => ['type' => 'shared_parent_stock']]],
+                ['id' => 202, 'other_info' => []],
+            ],
+            'taxonomies' => [],
+            'taxonomy_rows' => [],
+            'media' => [],
+            'downloads' => [],
+        ];
+        $gateway = new CatalogueSnapshotGateway($snapshot, [
+            'buy_section_rendered' => true,
+            'cartable_variation_ids' => [202],
+            'checkout_object_ids' => [202],
+        ]);
+        $receipt = new TransferReceipt(
+            'run-catalogue-22',
+            'catalogue_status',
+            $source,
+            1,
+            str_repeat('a', 64),
+            'catalogue_status',
+            $targetIds,
+            str_repeat('b', 64),
+            CanonicalJson::fingerprint([
+                'source_identity' => $source,
+                'target_id' => 902,
+                'post_type' => 'fluent-products',
+                'post_status' => 'publish',
+            ]),
+            1_000_001,
+            '2026-08-10T12:00:00Z',
+            '2026-08-10T12:00:01Z',
+        );
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (): string => 'publish';
+        $GLOBALS['_cartshift_test_get_results_callback'] = static fn (): array => [
+            ['entity_type' => 'product', 'wc_id' => '42', 'fc_id' => '902'],
+            ['entity_type' => 'product', 'wc_id' => '42:variation:101', 'fc_id' => '201'],
+            ['entity_type' => 'product', 'wc_id' => '42:variation:102', 'fc_id' => '202'],
+        ];
+
+        self::assertTrue((new LoadedCatalogueActivator('shop-alpha', $gateway))
+            ->storefrontAndCartReconcile([$receipt]));
+    }
 }
 
 final class CatalogueSnapshotGateway implements ProductTargetGateway
 {
     /** @param array<string, mixed> $snapshot */
-    public function __construct(private array $snapshot) {}
+    public function __construct(private array $snapshot, private array $behaviour = []) {}
     public function createTaxonomyTerm(array $plan, ?int $parentTargetId): int { throw new \LogicException(); }
     public function createDraftProduct(array $fields): int { throw new \LogicException(); }
     public function createProductDetail(int $productId, array $fields): int { throw new \LogicException(); }
@@ -85,5 +144,5 @@ final class CatalogueSnapshotGateway implements ProductTargetGateway
     public function createDownload(int $productId, array $variationIds, array $fields): int { throw new \LogicException(); }
     public function exists(int $productId): bool { return true; }
     public function snapshot(int $productId): array { return $this->snapshot; }
-    public function behaviour(int $productId, array $variationIds): array { throw new \LogicException(); }
+    public function behaviour(int $productId, array $variationIds): array { return $this->behaviour; }
 }

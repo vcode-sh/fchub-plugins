@@ -32,6 +32,7 @@ final class GuidedDecisionReviewTest extends PluginTestCase
         self::assertStringContainsString('Reconfirm because the source evidence changed', $presentation['items'][1]['summary']);
         self::assertSame('Ada Lovelace', $presentation['items'][2]['title']);
         self::assertStringContainsString('same WordPress account', $presentation['items'][2]['summary']);
+        self::assertSame(['orders', 'products', 'customers'], array_column($presentation['items'], 'group'));
 
         $encoded = json_encode($presentation, JSON_THROW_ON_ERROR);
         self::assertStringNotContainsString('shop-alpha', $encoded);

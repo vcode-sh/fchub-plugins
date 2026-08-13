@@ -9,7 +9,7 @@ defined('ABSPATH') || exit;
 final readonly class OrderProjectionContext
 {
     /**
-     * @param array<string, array{post_id: int, object_id: int, fulfillment_type: string}> $productTargets Exact order-line identity keys.
+     * @param array<string, array{post_id: int, object_id: int, fulfillment_type: string, historical_variation_unlinked?: bool}> $productTargets Exact order-line identity keys.
      * @param array<string, int|null> $couponTargets
      * @param array<string, int> $taxRateTargets
      */
@@ -25,7 +25,11 @@ final readonly class OrderProjectionContext
             throw new \InvalidArgumentException('Order projection payment evidence is invalid.');
         }
         foreach ($productTargets as $target) {
-            if (($target['post_id'] ?? 0) <= 0 || ($target['object_id'] ?? 0) <= 0
+            $unlinked = ($target['historical_variation_unlinked'] ?? false) === true;
+            if (($target['post_id'] ?? 0) <= 0
+                || (($target['object_id'] ?? -1) < 0)
+                || (($target['object_id'] ?? 0) === 0 && !$unlinked)
+                || (($target['object_id'] ?? 0) > 0 && $unlinked)
                 || trim((string) ($target['fulfillment_type'] ?? '')) === '') {
                 throw new \InvalidArgumentException('Order projection contains an invalid product target.');
             }

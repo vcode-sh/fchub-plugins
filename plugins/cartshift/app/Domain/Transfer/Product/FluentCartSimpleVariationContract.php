@@ -80,6 +80,7 @@ final class FluentCartSimpleVariationContract
                     'on_hold' => 0,
                     'stock_status' => 'out-of-stock',
                     'backorders' => 0,
+                    'item_status' => 'inactive',
                 ],
                 'requires_manual_resolution' => true,
             ];
@@ -113,7 +114,9 @@ final class FluentCartSimpleVariationContract
             'committed' => 0,
             'on_hold' => 0,
             'fulfillment_type' => $record->fulfilmentType,
-            'item_status' => $record->status === 'publish' ? 'active' : 'draft',
+            'item_status' => $parentStockException
+                ? 'inactive'
+                : ($record->status === 'publish' ? 'active' : 'draft'),
             'manage_cost' => $record->cost === null ? 'false' : 'true',
             'item_price' => $record->price->activePrice,
             'item_cost' => $record->cost ?? 0,

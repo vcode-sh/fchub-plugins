@@ -184,7 +184,7 @@ final class LoadedPreparedTargetBaselineProbe implements PreparedTargetBaselineP
             ];
         }
 
-        $preexisting = ($this->preexistingReader)($sourceKey, $runId);
+        $preexisting = $this->baselineRows(($this->preexistingReader)($sourceKey, $runId));
         foreach ((array) ($preexisting['maps'] ?? []) as $row) {
             $sourceId = (string) ($row['source_id'] ?? $row['wc_id'] ?? '');
             $kind = (string) ($row['entity_type'] ?? '');
@@ -213,8 +213,13 @@ final class LoadedPreparedTargetBaselineProbe implements PreparedTargetBaselineP
 
     public function verify(PreparedTargetBaseline $baseline, string $runId): void
     {
-        $current = CanonicalJson::canonicalise(($this->preexistingReader)($baseline->sourceKey, $runId));
-        if (CanonicalJson::encode($current) !== CanonicalJson::encode($baseline->snapshot['preexisting_rows'] ?? null)) {
+        $current = CanonicalJson::canonicalise($this->baselineRows(
+            ($this->preexistingReader)($baseline->sourceKey, $runId),
+        ));
+        $expected = CanonicalJson::canonicalise($this->baselineRows(
+            (array) ($baseline->snapshot['preexisting_rows'] ?? []),
+        ));
+        if (CanonicalJson::encode($current) !== CanonicalJson::encode($expected)) {
             throw new \RuntimeException('target_baseline_preexisting_rows_changed');
         }
         foreach ((array) ($baseline->snapshot['protected_targets'] ?? []) as $key => $protected) {
@@ -242,7 +247,8 @@ final class LoadedPreparedTargetBaselineProbe implements PreparedTargetBaselineP
             "SELECT source_key, entity_type, wc_id AS source_id, fc_id AS target_id, migration_id,
                     created_by_migration, source_fingerprint, target_fingerprint, record_state
              FROM {$mapTable}
-             WHERE source_key = %s AND is_simulated = 0 AND COALESCE(migration_id, '') <> %s
+             WHERE source_key = %s AND is_simulated = 0 AND record_state <> 'rolled_back'
+               AND COALESCE(migration_id, '') <> %s
              ORDER BY entity_type, wc_id",
             $sourceKey,
             $runId,
@@ -281,6 +287,22 @@ final class LoadedPreparedTargetBaselineProbe implements PreparedTargetBaselineP
         }
         unset($row);
         return $rows;
+    }
+
+    /** @param array<string,mixed> $rows @return array<string,mixed> */
+    private function baselineRows(array $rows): array
+    {
+        $maps = array_values(array_filter(
+            (array) ($rows['maps'] ?? []),
+            static fn (mixed $row): bool => is_array($row)
+                && ($row['record_state'] ?? null) !== 'rolled_back',
+        ));
+
+        return [
+            'maps' => $maps,
+            'claims' => array_values((array) ($rows['claims'] ?? [])),
+            'shared_links' => array_values((array) ($rows['shared_links'] ?? [])),
+        ];
     }
 
     /** @return array<string,mixed> */

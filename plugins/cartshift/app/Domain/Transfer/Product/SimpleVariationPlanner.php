@@ -18,6 +18,13 @@ final class SimpleVariationPlanner
     public function plan(ProductRecord $product, ProductAssessmentContext $context, array $skuOverrides = []): array
     {
         $variations = $product->variations;
+        $skuCounts = [];
+        foreach ($variations as $variation) {
+            $key = $this->skuKey($variation->sku);
+            if ($key !== '') {
+                $skuCounts[$key] = ($skuCounts[$key] ?? 0) + 1;
+            }
+        }
         usort($variations, static fn (VariationRecord $left, VariationRecord $right): int =>
             $left->identity->canonical() <=> $right->identity->canonical()
         );
@@ -54,7 +61,8 @@ final class SimpleVariationPlanner
                 throw new SourceRecordException('target_schema_unrepresentable', 'Variation title exceeds the installed target column.');
             }
 
-            $targetSku = $skuOverrides[$source] ?? null;
+            $duplicateSku = ($skuCounts[$this->skuKey($variation->sku)] ?? 0) > 1;
+            $targetSku = $skuOverrides[$source] ?? ($duplicateSku ? $this->uniqueSku($variation) : null);
             if ($targetSku !== null && !is_string($targetSku)) {
                 throw new SourceRecordException('target_schema_unrepresentable', 'Reviewed variation SKU mapping is invalid.');
             }
@@ -69,6 +77,16 @@ final class SimpleVariationPlanner
             $otherInfo = $fields['other_info'];
             $otherInfo['source_identity'] = $source;
             $otherInfo['source_attributes'] = $attributeMetadata;
+            if ($duplicateSku) {
+                $otherInfo['sku_migration_exception'] = [
+                    'version' => 1,
+                    'type' => 'duplicate_variation_sku',
+                    'source_variation' => $source,
+                    'source_sku' => $variation->sku,
+                    'target_sku' => $targetSku,
+                    'requires_manual_resolution' => true,
+                ];
+            }
             $fields['other_info'] = $otherInfo;
             $fields['variation_type'] = FluentCartSimpleVariationContract::VARIATION_TYPE;
             $fields['variation_identifier'] = $identifier;
@@ -140,5 +158,16 @@ final class SimpleVariationPlanner
     private function length(string $value): int
     {
         return function_exists('mb_strlen') ? mb_strlen($value, 'UTF-8') : strlen($value);
+    }
+
+    private function skuKey(string $sku): string
+    {
+        $sku = trim($sku);
+        return function_exists('mb_strtolower') ? mb_strtolower($sku, 'UTF-8') : strtolower($sku);
+    }
+
+    private function uniqueSku(VariationRecord $variation): string
+    {
+        return 'CS-' . strtoupper(substr(hash('sha256', $variation->identity->canonical()), 0, 20));
     }
 }

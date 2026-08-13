@@ -347,6 +347,9 @@ final class LoadedFluentCartProductGateway implements ProductTargetGateway
                     if ($variationId <= 0 || !isset($requested[$variationId])) {
                         continue;
                     }
+                    if (isset($variation['other_info']['stock_migration_exception'])) {
+                        continue;
+                    }
                     $originalStatus = $variation['item_status'] ?? null;
                     if (!is_string($originalStatus) || $originalStatus === '') {
                         throw new SourceRecordException('target_reconciliation_failed', 'Variation status could not be restored safely.');

@@ -934,6 +934,7 @@ final class InMemoryProductTargetGateway implements ProductTargetGateway
     public ?string $omitTaxonomyField = null;
     public ?string $omitMediaField = null;
     public bool $buySectionRendered = true;
+    public bool $stockManagementActive = true;
     /** @var list<int>|null */
     public ?array $cartableOverride = null;
     /** @var list<int>|null */
@@ -1079,7 +1080,9 @@ final class InMemoryProductTargetGateway implements ProductTargetGateway
         $cartable = array_values(array_filter(
             $variationIds,
             fn (int $variationId): bool => isset($this->variations[$variationId])
-                && (!$productManagesStock
+                && ($this->variations[$variationId]['item_status'] ?? null) === 'active'
+                && (!$this->stockManagementActive
+                    || !$productManagesStock
                     || ($this->variations[$variationId]['manage_stock'] ?? 0) !== 1
                     || ($this->variations[$variationId]['stock_status'] ?? null) !== 'out-of-stock'),
         ));

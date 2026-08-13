@@ -73,6 +73,9 @@ final class FluentCartOrderMoneyContract
                     'source_variation_identity' => $line->variation->canonical(),
                     'item_attributes' => $line->attributeSnapshot,
                     'cost_disposition' => $line->costDisposition,
+                    ...(($target['historical_variation_unlinked'] ?? false) === true
+                        ? ['historical_variation_unlinked' => true]
+                        : []),
                 ],
                 'line_meta' => [
                     ...$line->lineMeta,

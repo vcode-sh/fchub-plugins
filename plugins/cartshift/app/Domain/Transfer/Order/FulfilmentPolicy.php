@@ -36,26 +36,37 @@ final readonly class FulfilmentPolicy
             }
             $types[$type] = true;
         }
-        if (count($types) !== 1) {
-            $this->block('Mixed fulfilment has no proved target per-line representation.');
-        }
-
-        $type = array_key_first($types);
+        $hasPhysical = isset($types['physical']);
+        $type = $hasPhysical ? 'physical' : (isset($types['digital']) ? 'digital' : 'service');
         $fulfilled = [];
-        if ($type !== 'physical') {
+        if (!$hasPhysical) {
             foreach ($record->productLines as $line) {
                 $fulfilled[$line->identity->canonical()] = $line->quantity;
             }
             return new FulfilmentProjection($type, '', $fulfilled);
         }
-        if ($this->physicalDecision === null) {
-            $this->block('Physical fulfilment requires an adapter or fingerprint-bound cohort policy.');
-        }
-        $complete = $this->physicalDecision === 'historical_complete';
+
+        $decision = $this->physicalDecision ?? $this->historicalDecision($record);
+        $complete = $decision === 'historical_complete';
         foreach ($record->productLines as $line) {
-            $fulfilled[$line->identity->canonical()] = $complete ? $line->quantity : 0;
+            $lineType = (string) $line->otherInfo['source_fulfilment_type'];
+            $fulfilled[$line->identity->canonical()] = $lineType === 'physical' && !$complete
+                ? 0
+                : $line->quantity;
         }
         return new FulfilmentProjection('physical', $complete ? 'delivered' : 'unshipped', $fulfilled);
+    }
+
+    private function historicalDecision(OrderRecord $record): string
+    {
+        $status = strtolower(trim($record->sourceStatus));
+        if (str_starts_with($status, 'wc-')) {
+            $status = substr($status, 3);
+        }
+
+        return $status === 'completed' && $record->completedUtc !== null
+            ? 'historical_complete'
+            : 'unshipped';
     }
 
     private function block(string $message): never

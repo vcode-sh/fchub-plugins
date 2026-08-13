@@ -176,6 +176,51 @@ final class LoadedPreparedTargetBaselineProbeTest extends PluginTestCase
         $probe->verify($baseline, 'run-target-22');
     }
 
+    public function testRolledBackMapCanBeReclaimedByTheCurrentRunWithoutChangingTheBaseline(): void
+    {
+        $active = [
+            'source_key' => 'shop-alpha',
+            'entity_type' => 'product',
+            'source_id' => '8',
+            'target_id' => 80,
+            'migration_id' => 'older-active-run',
+            'record_state' => 'reconciled',
+        ];
+        $rolledBack = [
+            'source_key' => 'shop-alpha',
+            'entity_type' => 'product',
+            'source_id' => '9',
+            'target_id' => 90,
+            'migration_id' => 'rolled-back-run',
+            'record_state' => 'rolled_back',
+        ];
+        $rows = ['maps' => [$active, $rolledBack], 'claims' => [], 'shared_links' => []];
+        $probe = new LoadedPreparedTargetBaselineProbe(
+            fn (): TargetOwnershipReport => $this->report([]),
+            static function () use (&$rows): array { return $rows; },
+            static fn (): array => [],
+        );
+
+        $baseline = $probe->capture('shop-alpha', [], TransferDecisionSet::empty(), 'current-run');
+        $legacyBaseline = new \CartShift\Domain\Transfer\Execution\PreparedTargetBaseline(
+            'shop-alpha',
+            [
+                'preexisting_rows' => CanonicalJson::canonicalise([
+                    'maps' => [$active, $rolledBack],
+                    'claims' => [],
+                    'shared_links' => [],
+                ]),
+                'protected_targets' => $baseline->snapshot['protected_targets'],
+            ],
+            [],
+        );
+        $rows['maps'] = [$active];
+
+        $probe->verify($baseline, 'current-run');
+        $probe->verify($legacyBaseline, 'current-run');
+        self::assertSame(CanonicalJson::canonicalise([$active]), $baseline->snapshot['preexisting_rows']['maps']);
+    }
+
     public function testApprovedExistingProductIsProtectedFromReviewToExecution(): void
     {
         $product = $this->record('product', '9');

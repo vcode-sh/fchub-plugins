@@ -6,6 +6,7 @@ namespace CartShift\Tests\Unit\Domain\Transfer\SameSite;
 
 use CartShift\Domain\Transfer\Decision\TransferDecisionSet;
 use CartShift\Domain\Transfer\Order\OrderRecord;
+use CartShift\Domain\Transfer\Order\OrderLineRecord;
 use CartShift\Domain\Transfer\Package\TransferPackageValidator;
 use CartShift\Domain\Transfer\Package\TransferPackageWriter;
 use CartShift\Domain\Transfer\Product\StockOwnership;
@@ -108,6 +109,60 @@ final class GuidedTargetReadinessInspectorTest extends PluginTestCase
         self::assertSame('parent', $result['migration_exceptions'][0]['source_stock']['ownership']);
     }
 
+    public function testDuplicateVariationSkusBecomeVisibleMigrationFollowUps(): void
+    {
+        $parent = ProductAssessmentFixture::identity('42');
+        $product = ProductAssessmentFixture::product([
+            'productType' => 'variable',
+            'variations' => [
+                ProductAssessmentFixture::variation($parent, [
+                    'identity' => ProductAssessmentFixture::identity('42:variation:101'),
+                    'sku' => 'DUPLICATE',
+                ]),
+                ProductAssessmentFixture::variation($parent, [
+                    'identity' => ProductAssessmentFixture::identity('42:variation:102'),
+                    'sku' => 'DUPLICATE',
+                ]),
+            ],
+        ]);
+        [$package, $decisionPath] = $this->package(
+            [$product->envelope()],
+            [$this->productDecision($product->identity, $product->envelope()->sourceContentDigest)],
+        );
+
+        $result = (new GuidedTargetReadinessInspector())->inspect([
+            'package' => $package,
+            'decision_set' => $decisionPath,
+        ]);
+
+        self::assertSame(
+            ['duplicate_variation_sku', 'duplicate_variation_sku'],
+            array_column($result['migration_exceptions'], 'kind'),
+        );
+        self::assertSame(['DUPLICATE', 'DUPLICATE'], array_column($result['migration_exceptions'], 'source_sku'));
+        self::assertCount(2, array_unique(array_column($result['migration_exceptions'], 'target_sku')));
+    }
+
+    public function testPhysicalOrderStatusBecomesOneEvidenceBoundFollowUp(): void
+    {
+        $order = $this->physicalOrder();
+        [$package, $decisionPath] = $this->package([$order->envelope()], []);
+
+        $result = (new GuidedTargetReadinessInspector())->inspect([
+            'package' => $package,
+            'decision_set' => $decisionPath,
+        ]);
+
+        self::assertSame('physical_order_fulfilment', $result['migration_exceptions'][0]['kind']);
+        self::assertSame($order->identity->canonical(), $result['migration_exceptions'][0]['source_order']);
+        self::assertSame('delivered', $result['migration_exceptions'][0]['projection']);
+        self::assertTrue($result['migration_exceptions'][0]['mixed']);
+        self::assertSame(2, count(array_filter(
+            $result['migration_exceptions'],
+            static fn (array $item): bool => ($item['kind'] ?? null) === 'historical_order_variation_unlinked',
+        )));
+    }
+
     /** @param list<\CartShift\Domain\Transfer\RecordEnvelope> $records @param list<array<string,mixed>> $decisions */
     private function package(array $records, array $decisions): array
     {
@@ -159,6 +214,32 @@ final class GuidedTargetReadinessInspectorTest extends PluginTestCase
             'reason' => 'Owner reviewed the product.',
             'decided_at' => '2026-08-12T12:00:00Z',
         ];
+    }
+
+    private function physicalOrder(): OrderRecord
+    {
+        $identity = new SourceIdentity('lapka-web', 'order', '116');
+        $lines = [];
+        foreach (['physical', 'digital'] as $index => $type) {
+            $sourceId = (string) (10 + $index);
+            $lines[] = new OrderLineRecord(
+                new SourceIdentity('lapka-web', 'order', '116:item:' . $sourceId),
+                (int) $sourceId,
+                new SourceIdentity('lapka-web', 'product', $sourceId),
+                new SourceIdentity('lapka-web', 'product', $sourceId . ':variation:' . $sourceId),
+                'Item', '', [], 1, $index, 1000, 1000, 0, 0, 0, 0, 1000, 0,
+                'unavailable', 0, '1', '2026-01-01T10:00:00Z', [],
+                ['source_fulfilment_type' => $type],
+                [],
+            );
+        }
+
+        return new OrderRecord(
+            $identity, null, null, 'checkout', 'completed', 'PLN', 'PLN', 'PLN', '1',
+            'source_currency_equals_target', false, 2000, 0, 0, 0, 0, 0, 0, 0, 0, 2000, 0,
+            '2026-01-01T10:00:00Z', null, '2026-01-01T10:00:00Z', '2026-01-01T10:00:00Z', null,
+            $lines, [], [], [], [], [], [], [], [],
+        );
     }
 
     private function removeTree(string $path): void

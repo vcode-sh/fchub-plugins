@@ -48,6 +48,10 @@ final class ParentStockExceptionReportTest extends PluginTestCase
         $gateway->variations[101]['other_info']['stock_migration_exception']['source_stock']['low_stock_threshold'] = 9;
         self::assertFalse($reporter->confirm([$receipt], [$expected])[0]['target_verified']);
 
+        $gateway->variations[101] = $this->variation(100, 101, $expected);
+        $gateway->variations[101]['item_status'] = 'active';
+        self::assertFalse($reporter->confirm([$receipt], [$expected])[0]['target_verified']);
+
         $unowned = $reporter->confirm([], [$expected]);
         self::assertNull($unowned[0]['target_verified']);
     }
@@ -104,6 +108,7 @@ final class ParentStockExceptionReportTest extends PluginTestCase
             'on_hold' => 0,
             'stock_status' => 'out-of-stock',
             'backorders' => 0,
+            'item_status' => 'inactive',
         ];
 
         return [

@@ -15,12 +15,20 @@ final class ProductRecordFactory
     /** @var (\Closure(object): list<int>)|null */
     private readonly ?\Closure $variationIds;
 
-    /** @param (callable(object): list<int>)|null $variationIds */
+    /** @var (\Closure(int,string,list<int>): array<int,int>)|null */
+    private readonly ?\Closure $taxonomyOrders;
+
+    /**
+     * @param (callable(object): list<int>)|null $variationIds
+     * @param (callable(int,string,list<int>): array<int,int>)|null $taxonomyOrders
+     */
     public function __construct(
         private readonly ProductFieldRegistry $fieldRegistry = new ProductFieldRegistry(),
         ?callable $variationIds = null,
+        ?callable $taxonomyOrders = null,
     ) {
         $this->variationIds = $variationIds !== null ? $variationIds(...) : null;
+        $this->taxonomyOrders = $taxonomyOrders !== null ? $taxonomyOrders(...) : null;
     }
 
     public static function forLoadedWoo(): self
@@ -50,6 +58,36 @@ final class ProductRecordFactory
 
                 return array_values(array_map('intval', (array) $ids));
             },
+            static function (int $productId, string $taxonomy, array $assignedIds): array {
+                global $wpdb;
+                if (!is_object($wpdb)) {
+                    throw new SourceRecordException(
+                        'product_taxonomy_order_read_failed',
+                        'The WordPress taxonomy relationship store is unavailable.',
+                    );
+                }
+                $wpdb->last_error = '';
+                $rows = $wpdb->get_results($wpdb->prepare(
+                    "SELECT tt.term_id, tr.term_order
+                     FROM {$wpdb->term_relationships} tr
+                     INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
+                     WHERE tr.object_id = %d AND tt.taxonomy = %s
+                     ORDER BY tr.term_order ASC, tt.term_id ASC",
+                    $productId,
+                    $taxonomy,
+                ), ARRAY_A);
+                if (trim((string) ($wpdb->last_error ?? '')) !== '' || !is_array($rows)) {
+                    throw new SourceRecordException(
+                        'product_taxonomy_order_read_failed',
+                        'Source taxonomy relationship order could not be read.',
+                    );
+                }
+                $orders = [];
+                foreach ($rows as $row) {
+                    $orders[(int) ($row['term_id'] ?? 0)] = (int) ($row['term_order'] ?? -1);
+                }
+                return $orders;
+            },
         );
     }
 
@@ -72,7 +110,16 @@ final class ProductRecordFactory
         $shippingClassSlug = $this->shippingClassSlug($product, $data);
         $media = $this->media($product, $identity, 'product');
         $downloads = $this->downloads($product, $identity, $data);
-        $variations = $this->variations($product, $identity, $currency, $tax, $stock, $shippingClassSlug, $data);
+        $variations = $this->variations(
+            $product,
+            $identity,
+            $currency,
+            $tax,
+            $stock,
+            $shippingClassSlug,
+            $attributes,
+            $data,
+        );
         $created = $this->utc($this->read($product, 'get_date_created', $data['date_created'] ?? null));
 
         if ($created === null) {
@@ -127,6 +174,7 @@ final class ProductRecordFactory
         TaxProfile $parentTax,
         StockProfile $parentStock,
         string $parentShippingClassSlug,
+        array $attributes,
         array $data,
     ): array {
         $type = (string) $this->read($product, 'get_type', 'simple');
@@ -144,7 +192,18 @@ final class ProductRecordFactory
                 RecordKind::Product->value,
                 $parent->sourceId . ':variation:' . $parent->sourceId,
             );
-            return [$this->variation($product, $synthetic, $parent, $currency, $parentTax, $parentStock, $parentShippingClassSlug, true, $data)];
+            return [$this->variation(
+                $product,
+                $synthetic,
+                $parent,
+                $currency,
+                $parentTax,
+                $parentStock,
+                $parentShippingClassSlug,
+                $attributes,
+                true,
+                $data,
+            )];
         }
 
         $records = [];
@@ -172,7 +231,18 @@ final class ProductRecordFactory
             }
 
             $identity = new SourceIdentity($parent->sourceKey, RecordKind::Product->value, $parent->sourceId . ':variation:' . $childId);
-            $records[] = $this->variation($variation, $identity, $parent, $currency, $parentTax, $parentStock, $parentShippingClassSlug, false, $variationData);
+            $records[] = $this->variation(
+                $variation,
+                $identity,
+                $parent,
+                $currency,
+                $parentTax,
+                $parentStock,
+                $parentShippingClassSlug,
+                $attributes,
+                false,
+                $variationData,
+            );
         }
 
         usort($records, static fn (VariationRecord $left, VariationRecord $right): int =>
@@ -190,6 +260,7 @@ final class ProductRecordFactory
         TaxProfile $parentTax,
         StockProfile $parentStock,
         string $parentShippingClassSlug,
+        array $attributes,
         bool $synthetic,
         array $data,
     ): VariationRecord {
@@ -202,6 +273,11 @@ final class ProductRecordFactory
             throw new SourceRecordException('variation_attributes_invalid', 'Variation attributes must be a scalar map.');
         }
 
+        $declaredAttributes = [];
+        foreach ($attributes as $attribute) {
+            $declaredAttributes[$attribute->sourceKey] = $attribute;
+        }
+
         foreach ($rawAssignments as $key => $value) {
             if (!is_scalar($value) && $value !== null) {
                 throw new SourceRecordException('variation_attribute_value_invalid', 'Variation attribute values must be scalar.');
@@ -209,10 +285,15 @@ final class ProductRecordFactory
 
             $key = $this->attributeKey((string) $key);
             $value = trim((string) $value);
+            $declared = $declaredAttributes[$key] ?? null;
             $assignments[] = [
                 'attribute_key' => $key,
-                'value' => $value,
-                'kind' => str_starts_with($key, 'pa_') ? 'taxonomy' : 'custom',
+                'value' => $declared instanceof AttributeRecord
+                    ? $this->declaredVariationValue($value, $declared)
+                    : $value,
+                'kind' => $declared instanceof AttributeRecord
+                    ? $declared->kind
+                    : (str_starts_with($key, 'pa_') ? 'taxonomy' : 'custom'),
                 'wildcard' => $value === '',
             ];
         }
@@ -586,31 +667,36 @@ final class ProductRecordFactory
             return [];
         }
 
-        if (!function_exists('wc_get_product_terms')) {
-            throw new SourceRecordException('product_taxonomy_order_read_failed', 'The WooCommerce taxonomy relationship API is unavailable.');
+        if ($this->taxonomyOrders !== null) {
+            $orders = ($this->taxonomyOrders)($productId, $taxonomy, $assignedIds);
+        } else {
+            if (!function_exists('wc_get_product_terms')) {
+                throw new SourceRecordException('product_taxonomy_order_read_failed', 'The WooCommerce taxonomy relationship API is unavailable.');
+            }
+            $orderedIds = wc_get_product_terms(
+                $productId,
+                $taxonomy,
+                ['fields' => 'ids', 'orderby' => 'term_order', 'order' => 'ASC'],
+            );
+            if (is_wp_error($orderedIds) || !is_array($orderedIds) || !array_is_list($orderedIds)) {
+                throw new SourceRecordException('product_taxonomy_order_read_failed', 'Source taxonomy relationship order could not be read.');
+            }
+            $orders = [];
+            foreach ($orderedIds as $rank => $rawTermId) {
+                if ((!is_int($rawTermId) && !(is_string($rawTermId) && preg_match('/\A[1-9][0-9]*\z/D', $rawTermId) === 1))) {
+                    throw new SourceRecordException('product_taxonomy_order_invalid', 'Source taxonomy relationship order is malformed.');
+                }
+                $termId = (int) $rawTermId;
+                if (isset($orders[$termId])) {
+                    throw new SourceRecordException('product_taxonomy_order_duplicate', 'A source taxonomy relationship occurs more than once.');
+                }
+                $orders[$termId] = $rank;
+            }
         }
-
-        $orderedIds = wc_get_product_terms(
-            $productId,
-            $taxonomy,
-            ['fields' => 'ids', 'orderby' => 'term_order', 'order' => 'ASC'],
-        );
-
-        if (is_wp_error($orderedIds) || !is_array($orderedIds) || !array_is_list($orderedIds)) {
-            throw new SourceRecordException('product_taxonomy_order_read_failed', 'Source taxonomy relationship order could not be read.');
-        }
-
-        $orders = [];
-        foreach ($orderedIds as $rank => $rawTermId) {
-            if ((!is_int($rawTermId) && !(is_string($rawTermId) && preg_match('/\A[1-9][0-9]*\z/D', $rawTermId) === 1))) {
+        foreach ($orders as $termId => $order) {
+            if (!is_int($termId) || $termId <= 0 || !is_int($order) || $order < 0) {
                 throw new SourceRecordException('product_taxonomy_order_invalid', 'Source taxonomy relationship order is malformed.');
             }
-
-            $termId = (int) $rawTermId;
-            if (isset($orders[$termId])) {
-                throw new SourceRecordException('product_taxonomy_order_duplicate', 'A source taxonomy relationship occurs more than once.');
-            }
-            $orders[$termId] = $rank;
         }
 
         $expected = array_values(array_unique($assignedIds));
@@ -848,6 +934,29 @@ final class ProductRecordFactory
         }
 
         return [$value, $value];
+    }
+
+    private function declaredVariationValue(string $value, AttributeRecord $attribute): string
+    {
+        if ($value === '' || $attribute->kind === 'taxonomy' || in_array($value, $attribute->values, true)) {
+            return $value;
+        }
+
+        $matches = array_values(array_filter(
+            $attribute->values,
+            fn (string $candidate): bool => $this->variationValueSlug($candidate) === $value,
+        ));
+
+        return count($matches) === 1 ? $matches[0] : $value;
+    }
+
+    private function variationValueSlug(string $value): string
+    {
+        if (function_exists('sanitize_title')) {
+            return sanitize_title($value);
+        }
+
+        return $this->attributeKey($value);
     }
 
     private function fulfilment(object $product, array $data): string

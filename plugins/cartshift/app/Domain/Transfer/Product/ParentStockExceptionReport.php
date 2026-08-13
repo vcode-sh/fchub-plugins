@@ -93,7 +93,7 @@ final readonly class ParentStockExceptionReport
         return true;
     }
 
-    /** @return array{manage_stock:int,total_stock:int,available:int,committed:int,on_hold:int,stock_status:string,backorders:int} */
+    /** @return array{manage_stock:int,total_stock:int,available:int,committed:int,on_hold:int,stock_status:string,backorders:int,item_status:string} */
     private function projection(): array
     {
         return [
@@ -104,6 +104,7 @@ final readonly class ParentStockExceptionReport
             'on_hold' => 0,
             'stock_status' => 'out-of-stock',
             'backorders' => 0,
+            'item_status' => 'inactive',
         ];
     }
 }

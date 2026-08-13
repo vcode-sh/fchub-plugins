@@ -98,6 +98,34 @@ final class ProductRecordFactoryTest extends PluginTestCase
         self::assertSame('', $record->variations[0]->attributeAssignments[2]['value']);
     }
 
+    public function testCustomAttributeWithTaxonomyPrefixUsesItsDeclaredValue(): void
+    {
+        $parent = $this->product([
+            'get_type' => 'variable',
+            'get_children' => [101],
+            'get_attributes' => [[
+                'name' => 'pa_color',
+                'taxonomy' => false,
+                'options' => ['Czarny', 'Bialy'],
+                'variation' => true,
+            ]],
+        ]);
+        $GLOBALS['_cartshift_test_wc_products'][101] = $this->product([
+            'get_id' => 101,
+            'get_parent_id' => 42,
+            'get_attributes' => ['pa_color' => 'czarny'],
+        ]);
+
+        $record = $this->factory->fromWooProduct($parent, 'lapka-web');
+
+        self::assertSame([
+            'attribute_key' => 'pa_color',
+            'value' => 'Czarny',
+            'kind' => 'custom',
+            'wildcard' => false,
+        ], $record->variations[0]->attributeAssignments[0]);
+    }
+
     public function testTaxonomyLabelsAndUnassignedAncestorsRemainDistinct(): void
     {
         $GLOBALS['_cartshift_test_terms_by_id'] = [
@@ -147,6 +175,28 @@ final class ProductRecordFactoryTest extends PluginTestCase
             'orderby' => 'term_order',
             'order' => 'ASC',
         ]], $GLOBALS['_cartshift_test_wc_product_term_calls']);
+    }
+
+    public function testLoadedTaxonomyReaderPreservesEqualRelationshipOrdersWithoutInventingRanks(): void
+    {
+        $GLOBALS['_cartshift_test_terms_by_id'] = [
+            'product_cat' => [
+                10 => (object) ['name' => 'First', 'slug' => 'first', 'description' => '', 'parent' => 0],
+                11 => (object) ['name' => 'Second', 'slug' => 'second', 'description' => '', 'parent' => 0],
+            ],
+        ];
+        $factory = new ProductRecordFactory(
+            taxonomyOrders: static fn (int $productId, string $taxonomy, array $ids): array => [
+                10 => 0,
+                11 => 0,
+            ],
+        );
+
+        $record = $factory->fromWooProduct($this->product([
+            'get_category_ids' => [10, 11],
+        ]), 'lapka-web');
+
+        self::assertSame(['first' => 0, 'second' => 0], array_column($record->taxonomies, 'order', 'slug'));
     }
 
     public function testSelectedTaxonomyMissingFromTheOrderedPublicApiResultBlocksTheExport(): void

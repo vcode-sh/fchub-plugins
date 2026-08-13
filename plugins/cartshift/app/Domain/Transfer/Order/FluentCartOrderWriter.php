@@ -203,7 +203,9 @@ final class FluentCartOrderWriter implements OrderStageWriter
                 throw new \RuntimeException('order_dependency_mapping_missing: product');
             }
             $this->assertDependency($line->product, (int) $target['post_id'], 'product');
-            $this->assertDependency($line->variation, (int) $target['object_id'], 'variation');
+            if (($target['historical_variation_unlinked'] ?? false) !== true) {
+                $this->assertDependency($line->variation, (int) $target['object_id'], 'variation');
+            }
         }
     }
 

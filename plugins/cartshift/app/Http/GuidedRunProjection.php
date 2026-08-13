@@ -310,6 +310,60 @@ final class GuidedRunProjection
                 ];
                 continue;
             }
+            if (($exception['kind'] ?? null) === 'duplicate_variation_sku') {
+                $title = trim((string) ($exception['product_name'] ?? 'Product'));
+                $key = 'sku-' . hash('sha256', (string) ($exception['source_product'] ?? $title));
+                $groups[$key] ??= [
+                    'type' => 'sku_change',
+                    'title' => $title,
+                    'message' => 'WooCommerce allowed the same SKU on more than one variation. '
+                        . 'FluentCart requires every variation SKU to be unique, so CartShift kept every variation and assigned a safe unique FluentCart SKU.',
+                    'variations' => [],
+                    'suggestions' => [
+                        'Review any fulfilment or inventory integration that uses the original SKU.',
+                        'Keep the generated SKU or replace it with another unique value in FluentCart.',
+                    ],
+                ];
+                $groups[$key]['variations'][] = [
+                    'title' => trim((string) ($exception['variation_name'] ?? 'Variation')),
+                    'source_sku' => trim((string) ($exception['source_sku'] ?? '')),
+                    'target_sku' => trim((string) ($exception['target_sku'] ?? '')),
+                ];
+                continue;
+            }
+            if (($exception['kind'] ?? null) === 'physical_order_fulfilment') {
+                $key = 'physical-order-fulfilment';
+                $groups[$key] ??= [
+                    'type' => 'fulfilment_summary',
+                    'title' => 'Physical order history',
+                    'message' => 'CartShift used each WooCommerce order status to preserve historical fulfilment without creating new shipping work.',
+                    'order_count' => 0,
+                    'delivered_count' => 0,
+                    'unshipped_count' => 0,
+                    'mixed_count' => 0,
+                ];
+                $groups[$key]['order_count']++;
+                if (($exception['projection'] ?? null) === 'delivered') {
+                    $groups[$key]['delivered_count']++;
+                } else {
+                    $groups[$key]['unshipped_count']++;
+                }
+                if (($exception['mixed'] ?? null) === true) {
+                    $groups[$key]['mixed_count']++;
+                }
+                continue;
+            }
+            if (($exception['kind'] ?? null) === 'historical_order_variation_unlinked') {
+                $key = 'historical-order-variation-unlinked';
+                $groups[$key] ??= [
+                    'type' => 'historical_line_summary',
+                    'title' => 'Historical product links',
+                    'message' => 'Some WooCommerce orders reference a variation that no longer exists. CartShift kept the product history without guessing a replacement variation.',
+                    'line_count' => 0,
+                ];
+                $groups[$key]['line_count']++;
+                continue;
+            }
             if (($exception['kind'] ?? null) !== 'shared_parent_stock') {
                 continue;
             }
@@ -324,18 +378,18 @@ final class GuidedRunProjection
                 'source_quantity' => $quantity,
                 'source_quantity_state' => $quantityState,
                 'message' => 'WooCommerce shares one stock total across this product, while FluentCart stores stock per variation. '
-                    . 'CartShift will migrate the affected variations unavailable with zero stock and backorders disabled to prevent overselling. '
+                    . 'CartShift will migrate the affected variations inactive and unavailable with zero stock and backorders disabled to prevent overselling. '
                     . ($quantityState === 'known'
                         ? 'The original quantity below is one product-wide total, not an amount to copy into every variation.'
                         : 'WooCommerce did not provide a usable stock total, so keep every affected variation unavailable until stock is counted.'),
                 'suggestions' => $quantityState === 'known' ? [
-                    'Allocate stock across the FluentCart variations without exceeding the original shared total.',
-                    'Enable only the variations you want to sell.',
-                    'Leave the variations unavailable until stock is confirmed.',
+                    'Enable FluentCart stock management, then allocate stock without exceeding the original shared total.',
+                    'Activate only the variations you want to sell after their stock is set.',
+                    'Leave the variations inactive until stock is confirmed.',
                 ] : [
                     'Count the available stock before entering quantities in FluentCart.',
-                    'Enable only variations whose stock you have confirmed.',
-                    'Leave all affected variations unavailable until the count is complete.',
+                    'Enable FluentCart stock management before activating confirmed variations.',
+                    'Leave all affected variations inactive until the count is complete.',
                 ],
                 '_target_verification' => [],
             ];
@@ -356,6 +410,13 @@ final class GuidedRunProjection
             $group['target_state'] = in_array(false, $verification, true)
                 ? 'needs_review'
                 : (in_array(null, $verification, true) ? 'planned' : 'confirmed');
+            if ($group['target_state'] !== 'planned') {
+                $group['message'] = str_replace(
+                    'CartShift will migrate the affected variations',
+                    'CartShift migrated the affected variations',
+                    $group['message'],
+                );
+            }
         }
         unset($group);
 

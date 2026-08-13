@@ -210,14 +210,18 @@ final class TargetRecordPlanFactory
                     break;
                 }
             }
-            if ($variation === null) {
-                throw new \RuntimeException('order_dependency_package_variation_missing');
-            }
-            $productTargets[$line->identity->canonical()] = [
-                'post_id' => $this->mapped($line->product, 'product'),
-                'object_id' => $this->mapped($line->variation, 'variation'),
-                'fulfillment_type' => $variation->fulfilmentType,
-            ];
+            $productTargets[$line->identity->canonical()] = $variation === null
+                ? [
+                    'post_id' => $this->mapped($line->product, 'product'),
+                    'object_id' => 0,
+                    'fulfillment_type' => (string) ($line->otherInfo['source_fulfilment_type'] ?? ''),
+                    'historical_variation_unlinked' => true,
+                ]
+                : [
+                    'post_id' => $this->mapped($line->product, 'product'),
+                    'object_id' => $this->mapped($line->variation, 'variation'),
+                    'fulfillment_type' => $variation->fulfilmentType,
+                ];
         }
         $decision = $this->decisions->for($record->identity);
         if ($decision !== null && !hash_equals($envelope->sourceContentDigest, (string) ($decision['source_fingerprint'] ?? ''))) {

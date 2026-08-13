@@ -27,6 +27,7 @@ final readonly class GuidedDecisionReview
             $items[] = [
                 'review_id' => $this->decisionReviewId($row),
                 'kind' => 'migration_decision',
+                'group' => $identity->entityType . 's',
                 'title' => $this->title($identity),
                 'summary' => $this->decisionSummary($row, $this->isRenewal($proposal, $row)),
             ];
@@ -38,6 +39,7 @@ final readonly class GuidedDecisionReview
             $items[] = [
                 'review_id' => (string) $question['review_id'],
                 'kind' => 'product_conflict',
+                'group' => 'products',
                 'title' => (string) $question['product_name'],
                 'summary' => $onlySkip
                     ? $this->productCascadeSkipSummary($question)
@@ -57,6 +59,7 @@ final readonly class GuidedDecisionReview
             $items[] = [
                 'review_id' => (string) $question['review_id'],
                 'kind' => $choices === [] ? 'customer_ownership' : 'customer_match',
+                'group' => 'customers',
                 'title' => $name !== '' ? $name : ($email !== '' ? $email : 'Guest customer'),
                 'summary' => $choices === []
                     ? $this->customerSummary($question)
@@ -69,6 +72,7 @@ final readonly class GuidedDecisionReview
             $items[] = [
                 'review_id' => (string) $question['review_id'],
                 'kind' => 'record_collision',
+                'group' => $kind === 'subscription' ? 'subscriptions' : 'orders',
                 'title' => $kind === 'subscription' ? 'Existing subscription' : 'Existing order',
                 'summary' => $this->collisionSummary($question),
                 'choices' => [[

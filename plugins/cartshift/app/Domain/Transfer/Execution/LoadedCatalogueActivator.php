@@ -100,9 +100,13 @@ final readonly class LoadedCatalogueActivator implements CatalogueActivator
                 $variations = $this->variationIds($receipt);
                 $behaviour = $this->gateway->behaviour($receipt->targetIds['primary'], $variations);
                 $cartable = array_values(array_map('intval', (array) ($behaviour['cartable_variation_ids'] ?? [])));
+                $checkout = array_values(array_map('intval', (array) ($behaviour['checkout_object_ids'] ?? [])));
+                $expected = $this->cartableVariationIds($receipt->targetIds['primary'], $variations);
                 sort($cartable);
-                sort($variations);
-                if (($behaviour['buy_section_rendered'] ?? false) !== true || $cartable !== $variations) {
+                sort($checkout);
+                if (($behaviour['buy_section_rendered'] ?? false) !== true
+                    || $cartable !== $expected
+                    || $checkout !== $expected) {
                     return false;
                 }
             } catch (\Throwable) {
@@ -110,6 +114,25 @@ final readonly class LoadedCatalogueActivator implements CatalogueActivator
             }
         }
         return true;
+    }
+
+    /** @param list<int> $variationIds @return list<int> */
+    private function cartableVariationIds(int $productId, array $variationIds): array
+    {
+        $expected = array_fill_keys($variationIds, true);
+        foreach ((array) ($this->gateway->snapshot($productId)['variations'] ?? []) as $variation) {
+            if (!is_array($variation)) {
+                continue;
+            }
+            $variationId = (int) ($variation['id'] ?? 0);
+            if (isset($expected[$variationId], $variation['other_info']['stock_migration_exception'])) {
+                unset($expected[$variationId]);
+            }
+        }
+        $ids = array_map('intval', array_keys($expected));
+        sort($ids);
+
+        return $ids;
     }
 
     private function restoreStatus(string $sourceIdentity, int $targetId, string $expectedBefore): void

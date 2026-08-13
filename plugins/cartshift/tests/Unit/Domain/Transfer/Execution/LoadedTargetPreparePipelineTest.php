@@ -84,6 +84,40 @@ final class LoadedTargetPreparePipelineTest extends PluginTestCase
         ));
     }
 
+    public function testLaterGenerationGetsANewDescriptorAndCanReclaimRolledBackMappings(): void
+    {
+        [$package, $decisions, $selection] = $this->inputs();
+        $firstPrivate = $this->root . '/evidence/first';
+        $secondPrivate = $this->root . '/evidence/second';
+        mkdir($firstPrivate, 0700);
+        mkdir($secondPrivate, 0700);
+        copy($decisions, $firstPrivate . '/decisions.json');
+        copy($decisions, $secondPrivate . '/decisions.json');
+        chmod($firstPrivate . '/decisions.json', 0600);
+        chmod($secondPrivate . '/decisions.json', 0600);
+
+        $pipeline = static fn (int $generation): LoadedTargetPreparePipeline => new LoadedTargetPreparePipeline(
+            new FixedPrepareRuntime(str_repeat('3', 64)),
+            new FixedTargetSettings(str_repeat('4', 64), str_repeat('5', 64)),
+            new RecordingTargetBaselineProbe(new PreparedTargetBaseline('shop-alpha', [], [])),
+            static fn (): string => '2026-08-11T10:11:12Z',
+            generation: static fn (string $sourceKey): int => $sourceKey === 'shop-alpha' ? $generation : 1,
+        );
+        $firstInput = array_replace($this->pipelineInput($package, $firstPrivate . '/decisions.json', $selection), [
+            'private_dir' => $firstPrivate,
+        ]);
+        $secondInput = array_replace($this->pipelineInput($package, $secondPrivate . '/decisions.json', $selection), [
+            'private_dir' => $secondPrivate,
+        ]);
+
+        $first = $pipeline(1)($firstInput);
+        $second = $pipeline(2)($secondInput);
+
+        self::assertNotSame($first['descriptor'], $second['descriptor']);
+        self::assertSame(1, (new PreparedTransferRepository($firstPrivate))->get($first['descriptor'])->generation);
+        self::assertSame(2, (new PreparedTransferRepository($secondPrivate))->get($second['descriptor'])->generation);
+    }
+
     public function testPrepareStopsOnUnreadyRuntimeOrAnUnresolvedTargetFindingAndPersistsNothing(): void
     {
         [$package, $decisions, $selection] = $this->inputs();

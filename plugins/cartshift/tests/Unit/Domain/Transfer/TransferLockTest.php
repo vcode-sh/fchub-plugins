@@ -140,6 +140,24 @@ final class TransferLockTest extends PluginTestCase
         $recovery->recoverExpired('run-b', $this->descriptorHash(), 'not-evidence');
     }
 
+    public function testSameSecondRenewalAcceptsMysqlNoOpOnlyForTheExactOwner(): void
+    {
+        $database = new LeaseDatabase();
+        $clock = static fn (): \DateTimeImmutable => new \DateTimeImmutable('2026-08-10 12:00:00 UTC');
+        $lease = new TransferLease($database, $clock);
+        $lease->acquire($this->targetFingerprint(), 'run-a', $this->descriptorHash(), 300);
+
+        $lease->renew('run-a', $this->descriptorHash(), 300);
+        $lease->assertOwned('run-a', $this->descriptorHash());
+
+        try {
+            $lease->renew('run-b', $this->descriptorHash(), 300);
+            self::fail('A no-op update hid the wrong lease owner.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('transfer_lease_renewal_conflict', $exception->getMessage());
+        }
+    }
+
     public function testRunGuardAlwaysReleasesMutexWhenLeaseOrMutationFails(): void
     {
         $lockDatabase = new LockDatabase('guard');
@@ -309,8 +327,9 @@ final class LeaseDatabase extends \wpdb
             return 0;
         }
 
+        $changed = $row->expires_at !== $expires || $row->heartbeat_at !== $heartbeat;
         $row->expires_at = $expires;
         $row->heartbeat_at = $heartbeat;
-        return 1;
+        return $changed ? 1 : 0;
     }
 }

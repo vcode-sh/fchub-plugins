@@ -388,6 +388,64 @@ describe('GuidedMigrationScreen', () => {
     ]);
   });
 
+  it('approves a group of routine order decisions without choosing a mapping for the member', async () => {
+    const orderItems = [116, 117, 118].map((order) => ({
+      review_id: `decision-order-${order}`,
+      kind: 'migration_decision',
+      group: 'orders',
+      title: `Order ${order}`,
+      summary: 'Keep the reviewed historical notes private.',
+    }));
+    const productItem = {
+      review_id: 'product-0123456789ab',
+      kind: 'product_conflict',
+      group: 'products',
+      title: 'Store membership',
+      summary: 'A likely match already exists in FluentCart.',
+      choices: [{
+        choice_id: 'choice-111111111111',
+        label: 'Use existing product',
+        description: 'Use the existing FluentCart product without changing it.',
+      }],
+    };
+    serve(status({
+      run: {
+        phase: 'awaiting_decisions',
+        completed_steps: 3,
+        total_steps: 12,
+        last_step: 'Review migration decisions',
+        review: { blockers: [], items: [...orderItems, productItem], proposal_counts: {} },
+      },
+    }));
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="review-summary"]').text()).toContain('0 of 4 complete');
+    expect(wrapper.findAll('.cartshift-review-group')).toHaveLength(2);
+    expect(wrapper.find('[data-test="review-group-orders"]').text()).toContain('3 items');
+
+    await wrapper.find('[data-test="review-group-orders"] [data-test="approve-group"]').trigger('click');
+
+    expect(wrapper.findAll('[data-test="review-group-orders"] input:checked')).toHaveLength(3);
+    expect(wrapper.find('[data-test="review-summary"]').text()).toContain('3 of 4 complete');
+    expect(wrapper.find('[data-test="accept-run-decisions"]').attributes('disabled')).toBeDefined();
+    expect(wrapper.find('[data-test="review-group-products"] input:checked').exists()).toBe(false);
+
+    await wrapper.find('[data-test="review-group-products"] input').setValue(true);
+    expect(wrapper.find('[data-test="accept-run-decisions"]').text()).toContain('Confirm 4 decisions');
+    await wrapper.find('[data-test="accept-run-decisions"]').trigger('click');
+    await flushPromises();
+
+    expect(apiMock.mock.calls).toContainEqual([
+      'POST',
+      'migration/decisions',
+      {
+        approved_reviews: [...orderItems.map(({ review_id }) => review_id), productItem.review_id],
+        review_answers: [{ review_id: productItem.review_id, choice_id: 'choice-111111111111' }],
+      },
+    ]);
+  });
+
   it('requires one clear product choice and never offers overwrite', async () => {
     const item = {
       review_id: 'product-0123456789ab',
@@ -675,6 +733,96 @@ describe('GuidedMigrationScreen', () => {
     expect(report.text()).toContain('Store membership');
     expect(report.text()).toContain('stayed in WooCommerce');
     expect(report.text()).not.toContain('shared quantity');
+  });
+
+  it('explains generated variation SKUs without suggesting that products were skipped', async () => {
+    serve(
+      status({
+        run: {
+          phase: 'completed',
+          completed_steps: 12,
+          total_steps: 12,
+          migration_exceptions: [
+            {
+              type: 'sku_change',
+              title: 'Trail harness',
+              message: 'FluentCart requires every variation SKU to be unique.',
+              variations: [
+                { title: 'Size: Small', source_sku: 'HARNESS', target_sku: 'CS-11111111111111111111' },
+                { title: 'Size: Large', source_sku: 'HARNESS', target_sku: 'CS-22222222222222222222' },
+              ],
+              suggestions: ['Review any fulfilment or inventory integration that uses the original SKU.'],
+            },
+          ],
+        },
+      })
+    );
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    const report = wrapper.find('[data-test="migration-exceptions"]');
+    expect(report.text()).toContain('All variations were kept');
+    expect(report.text()).toContain('HARNESS → CS-11111111111111111111');
+    expect(report.text()).toContain('Review any fulfilment');
+    expect(report.text()).not.toContain('stayed in WooCommerce');
+  });
+
+  it('summarises physical order history without listing every order', async () => {
+    serve(
+      status({
+        run: {
+          phase: 'completed',
+          completed_steps: 12,
+          total_steps: 12,
+          migration_exceptions: [
+            {
+              type: 'fulfilment_summary',
+              title: 'Physical order history',
+              message: 'CartShift used the WooCommerce order status to preserve historical fulfilment.',
+              order_count: 9,
+              delivered_count: 6,
+              unshipped_count: 3,
+              mixed_count: 2,
+            },
+          ],
+        },
+      })
+    );
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    const report = wrapper.find('[data-test="migration-exceptions"]');
+    expect(report.text()).toContain('9 orders reviewed together');
+    expect(report.text()).toContain('6 marked delivered');
+    expect(report.text()).toContain('3 kept unshipped');
+    expect(report.text()).toContain('2 mixed physical and digital orders');
+    expect(report.text()).not.toContain('Order 116');
+  });
+
+  it('explains historical lines whose original variation no longer exists', async () => {
+    serve(
+      status({
+        run: {
+          phase: 'completed',
+          completed_steps: 12,
+          total_steps: 12,
+          migration_exceptions: [
+            {
+              type: 'historical_line_summary',
+              title: 'Historical product links',
+              message: 'The original WooCommerce variation no longer exists.',
+              line_count: 2,
+            },
+          ],
+        },
+      })
+    );
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    const report = wrapper.find('[data-test="migration-exceptions"]');
+    expect(report.text()).toContain('2 order items kept with their names, prices and product links');
+    expect(report.text()).toContain('No replacement variation was guessed');
   });
 
   it('presents a completed migration as finished', async () => {

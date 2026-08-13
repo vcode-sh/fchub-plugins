@@ -59,29 +59,30 @@ final class OrderSemanticsTest extends PluginTestCase
         );
     }
 
-    public function testPhysicalOrderRequiresFingerprintBoundPolicyAndMixedOrderBlocks(): void
+    public function testPhysicalAndMixedOrdersUseTheirHistoricalWooCommerceStatus(): void
     {
-        foreach ([
-            [new FulfilmentPolicy(), $this->record(['physical'])],
-            [new FulfilmentPolicy('unshipped', str_repeat('a', 64)), $this->record(['physical', 'digital'])],
-        ] as [$policy, $order]) {
-            try {
-                $policy->project($order);
-                self::fail('Unproved fulfilment shape was accepted.');
-            } catch (SourceRecordException $exception) {
-                self::assertSame('target_schema_unrepresentable', $exception->reasonCode);
-            }
-        }
+        $complete = (new FulfilmentPolicy())->project($this->record(['physical']));
+        self::assertSame('physical', $complete->fulfilmentType);
+        self::assertSame('delivered', $complete->shippingStatus);
+        self::assertSame([2], array_values($complete->fulfilledQuantities));
+
+        $processing = (new FulfilmentPolicy())->project($this->record(
+            ['physical'],
+            status: 'processing',
+            completedUtc: null,
+        ));
+        self::assertSame('unshipped', $processing->shippingStatus);
+        self::assertSame([0], array_values($processing->fulfilledQuantities));
+
+        $mixed = (new FulfilmentPolicy())->project($this->record(['physical', 'digital']));
+        self::assertSame('physical', $mixed->fulfilmentType);
+        self::assertSame('delivered', $mixed->shippingStatus);
+        self::assertSame([2, 2], array_values($mixed->fulfilledQuantities));
 
         $unshipped = (new FulfilmentPolicy('unshipped', str_repeat('a', 64)))
             ->project($this->record(['physical']));
         self::assertSame('unshipped', $unshipped->shippingStatus);
         self::assertSame(0, array_values($unshipped->fulfilledQuantities)[0]);
-
-        $complete = (new FulfilmentPolicy('historical_complete', str_repeat('b', 64)))
-            ->project($this->record(['physical']));
-        self::assertSame('delivered', $complete->shippingStatus);
-        self::assertSame(2, array_values($complete->fulfilledQuantities)[0]);
     }
 
     public function testMeaningfulBillingAddressProjectsCanonicalBusinessCopies(): void
@@ -156,7 +157,13 @@ final class OrderSemanticsTest extends PluginTestCase
     }
 
     /** @param list<string> $lineTypes @param list<AddressRecord> $addresses */
-    private function record(array $lineTypes, array $addresses = [], bool $shipping = false): OrderRecord
+    private function record(
+        array $lineTypes,
+        array $addresses = [],
+        bool $shipping = false,
+        string $status = 'completed',
+        ?string $completedUtc = '2026-01-01T10:00:00Z',
+    ): OrderRecord
     {
         $orderIdentity = new SourceIdentity('lapka-web', 'order', '9001');
         $lines = [];
@@ -206,7 +213,7 @@ final class OrderSemanticsTest extends PluginTestCase
             null,
             null,
             'checkout',
-            'completed',
+            $status,
             'PLN',
             'PLN',
             'PLN',
@@ -227,7 +234,7 @@ final class OrderSemanticsTest extends PluginTestCase
             '2026-01-01T10:00:00Z',
             null,
             '2026-01-01T10:00:00Z',
-            '2026-01-01T10:00:00Z',
+            $completedUtc,
             null,
             $lines,
             [],

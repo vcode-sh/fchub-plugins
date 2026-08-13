@@ -92,7 +92,20 @@ final class TransferLease
             $now,
         ));
 
-        $this->requireOneAffected($updated, 'transfer_lease_renewal_conflict');
+        if ($updated === false) {
+            throw new \RuntimeException('transfer_lease_database_failure');
+        }
+        if ($updated === 0) {
+            try {
+                $this->verifyOwned($holderId, $descriptorHash, true);
+            } catch (\RuntimeException $exception) {
+                throw new \RuntimeException('transfer_lease_renewal_conflict', 0, $exception);
+            }
+            return;
+        }
+        if ($updated !== 1) {
+            throw new \RuntimeException('transfer_lease_renewal_conflict');
+        }
         $this->verifyOwned($holderId, $descriptorHash, true);
     }
 

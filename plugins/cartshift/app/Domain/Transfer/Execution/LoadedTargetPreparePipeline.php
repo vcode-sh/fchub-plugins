@@ -18,8 +18,9 @@ defined('ABSPATH') || exit;
 final readonly class LoadedTargetPreparePipeline
 {
     private \Closure $clock;
+    private \Closure $generation;
 
-    /** @param callable():string $clock */
+    /** @param callable():string $clock @param null|callable(string):int $generation */
     public function __construct(
         private TransferRuntimeInspector $runtime,
         private TargetSettingsInspector $settings,
@@ -27,8 +28,10 @@ final readonly class LoadedTargetPreparePipeline
         callable $clock,
         private TransferPackageValidator $validator = new TransferPackageValidator(),
         private bool $allowGuidedContext = false,
+        ?callable $generation = null,
     ) {
         $this->clock = $clock(...);
+        $this->generation = ($generation ?? static fn (string $sourceKey): int => 1)(...);
     }
 
     public static function create(): self
@@ -38,6 +41,7 @@ final readonly class LoadedTargetPreparePipeline
             new LoadedTargetSettingsInspector(),
             new LoadedPreparedTargetBaselineProbe(),
             static fn (): string => gmdate('Y-m-d\TH:i:s\Z'),
+            generation: static fn (string $sourceKey): int => self::nextGeneration($sourceKey),
         );
     }
 
@@ -50,6 +54,7 @@ final readonly class LoadedTargetPreparePipeline
             new LoadedPreparedTargetBaselineProbe(),
             static fn (): string => gmdate('Y-m-d\TH:i:s\Z'),
             allowGuidedContext: true,
+            generation: static fn (string $sourceKey): int => self::nextGeneration($sourceKey),
         );
     }
 
@@ -103,6 +108,10 @@ final readonly class LoadedTargetPreparePipeline
         $this->assertHash($settingsHash, 'target_settings_fingerprint_invalid');
         $this->assertHash($gatewayHash, 'target_gateway_fingerprint_invalid');
 
+        $generation = ($this->generation)($manifest->sourceKey);
+        if ($generation < 1) {
+            throw new \RuntimeException('target_generation_invalid');
+        }
         $runId = 'tr-' . substr(CanonicalJson::fingerprint([
             'package' => $input['package_hash'],
             'decision' => $input['decision_hash'],
@@ -111,6 +120,7 @@ final readonly class LoadedTargetPreparePipeline
             'settings' => $settingsHash,
             'gateway' => $gatewayHash,
             'context' => $input['execution_context'],
+            'generation' => $generation,
         ]), 0, 24);
         $baseline = $this->baselineProbe->capture($manifest->sourceKey, $closure->orderedRecords, $decisions, $runId);
         if ($baseline->sourceKey !== $manifest->sourceKey) {
@@ -151,6 +161,7 @@ final readonly class LoadedTargetPreparePipeline
             $leaveDraftAccepted,
             ($this->clock)(),
             $manifest->sourceKey,
+            $generation,
         );
         (new PreparedTargetBaselineRepository($private))->save($runId, $baseline);
         (new PreparedDecisionSetRepository($private))->save($runId, $decisions);
@@ -178,5 +189,24 @@ final readonly class LoadedTargetPreparePipeline
         if (preg_match('/\A[a-f0-9]{64}\z/D', $value) !== 1) {
             throw new \RuntimeException($reason);
         }
+    }
+
+    private static function nextGeneration(string $sourceKey): int
+    {
+        global $wpdb;
+        if (!is_object($wpdb)) {
+            throw new \RuntimeException('target_generation_database_unavailable');
+        }
+        $wpdb->last_error = '';
+        $maximum = (int) $wpdb->get_var("SELECT MAX(generation) FROM {$wpdb->prefix}cartshift_transfer_runs");
+        $rolledBack = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT 1 FROM {$wpdb->prefix}cartshift_id_map
+             WHERE source_key = %s AND is_simulated = 0 AND record_state = 'rolled_back' LIMIT 1",
+            $sourceKey,
+        ));
+        if (trim((string) ($wpdb->last_error ?? '')) !== '') {
+            throw new \RuntimeException('target_generation_read_failed');
+        }
+        return max($maximum + 1, $rolledBack === 1 ? 2 : 1);
     }
 }

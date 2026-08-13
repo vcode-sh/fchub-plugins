@@ -143,6 +143,8 @@ final class SimpleVariationPlannerTest extends PluginTestCase
         self::assertSame(0, $baseline['on_hold']);
         self::assertSame('out-of-stock', $baseline['stock_status']);
         self::assertSame(0, $baseline['backorders']);
+        self::assertSame('inactive', $baseline['item_status']);
+        self::assertSame('inactive', $exception['target_projection']['item_status']);
         self::assertSame($variation->stock->toArray(), $exception['source_stock']);
         self::assertSame('shared_parent_stock', $exception['type']);
         self::assertTrue($exception['requires_manual_resolution']);
@@ -168,6 +170,39 @@ final class SimpleVariationPlannerTest extends PluginTestCase
 
         self::assertSame('REVIEWED-SKU', $plans[0]->targetFields['sku']);
         self::assertSame(str_repeat('S', 31), $product->variations[0]->sku);
+    }
+
+    public function testDuplicateSourceSkusGetUniqueTargetSkusWithManualFollowUpEvidence(): void
+    {
+        $parent = ProductAssessmentFixture::identity('42');
+        $first = ProductAssessmentFixture::variation($parent, [
+            'identity' => ProductAssessmentFixture::identity('42:variation:101'),
+            'sku' => 'SHARED-SKU',
+        ]);
+        $second = ProductAssessmentFixture::variation($parent, [
+            'identity' => ProductAssessmentFixture::identity('42:variation:102'),
+            'sku' => 'shared-sku',
+        ]);
+        $product = ProductAssessmentFixture::product([
+            'productType' => 'variable',
+            'variations' => [$first, $second],
+        ]);
+
+        $plans = (new SimpleVariationPlanner())->plan($product, $this->context());
+
+        self::assertCount(2, array_unique(array_column(array_column($plans, 'targetFields'), 'sku')));
+        foreach ($plans as $index => $plan) {
+            self::assertMatchesRegularExpression('/\ACS-[A-F0-9]{20}\z/D', $plan->targetFields['sku']);
+            self::assertSame(
+                $product->variations[$index]->sku,
+                $plan->targetOtherInfo['sku_migration_exception']['source_sku'],
+            );
+            self::assertSame(
+                $plan->targetFields['sku'],
+                $plan->targetOtherInfo['sku_migration_exception']['target_sku'],
+            );
+            self::assertTrue($plan->targetOtherInfo['sku_migration_exception']['requires_manual_resolution']);
+        }
     }
 
     public function testUnknownOrInvalidSkuOverrideBlocks(): void

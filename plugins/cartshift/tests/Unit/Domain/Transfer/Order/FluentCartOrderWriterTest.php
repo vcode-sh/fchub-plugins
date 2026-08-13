@@ -193,6 +193,36 @@ final class FluentCartOrderWriterTest extends PluginTestCase
         self::assertSame([], $maps->ownedRecords());
     }
 
+    public function testHistoricalLineWithDeletedVariationRequiresOnlyItsProductMapping(): void
+    {
+        [$writer, $target, $maps] = $this->writer();
+        $record = OrderWriterFixture::record();
+        unset($maps->records[$record->productLines[0]->variation->canonical()]);
+        $plan = OrderStagePlan::build(
+            $record,
+            new OrderProjectionContext(
+                [$record->productLines[0]->identity->canonical() => [
+                    'post_id' => 501,
+                    'object_id' => 0,
+                    'fulfillment_type' => 'digital',
+                    'historical_variation_unlinked' => true,
+                ]],
+                [$record->couponLines[0]->identity->canonical() => null],
+                [],
+                'test',
+                'Historical WooCommerce provenance',
+                true,
+            ),
+            customerTargetId: 701,
+        );
+
+        $writer->stage($plan, $this->stageContext());
+
+        self::assertCount(2, $target->items);
+        self::assertSame(0, $target->items[array_key_first($target->items)]['object_id']);
+        self::assertTrue($target->items[array_key_first($target->items)]['other_info']['historical_variation_unlinked']);
+    }
+
     public function testNoteDecisionFingerprintCannotBeReusedAfterPrivateContentDrifts(): void
     {
         $selected = new OrderNoteRecord(
