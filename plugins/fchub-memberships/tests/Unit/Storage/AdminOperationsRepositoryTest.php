@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMemberships\Tests\Unit\Storage;
 
+use FChubMemberships\Storage\AdminMemberQuery;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRepository;
 use FChubMemberships\Tests\Unit\PluginTestCase;
@@ -124,7 +125,7 @@ final class AdminOperationsRepositoryTest extends PluginTestCase
             return 1;
         };
 
-        $repo = new GrantRepository();
+        $repo = new AdminMemberQuery();
         $members = $repo->getMembers([
             'search' => '21',
             'expires_within' => 7,
@@ -160,7 +161,7 @@ final class AdminOperationsRepositoryTest extends PluginTestCase
             return ['active' => '9', 'expiring_soon' => '2', 'scheduled' => '3', 'paused' => '1', 'ended' => '4'];
         };
 
-        $summary = (new GrantRepository())->getAdminSummary(7);
+        $summary = (new AdminMemberQuery())->getAdminSummary(7);
 
         self::assertSame(
             ['active' => 9, 'expiring_soon' => 2, 'scheduled' => 3, 'paused' => 1, 'ended' => 4],

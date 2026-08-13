@@ -4,6 +4,7 @@ namespace FChubMemberships\CLI;
 
 defined('ABSPATH') || exit;
 
+use FChubMemberships\Storage\AdminMemberQuery;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRepository;
 use FChubMemberships\Storage\PlanRuleRepository;
@@ -39,6 +40,7 @@ use WP_User;
 class GrantCommand
 {
     private GrantRepository $grantRepo;
+    private AdminMemberQuery $memberQuery;
     private PlanRepository $planRepo;
     private PlanRuleRepository $ruleRepo;
     private DripScheduleRepository $dripRepo;
@@ -51,10 +53,12 @@ class GrantCommand
         ?PlanRuleRepository $ruleRepo = null,
         ?DripScheduleRepository $dripRepo = null,
         ?Clock $clock = null,
-        ?EntitlementBackfillService $entitlementBackfillService = null
+        ?EntitlementBackfillService $entitlementBackfillService = null,
+        ?AdminMemberQuery $memberQuery = null
     )
     {
         $this->grantRepo = $grantRepo ?? new GrantRepository();
+        $this->memberQuery = $memberQuery ?? new AdminMemberQuery();
         $this->planRepo = $planRepo ?? new PlanRepository();
         $this->ruleRepo = $ruleRepo ?? new PlanRuleRepository();
         $this->dripRepo = $dripRepo ?? new DripScheduleRepository();
@@ -1235,7 +1239,7 @@ class GrantCommand
         WP_CLI::line(sprintf('Drip notifications: %d pending, %d sent', $pendingDrip, $sentDrip));
 
         // Expiring soon
-        $expiringSoon = $this->grantRepo->getExpiringSoon(7, 5);
+        $expiringSoon = $this->memberQuery->getExpiringSoon(7, 5);
         if (!empty($expiringSoon)) {
             WP_CLI::line('');
             WP_CLI::line('=== Expiring Soon (7 days) ===');
@@ -1371,9 +1375,9 @@ class GrantCommand
     {
         $range = $this->parsePeriod($period);
 
-        $activeMembers = $this->grantRepo->countActiveMembers($plan['id']);
-        $newMembers = $this->grantRepo->countNewMembers($range['from'], $range['to'], $plan['id']);
-        $churnedMembers = $this->grantRepo->countChurnedMembers($range['from'], $range['to'], $plan['id']);
+        $activeMembers = $this->memberQuery->countActiveMembers($plan['id']);
+        $newMembers = $this->memberQuery->countNewMembers($range['from'], $range['to'], $plan['id']);
+        $churnedMembers = $this->memberQuery->countChurnedMembers($range['from'], $range['to'], $plan['id']);
         $ruleCount = $this->ruleRepo->countByPlanId($plan['id']);
 
         WP_CLI::line(sprintf('=== Plan: %s (%s) ===', $plan['title'], $plan['slug']));

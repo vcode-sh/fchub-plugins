@@ -4,12 +4,12 @@ namespace FChubMemberships\Reports;
 
 defined('ABSPATH') || exit;
 
-use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Storage\AdminMemberQuery;
 use FChubMemberships\Storage\PlanRepository;
 
 class MemberStatsReport
 {
-    private GrantRepository $grantRepo;
+    private AdminMemberQuery $memberQuery;
     private PlanRepository $planRepo;
     private string $statsTable;
     private string $grantsTable;
@@ -17,7 +17,7 @@ class MemberStatsReport
     public function __construct()
     {
         global $wpdb;
-        $this->grantRepo = new GrantRepository();
+        $this->memberQuery = new AdminMemberQuery();
         $this->planRepo = new PlanRepository();
         $this->statsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_stats_daily');
         $this->grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
@@ -33,9 +33,9 @@ class MemberStatsReport
         $range = $this->resolveRange('30d', $from, $to);
         $activeAt = $range['to_datetime'];
 
-        $activeMembers = $this->grantRepo->countActiveMembers(null, $activeAt);
-        $newThisMonth = $this->grantRepo->countNewMembers($range['from_datetime'], $range['to_datetime']);
-        $churnedThisMonth = $this->grantRepo->countChurnedMembers($range['from_datetime'], $range['to_datetime']);
+        $activeMembers = $this->memberQuery->countActiveMembers(null, $activeAt);
+        $newThisMonth = $this->memberQuery->countNewMembers($range['from_datetime'], $range['to_datetime']);
+        $churnedThisMonth = $this->memberQuery->countChurnedMembers($range['from_datetime'], $range['to_datetime']);
 
         $churnRate = 0.0;
         if ($activeMembers + $churnedThisMonth > 0) {
@@ -158,9 +158,9 @@ class MemberStatsReport
         foreach ($plans as $plan) {
             $planId = $plan['id'];
 
-            $activeCount = $this->grantRepo->countActiveMembers($planId);
-            $newCount = $this->grantRepo->countNewMembers($dayStart, $dayEnd, $planId);
-            $churnedCount = $this->grantRepo->countChurnedMembers($dayStart, $dayEnd, $planId);
+            $activeCount = $this->memberQuery->countActiveMembers($planId);
+            $newCount = $this->memberQuery->countNewMembers($dayStart, $dayEnd, $planId);
+            $churnedCount = $this->memberQuery->countChurnedMembers($dayStart, $dayEnd, $planId);
 
             // Get revenue from orders linked to this plan's grants today
             $revenue = $this->getDailyRevenue($planId, $dayStart, $dayEnd);
@@ -195,9 +195,9 @@ class MemberStatsReport
         }
 
         // Aggregate totals (plan_id = 0)
-        $totalActive = $this->grantRepo->countActiveMembers();
-        $totalNew = $this->grantRepo->countNewMembers($dayStart, $dayEnd);
-        $totalChurned = $this->grantRepo->countChurnedMembers($dayStart, $dayEnd);
+        $totalActive = $this->memberQuery->countActiveMembers();
+        $totalNew = $this->memberQuery->countNewMembers($dayStart, $dayEnd);
+        $totalChurned = $this->memberQuery->countChurnedMembers($dayStart, $dayEnd);
         $totalRevenue = $this->getDailyRevenue(null, $dayStart, $dayEnd);
 
         $existing = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(

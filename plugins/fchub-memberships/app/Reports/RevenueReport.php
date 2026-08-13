@@ -4,12 +4,12 @@ namespace FChubMemberships\Reports;
 
 defined('ABSPATH') || exit;
 
-use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Storage\AdminMemberQuery;
 use FChubMemberships\Storage\PlanRepository;
 
 class RevenueReport
 {
-    private GrantRepository $grantRepo;
+    private AdminMemberQuery $memberQuery;
     private PlanRepository $planRepo;
     private string $grantsTable;
     private string $plansTable;
@@ -19,7 +19,7 @@ class RevenueReport
     public function __construct()
     {
         global $wpdb;
-        $this->grantRepo = new GrantRepository();
+        $this->memberQuery = new AdminMemberQuery();
         $this->planRepo = new PlanRepository();
         $this->grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
         $this->plansTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plans');
@@ -108,7 +108,7 @@ class RevenueReport
         global $wpdb;
 
         $range = $this->resolveRange('12m', $from, $to);
-        $activeMembers = $this->grantRepo->countActiveMembers(null, $range['to']);
+        $activeMembers = $this->memberQuery->countActiveMembers(null, $range['to']);
 
         if ($activeMembers === 0) {
             return 0;

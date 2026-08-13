@@ -9,7 +9,7 @@ defined('ABSPATH') || exit;
 use FChubMemberships\Domain\Drip\DripAdminQueryService;
 use FChubMemberships\Reports\MemberStatsReport;
 use FChubMemberships\Storage\AuditLogRepository;
-use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Storage\AdminMemberQuery;
 
 final class DashboardQueryService
 {
@@ -25,7 +25,7 @@ final class DashboardQueryService
         ?\Closure $recentActivity = null
     ) {
         $this->memberStats = $memberStats ?? new MemberStatsReport();
-        $this->expiringSoonCount = $expiringSoonCount ?? static fn(): int => (new GrantRepository())->countExpiringSoon(7);
+        $this->expiringSoonCount = $expiringSoonCount ?? static fn(): int => (new AdminMemberQuery())->countExpiringSoon(7);
         $this->dripOverview = $dripOverview ?? static fn(): array => (new DripAdminQueryService())->overview();
         $this->recentActivity = $recentActivity ?? static fn(): array => (new AuditLogRepository())->getRecent(8);
     }

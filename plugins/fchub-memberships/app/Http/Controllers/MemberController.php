@@ -4,6 +4,7 @@ namespace FChubMemberships\Http\Controllers;
 
 defined('ABSPATH') || exit;
 
+use FChubMemberships\Storage\AdminMemberQuery;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Domain\AccessGrantService;
 use FChubMemberships\Domain\Drip\DripEvaluator;
@@ -139,7 +140,7 @@ class MemberController
             return self::searchUsers($request);
         }
 
-        $repo = new GrantRepository();
+        $repo = new AdminMemberQuery();
         $filters = AdminRequestFilters::memberList($request);
 
         $members = $repo->getMembers($filters);
@@ -328,7 +329,7 @@ class MemberController
 
     public static function export(\WP_REST_Request $request): \WP_REST_Response
     {
-        $repo = new GrantRepository();
+        $repo = new AdminMemberQuery();
         $filters = [
             'status'  => $request->get_param('status') ?: 'active',
             'plan_id' => $request->get_param('plan_id'),

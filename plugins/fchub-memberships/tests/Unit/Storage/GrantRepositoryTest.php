@@ -8,6 +8,7 @@ use FChubMemberships\Domain\Access\ResourceAccessPolicy;
 use FChubMemberships\Domain\Access\ResourceAccessPolicyResolver;
 use FChubMemberships\Domain\AccessEvaluator;
 use FChubMemberships\Domain\Plan\PlanRuleResolver;
+use FChubMemberships\Storage\AdminMemberQuery;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\ProtectionRuleRepository;
 use FChubMemberships\Support\Clock;
@@ -275,7 +276,7 @@ final class GrantRepositoryTest extends PluginTestCase
         $timezone = new \DateTimeZone('Europe/Warsaw');
         $clock = new Clock(new \DateTimeImmutable('2026-03-28 12:30:00', $timezone), $timezone);
 
-        (new GrantRepository($clock))->countExpiringSoon(1);
+        (new AdminMemberQuery($clock))->countExpiringSoon(1);
 
         self::assertStringContainsString("expires_at > '2026-03-28 12:30:00'", $query);
         self::assertStringContainsString("expires_at <= '2026-03-29 12:30:00'", $query);
@@ -387,14 +388,15 @@ final class GrantRepositoryTest extends PluginTestCase
             : [$this->sampleGrantRow(['id' => 20, 'resource_type' => 'page', 'resource_id' => '77'])];
 
         $repo = new GrantRepository();
+        $memberQuery = new AdminMemberQuery();
 
         self::assertTrue($repo->hasActiveGrant(21, 'wordpress_core', 'post', '55'));
         self::assertTrue($repo->hasAccessibleGrant(21, 'wordpress_core', 'post', '55'));
-        self::assertSame(3, $repo->countActiveMembers(5, '2026-03-15 00:00:00'));
-        self::assertSame(3, $repo->countNewMembers('2026-03-01 00:00:00', '2026-03-31 23:59:59', 5));
-        self::assertSame(3, $repo->countChurnedMembers('2026-03-01 00:00:00', '2026-03-31 23:59:59', 5));
+        self::assertSame(3, $memberQuery->countActiveMembers(5, '2026-03-15 00:00:00'));
+        self::assertSame(3, $memberQuery->countNewMembers('2026-03-01 00:00:00', '2026-03-31 23:59:59', 5));
+        self::assertSame(3, $memberQuery->countChurnedMembers('2026-03-01 00:00:00', '2026-03-31 23:59:59', 5));
 
-        $members = $repo->getMembers([
+        $members = $memberQuery->getMembers([
             'status' => 'active',
             'plan_id' => 5,
             'search' => 'alice',
@@ -402,7 +404,7 @@ final class GrantRepositoryTest extends PluginTestCase
             'per_page' => 10,
             'page' => 2,
         ]);
-        $count = $repo->countMembers([
+        $count = $memberQuery->countMembers([
             'status' => 'paused',
             'plan_id' => 5,
             'search' => 'alice',
@@ -430,7 +432,7 @@ final class GrantRepositoryTest extends PluginTestCase
             return 4;
         };
 
-        $count = (new GrantRepository())->countExpiringSoon(7);
+        $count = (new AdminMemberQuery())->countExpiringSoon(7);
 
         self::assertSame(4, $count);
         self::assertStringContainsString('SELECT COUNT(*)', $query);
@@ -488,11 +490,12 @@ final class GrantRepositoryTest extends PluginTestCase
 
         $repo = new GrantRepository();
 
+        $memberQuery = new AdminMemberQuery();
         $junction = $repo->getBySourceId(77);
         $expiredTerms = $repo->getTermExpiredGrants('2026-03-13 22:00:00');
         $resources = $repo->getAllUserResourceIds(21);
         $planIds = $repo->getUserActivePlanIds(21);
-        $statusCounts = $repo->countByStatus();
+        $statusCounts = $memberQuery->countByStatus();
         $subscriptionIds = $repo->getActiveSubscriptionSourceIds();
 
         self::assertSame(90, $junction[0]['id']);

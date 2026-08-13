@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMemberships\Tests\Unit\Storage;
 
-use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Storage\AdminMemberQuery;
 use FChubMemberships\Support\Clock;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
@@ -175,9 +175,9 @@ final class AdminMemberAccessStatusTest extends PluginTestCase
         return substr($query, $start, (int) $end - $start);
     }
 
-    private function repository(): GrantRepository
+    private function repository(): AdminMemberQuery
     {
-        return new GrantRepository(new Clock(
+        return new AdminMemberQuery(new Clock(
             new \DateTimeImmutable('2026-08-13 12:00:00', new \DateTimeZone('UTC')),
             new \DateTimeZone('UTC')
         ));

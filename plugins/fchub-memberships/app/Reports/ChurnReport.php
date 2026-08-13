@@ -4,18 +4,18 @@ namespace FChubMemberships\Reports;
 
 defined('ABSPATH') || exit;
 
-use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Storage\AdminMemberQuery;
 
 class ChurnReport
 {
-    private GrantRepository $grantRepo;
+    private AdminMemberQuery $memberQuery;
     private string $grantsTable;
     private string $statsTable;
 
     public function __construct()
     {
         global $wpdb;
-        $this->grantRepo = new GrantRepository();
+        $this->memberQuery = new AdminMemberQuery();
         $this->grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
         $this->statsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_stats_daily');
     }
@@ -31,11 +31,11 @@ class ChurnReport
     {
         $range = $this->resolveRange($period, $from, $to);
 
-        $churnedCount = $this->grantRepo->countChurnedMembers($range['from'], $range['to']);
+        $churnedCount = $this->memberQuery->countChurnedMembers($range['from'], $range['to']);
 
         // Active at period start = current active + churned during period - new during period
-        $currentActive = $this->grantRepo->countActiveMembers(null, $range['to']);
-        $newDuringPeriod = $this->grantRepo->countNewMembers($range['from'], $range['to']);
+        $currentActive = $this->memberQuery->countActiveMembers(null, $range['to']);
+        $newDuringPeriod = $this->memberQuery->countNewMembers($range['from'], $range['to']);
         $activeAtStart = $currentActive + $churnedCount - $newDuringPeriod;
 
         if ($activeAtStart <= 0) {

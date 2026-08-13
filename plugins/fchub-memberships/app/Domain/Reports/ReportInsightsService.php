@@ -2,22 +2,22 @@
 
 namespace FChubMemberships\Domain\Reports;
 
-use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Storage\AdminMemberQuery;
 use FChubMemberships\Storage\PlanRepository;
 
 defined('ABSPATH') || exit;
 
 final class ReportInsightsService
 {
-    private GrantRepository $grants;
+    private AdminMemberQuery $grants;
     private PlanRepository $plans;
     private \wpdb $database;
     private string $grantsTable;
     private string $plansTable;
 
-    public function __construct(?GrantRepository $grants = null, ?PlanRepository $plans = null, ?\wpdb $database = null)
+    public function __construct(?AdminMemberQuery $grants = null, ?PlanRepository $plans = null, ?\wpdb $database = null)
     {
-        $this->grants = $grants ?? new GrantRepository();
+        $this->grants = $grants ?? new AdminMemberQuery();
         $this->plans = $plans ?? new PlanRepository();
         $this->database = $database ?? $GLOBALS['wpdb'];
         $this->grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifierOn($this->database, $this->database->prefix . 'fchub_membership_grants');
