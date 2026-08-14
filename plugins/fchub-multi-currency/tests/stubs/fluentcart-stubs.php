@@ -126,18 +126,39 @@ namespace FluentCart\Api;
 
 final class CurrencySettings
 {
+    /** @var array<string, mixed> */
+    private static array $mock = [];
+
     /**
+     * @param array<string, mixed> $settings
+     */
+    public static function setMock(array $settings): void
+    {
+        self::$mock = $settings;
+    }
+
+    public static function resetMock(): void
+    {
+        self::$mock = [];
+    }
+
+    /**
+     * Defaults mirror FluentCart 1.6.1 `CurrencySettings::get()`, including its
+     * `decimal_separator` default of the character `.` rather than the `dot`
+     * token an untouched store never stores.
+     *
      * @return array<string, mixed>
      */
     public static function get(): array
     {
-        return [
+        return array_merge([
             'currency_separator' => 'dot',
+            'decimal_separator'  => '.',
             'currency_sign'      => '$',
             'currency_position'  => 'before',
             'currency'           => 'USD',
             'is_zero_decimal'    => false,
-        ];
+        ], self::$mock);
     }
 
     public static function getPriceHtml(float $price, string $currencyCode = 'USD'): string

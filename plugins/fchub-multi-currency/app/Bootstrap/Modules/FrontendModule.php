@@ -81,7 +81,7 @@ final class FrontendModule implements ModuleContract
         $context = $contextService->resolve();
 
         $fcSettings = CurrencySettings::get();
-        $baseSeparatorSetting = $fcSettings['currency_separator'] ?? 'dot';
+        $isCommaDecimal = self::shopUsesCommaDecimal($fcSettings);
 
         $config = [
             'rate'                  => $context->rate->rateAsFloat(),
@@ -100,16 +100,8 @@ final class FrontendModule implements ModuleContract
             'baseCurrencySign'      => html_entity_decode($fcSettings['currency_sign'] ?? '$', ENT_QUOTES, 'UTF-8'),
             'baseCurrencyPosition'  => $fcSettings['currency_position'] ?? 'before',
             'baseCurrencyCode'      => $fcSettings['currency'] ?? 'USD',
-            'baseDecimalSep'        => match ($baseSeparatorSetting) {
-                'comma', 'space_comma' => ',',
-                default                => '.',
-            },
-            'baseThousandSep'       => match ($baseSeparatorSetting) {
-                'comma'       => '.',
-                'space_comma' => ' ',
-                'none_dot'    => '',
-                default       => ',',
-            },
+            'baseDecimalSep'        => $isCommaDecimal ? ',' : '.',
+            'baseThousandSep'       => $isCommaDecimal ? '.' : ',',
             'baseDecimals'          => ($fcSettings['is_zero_decimal'] ?? false) ? 0 : 2,
             'displayDecSep'         => self::resolveDisplaySep($context, $optionStore, 'decimal_separator', match ($context->displayCurrency->position->value) {
                 'right', 'right_space' => ',',
@@ -132,6 +124,23 @@ final class FrontendModule implements ModuleContract
         $config['disclosureText'] = $disclosure;
 
         return $config;
+    }
+
+    /**
+     * Whether FluentCart prints store prices with a comma decimal separator.
+     *
+     * Number Format is one radio (`decimal_separator`), and the thousand
+     * separator is always its opposite — see FluentCart's own `Helper::toDecimal`.
+     * Anything other than `comma` means the dot pairing, including the character
+     * `.` that `CurrencySettings::get()` returns for an untouched store.
+     * `currency_separator` is leftover in that array and FluentCart no longer
+     * reads it.
+     *
+     * @param array<string, mixed> $fcSettings
+     */
+    private static function shopUsesCommaDecimal(array $fcSettings): bool
+    {
+        return ($fcSettings['decimal_separator'] ?? '') === 'comma';
     }
 
     private static function resolveDisplaySep(

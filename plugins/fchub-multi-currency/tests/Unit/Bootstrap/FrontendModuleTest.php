@@ -6,17 +6,17 @@ namespace FChubMultiCurrency\Tests\Unit\Bootstrap;
 
 use FChubMultiCurrency\Bootstrap\Modules\FrontendModule;
 use FChubMultiCurrency\Tests\Support\TestCase;
+use FluentCart\Api\CurrencySettings;
 use PHPUnit\Framework\Attributes\Test;
 
 final class FrontendModuleTest extends TestCase
 {
-    #[Test]
-    public function testRenderSwitcherShowsBaseCurrencyOptionAndSelectedCodeWhenBaseIsChosen(): void
+    /**
+     * @return array<string, mixed>
+     */
+    private function switcherSettings(): array
     {
-        $_GET = [];
-        $_COOKIE = [];
-
-        $this->setOption('fchub_mc_settings', [
+        return [
             'enabled' => 'yes',
             'base_currency' => 'EUR',
             'default_display_currency' => 'USD',
@@ -29,7 +29,72 @@ final class FrontendModuleTest extends TestCase
                     'position' => 'left',
                 ],
             ],
+        ];
+    }
+
+    #[Test]
+    public function testFrontendConfigFollowsFluentCartDecimalSeparatorWhenCurrencySeparatorDisagrees(): void
+    {
+        $this->setOption('fchub_mc_settings', $this->switcherSettings());
+        $this->setWpdbMockRow(null);
+
+        CurrencySettings::setMock([
+            'currency' => 'PLN',
+            'currency_sign' => 'zł',
+            'currency_position' => 'after',
+            'currency_separator' => 'dot',
+            'decimal_separator' => 'comma',
         ]);
+
+        $config = FrontendModule::buildFrontendConfig();
+
+        $this->assertSame(',', $config['baseDecimalSep']);
+        $this->assertSame('.', $config['baseThousandSep']);
+    }
+
+    #[Test]
+    public function testFrontendConfigIgnoresStaleCurrencySeparatorWhenDecimalSeparatorIsDot(): void
+    {
+        $this->setOption('fchub_mc_settings', $this->switcherSettings());
+        $this->setWpdbMockRow(null);
+
+        CurrencySettings::setMock([
+            'currency_separator' => 'comma',
+            'decimal_separator' => 'dot',
+        ]);
+
+        $config = FrontendModule::buildFrontendConfig();
+
+        $this->assertSame('.', $config['baseDecimalSep']);
+        $this->assertSame(',', $config['baseThousandSep']);
+    }
+
+    /**
+     * An untouched store never stores the `dot` token: FluentCart defaults
+     * `decimal_separator` to the character `.`, so only `comma` may flip the
+     * pairing.
+     */
+    #[Test]
+    public function testFrontendConfigTreatsFluentCartsCharacterDefaultAsTheDotPairing(): void
+    {
+        $this->setOption('fchub_mc_settings', $this->switcherSettings());
+        $this->setWpdbMockRow(null);
+
+        CurrencySettings::setMock(['decimal_separator' => '.']);
+
+        $config = FrontendModule::buildFrontendConfig();
+
+        $this->assertSame('.', $config['baseDecimalSep']);
+        $this->assertSame(',', $config['baseThousandSep']);
+    }
+
+    #[Test]
+    public function testRenderSwitcherShowsBaseCurrencyOptionAndSelectedCodeWhenBaseIsChosen(): void
+    {
+        $_GET = [];
+        $_COOKIE = [];
+
+        $this->setOption('fchub_mc_settings', $this->switcherSettings());
 
         // No EUR->USD rate available, so context should fall back to base (EUR).
         $this->setWpdbMockRow(null);

@@ -66,6 +66,7 @@ abstract class TestCase extends BaseTestCase
 
         // Reset CurrencyContextService singleton
         \FChubMultiCurrency\Domain\Services\CurrencyContextService::reset();
+        \FluentCart\Api\CurrencySettings::resetMock();
 
         $_GET = [];
         $_POST = [];

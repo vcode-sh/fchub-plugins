@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, currency, exchange-rates, ecommerce
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.4.3
+Stable tag: 1.4.4
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -90,6 +90,10 @@ No. Manual is the no-network default. A scheduled refresh is created only after 
 The failed response is not persisted. Customer prices continue to use the last good or manually entered rates according to the configured stale-rate fallback.
 
 == Changelog ==
+
+= 1.4.4 =
+
+* Fixed converted prices reading 100x too high in stores whose FluentCart number format uses a comma decimal separator. The frontend was told the decimal separator by the wrong setting, so a base price of "20,00" was parsed as 2000 before conversion.
 
 = 1.4.3 =
 

@@ -9,9 +9,9 @@ const readJson = async (path) =>
 const expectedVersions = {
   'fchub-memberships': '1.4.6',
   'fchub-wishlist': '1.0.3',
-  'fchub-multi-currency': '1.4.3',
-  'fchub-p24': '1.0.4',
-  'fchub-fakturownia': '1.1.2',
+  'fchub-multi-currency': '1.4.4',
+  'fchub-p24': '1.0.5',
+  'fchub-fakturownia': '1.1.3',
 }
 
 const expectedPreviousReleases = {
@@ -30,25 +30,25 @@ const expectedPreviousReleases = {
     sha256: '44ce62f2b8f75def910221ae720791c60803ace786a89a1557de45de9d6f892b',
   },
   'fchub-multi-currency': {
-    version: '1.4.2',
-    tag: 'fchub-multi-currency/v1.4.2',
-    commit: '541ab795d7b9007bf3db76042ef0a2d3e9840353',
-    asset: 'fchub-multi-currency-1.4.2.zip',
-    sha256: '76426ed287e9eed6a578948bb36213665356a78a1ec6d87b4f81bb3561a859ec',
+    version: '1.4.3',
+    tag: 'fchub-multi-currency/v1.4.3',
+    commit: '08e4e4bd7671b8da379474ae0b49fd839d3d0c3d',
+    asset: 'fchub-multi-currency-1.4.3.zip',
+    sha256: '157888de880698080356740b058885b6cc5b384e6bb34c9c393e7ebe57e7289b',
   },
   'fchub-p24': {
-    version: '1.0.3',
-    tag: 'fchub-p24/v1.0.3',
-    commit: '23bf80dbd3e0168083e155d7c88116c563af76a2',
-    asset: 'fchub-p24-1.0.3.zip',
-    sha256: 'd39712c3b0e59776b372468e0c94b10e550b7c2f727b2f53db34debd3fb6a6b4',
+    version: '1.0.4',
+    tag: 'fchub-p24/v1.0.4',
+    commit: '08e4e4bd7671b8da379474ae0b49fd839d3d0c3d',
+    asset: 'fchub-p24-1.0.4.zip',
+    sha256: 'deff34579a8f91663ea49f7c025bd1c9716535fc5216d654340fe8020d4f505d',
   },
   'fchub-fakturownia': {
-    version: '1.1.1',
-    tag: 'fchub-fakturownia/v1.1.1',
-    commit: '57640fed9823dbc3405d15de322b9451c01fbd54',
-    asset: 'fchub-fakturownia-1.1.1.zip',
-    sha256: 'ecb63aea5a7662e0debca50f498584132a1e15cb2d3f8ea20b9a622c3badf793',
+    version: '1.1.2',
+    tag: 'fchub-fakturownia/v1.1.2',
+    commit: '08e4e4bd7671b8da379474ae0b49fd839d3d0c3d',
+    asset: 'fchub-fakturownia-1.1.2.zip',
+    sha256: 'ee55bc3a20f4988d3a56b58e29a6be914a99f95c97cdb4f1c369e41307b260a0',
   },
 }
 

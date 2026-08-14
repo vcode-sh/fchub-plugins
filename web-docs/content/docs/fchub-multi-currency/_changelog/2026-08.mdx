@@ -1,3 +1,30 @@
+### v1.4.4
+
+*Released 14 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.4)
+
+One stale setting, two orders of magnitude.
+
+#### Converted prices were 100x too high in comma-decimal stores
+
+Reported by [@zellfusion](https://github.com/zellfusion) in [#142](https://github.com/vcode-sh/fchub-plugins/issues/142),
+traced to the exact line, with a patch attached — the kind of report that does most
+of the work for you. Thank you. A Polish store showing `20,00 zł` was converting it
+to `465,19 €` instead of `4,65 €`.
+
+FluentCart's Number Format is one radio, stored as `decimal_separator`. The plugin
+was reading `currency_separator` — a leftover key that `CurrencySettings::get()`
+still hands out and which FluentCart itself no longer reads anywhere. A store set to
+comma decimals was therefore told its decimal separator was a dot, and the frontend
+parser did the only reasonable thing with that lie: treated the comma in `20,00` as
+a thousands separator, stripped it, and carried on with 2000.
+
+The pairing now comes from `decimal_separator` alone, with the thousand separator as
+its opposite — the same two lines FluentCart uses internally, so the display layer
+and the store can no longer disagree about what a comma means. Stores on the dot
+pairing were never affected and are unchanged.
+
+<Separator className="my-8" />
+
 ### v1.4.3
 
 *Released 9 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.3)

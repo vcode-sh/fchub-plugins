@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, payments, przelewy24, blik
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.0.4
+Stable tag: 1.0.5
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -59,6 +59,10 @@ No. Card entry and processing happen at Przelewy24. The plugin stores only the r
 No. Transaction processing requires an active Przelewy24 merchant agreement.
 
 == Changelog ==
+
+= 1.0.5 =
+
+* Release metadata is now checked against the plugin header, so a version bump can no longer land half-applied. No change to gateway behaviour.
 
 = 1.0.4 =
 

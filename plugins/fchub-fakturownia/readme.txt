@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, invoices, ksef, accounting
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.1.2
+Stable tag: 1.1.3
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -90,6 +90,10 @@ No. Administrators download invoice PDFs through an authenticated WordPress endp
 3. Successful KSeF submission with the assigned reference number.
 
 == Changelog ==
+
+= 1.1.3 =
+
+* Release metadata is now checked against the plugin header, so a version bump can no longer land half-applied. No change to invoicing behaviour.
 
 = 1.1.2 =
 

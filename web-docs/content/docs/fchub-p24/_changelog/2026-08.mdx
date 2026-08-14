@@ -1,3 +1,23 @@
+### v1.0.5
+
+*Released 14 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-p24/v1.0.5)
+
+Housekeeping. Nothing in the gateway changed.
+
+#### The version can no longer disagree with itself
+
+A plugin declares its version in four places, and until now the tests pinned the
+literal in three more. Bumping meant editing seven strings and hoping, which is
+exactly the sort of arithmetic a human loses at eventually — a sibling plugin was
+found running three patch versions behind in one of them.
+
+The header is now the single source of truth, and one test asserts every other
+declaration agrees with it. The other suites check that a version declaration
+exists without caring what it says, so a bump touches only the files that
+genuinely declare a version.
+
+<Separator className="my-8" />
+
 ### v1.0.4
 
 *Released 9 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-p24/v1.0.4)

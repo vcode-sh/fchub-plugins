@@ -20,14 +20,15 @@ class WordPressOrgIdentityTest extends TestCase
         $this->assertIsString($plugin);
         $this->assertStringContainsString('Plugin Name: FCHub Przelewy24', $plugin);
         $this->assertStringContainsString('Plugin URI: https://fchub.co/docs/fchub-p24', $plugin);
-        $this->assertStringContainsString('Version: 1.0.4', $plugin);
+        // The value is owned by VersionMetadataContractTest; here it only has to exist.
+        $this->assertMatchesRegularExpression('/^\s*\*\s+Version:\s*\S+/m', $plugin);
         $this->assertStringContainsString('Requires at least: 7.0', $plugin);
         $this->assertStringContainsString('Tested up to: 7.0', $plugin);
         $this->assertStringContainsString('Requires PHP: 8.3', $plugin);
         $this->assertStringContainsString('Requires Plugins: fluent-cart', $plugin);
         $this->assertStringContainsString('Text Domain: fchub-p24', $plugin);
         $this->assertStringNotContainsString('Domain Path:', $plugin);
-        $this->assertStringContainsString("define('FCHUB_P24_VERSION', '1.0.4');", $plugin);
+        $this->assertMatchesRegularExpression("/define\\('FCHUB_P24_VERSION', '\\S+'\\);/", $plugin);
         // Update URI and updater registration are governed by tests/repository/updater-presence-contract.test.mjs.
     }
 
@@ -47,7 +48,7 @@ class WordPressOrgIdentityTest extends TestCase
         $this->assertStringContainsString('Contributors: vcodesh', $readme);
         $this->assertStringContainsString('Requires at least: 7.0', $readme);
         $this->assertStringContainsString('Tested up to: 7.0', $readme);
-        $this->assertStringContainsString('Stable tag: 1.0.4', $readme);
+        $this->assertMatchesRegularExpression('/^Stable tag: \S+$/m', $readme);
         $this->assertStringContainsString('Requires PHP: 8.3', $readme);
         $this->assertStringContainsString('https://developers.przelewy24.pl/', $readme);
         $this->assertStringContainsString('https://www.przelewy24.pl/polityka-prywatnosci', $readme);

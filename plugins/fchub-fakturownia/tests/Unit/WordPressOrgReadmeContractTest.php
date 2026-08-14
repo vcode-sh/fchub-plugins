@@ -22,7 +22,7 @@ final class WordPressOrgReadmeContractTest extends TestCase
             'Tags: fluentcart, invoices, ksef, accounting',
             'Requires at least: 7.0',
             'Tested up to: 7.0',
-            'Stable tag: 1.1.2',
+            // Stable tag is deliberately absent: VersionMetadataContractTest owns it.
             'Requires PHP: 8.3',
             'License: GPLv2 or later',
             'https://fakturownia.pl/api-przyklady',

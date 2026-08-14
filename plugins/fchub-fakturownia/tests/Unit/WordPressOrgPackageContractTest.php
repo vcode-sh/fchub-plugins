@@ -15,8 +15,9 @@ final class WordPressOrgPackageContractTest extends TestCase
         $composer = json_decode((string) file_get_contents($pluginRoot . '/composer.json'), true);
         $lock = json_decode((string) file_get_contents($pluginRoot . '/composer.lock'), true);
 
-        self::assertStringContainsString('Version: 1.1.2', $mainSource);
-        self::assertStringContainsString("FCHUB_FAKTUROWNIA_VERSION', '1.1.2'", $mainSource);
+        // The value is owned by VersionMetadataContractTest; here it only has to exist.
+        self::assertMatchesRegularExpression('/^\s*\*\s+Version:\s*\S+/m', $mainSource);
+        self::assertMatchesRegularExpression("/FCHUB_FAKTUROWNIA_VERSION', '\\S+'/", $mainSource);
         self::assertStringNotContainsString('FCHub - Fakturownia', $mainSource);
         self::assertSame('>=8.3', $composer['require']['php'] ?? null);
         self::assertSame('>=8.3', $lock['platform']['php'] ?? null);
