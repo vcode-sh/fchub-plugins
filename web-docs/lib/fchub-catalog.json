@@ -20,11 +20,11 @@
       ],
       "docs_path": "/docs/fchub-p24",
       "admin_path": "admin.php?page=fluent-cart#/settings/payment-methods",
-      "version": "1.0.4",
+      "version": "1.0.5",
       "docs_url": "https://fchub.co/docs/fchub-p24",
-      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-p24/v1.0.4",
-      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-p24/v1.0.4/fchub-p24-1.0.4.zip",
-      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-p24/v1.0.4/fchub-p24-1.0.4.zip.sha256"
+      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-p24/v1.0.5",
+      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-p24/v1.0.5/fchub-p24-1.0.5.zip",
+      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-p24/v1.0.5/fchub-p24-1.0.5.zip.sha256"
     },
     "fchub-fakturownia": {
       "name": "Fakturownia",
@@ -38,11 +38,11 @@
       ],
       "docs_path": "/docs/fchub-fakturownia",
       "admin_path": "admin.php?page=fluent-cart#/integrations/fakturownia",
-      "version": "1.1.2",
+      "version": "1.1.3",
       "docs_url": "https://fchub.co/docs/fchub-fakturownia",
-      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia/v1.1.2",
-      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-fakturownia/v1.1.2/fchub-fakturownia-1.1.2.zip",
-      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-fakturownia/v1.1.2/fchub-fakturownia-1.1.2.zip.sha256"
+      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia/v1.1.3",
+      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-fakturownia/v1.1.3/fchub-fakturownia-1.1.3.zip",
+      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-fakturownia/v1.1.3/fchub-fakturownia-1.1.3.zip.sha256"
     },
     "fchub-memberships": {
       "name": "Memberships",
@@ -110,11 +110,11 @@
       ],
       "docs_path": "/docs/fchub-multi-currency",
       "admin_path": "admin.php?page=fluent-cart#/settings/multi-currency",
-      "version": "1.4.3",
+      "version": "1.4.4",
       "docs_url": "https://fchub.co/docs/fchub-multi-currency",
-      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.3",
-      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-multi-currency/v1.4.3/fchub-multi-currency-1.4.3.zip",
-      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-multi-currency/v1.4.3/fchub-multi-currency-1.4.3.zip.sha256"
+      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.4",
+      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-multi-currency/v1.4.4/fchub-multi-currency-1.4.4.zip",
+      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-multi-currency/v1.4.4/fchub-multi-currency-1.4.4.zip.sha256"
     }
   }
 }
