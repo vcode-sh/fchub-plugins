@@ -772,6 +772,207 @@ final class EntitlementServiceTest extends PluginTestCase
     }
 
     /** @return array{EntitlementService, EntitlementEdgeRepository&object, GrantRepository&object} */
+    public function test_end_refuses_a_terminal_status_outside_expired_and_revoked(): void
+    {
+        [$service] = $this->service();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageIs('Terminal grant status must be expired or revoked.');
+
+        $service->end($this->identity(), 'Owner request', 'paused');
+    }
+
+    public function test_end_refuses_a_reason_that_says_nothing(): void
+    {
+        [$service] = $this->service();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageIs('Entitlement end reason must contain 1 to 191 characters.');
+
+        $service->end($this->identity(), '   ');
+    }
+
+    public function test_end_refuses_a_reason_longer_than_the_column_holds(): void
+    {
+        [$service] = $this->service();
+
+        // 191 is the stored width; one more has to be refused rather than
+        // silently truncated.
+        self::assertSame('not_found', $service->end($this->identity(), str_repeat('x', 191))['action']);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageIs('Entitlement end reason must contain 1 to 191 characters.');
+
+        $service->end($this->identity(), str_repeat('x', 192));
+    }
+
+    public function test_a_lifecycle_receipt_must_be_a_sha256_hash(): void
+    {
+        [$service] = $this->service();
+
+        // Both halves of the shape matter: the alphabet and the exact width.
+        // Checking only a non-hex string would let a short hex value through.
+        foreach ([
+            'non-hex characters' => 'not-a-hash',
+            'right width, wrong alphabet' => str_repeat('z', 64),
+            'one character short' => str_repeat('a', 63),
+            'one character long' => str_repeat('a', 65),
+            'a short hex string' => 'abc123',
+            'nothing at all' => '',
+        ] as $why => $receipt) {
+            try {
+                $service->extendActiveExpiry($this->identity(), '2027-01-01 00:00:00', $receipt);
+                self::fail("A receipt with {$why} must be refused.");
+            } catch (\InvalidArgumentException $exception) {
+                self::assertSame('Lifecycle event receipt must be a SHA-256 hash.', $exception->getMessage(), $why);
+            }
+        }
+    }
+
+    public function test_a_lifecycle_date_must_use_the_storage_format(): void
+    {
+        [$service] = $this->service();
+
+        // A date that parses is not the same as a date that is real: the
+        // overflowing ones parse and only report warnings.
+        foreach ([
+            'no time part' => '2027-01-01',
+            'an ISO separator' => '2027-01-01T00:00:00',
+            'a day that does not exist' => '2027-02-30 00:00:00',
+            'an impossible hour' => '2027-01-01 25:00:00',
+            'a month that does not exist' => '2027-13-01 00:00:00',
+            'words instead of a date' => 'tomorrow',
+            'nothing at all' => '',
+        ] as $why => $date) {
+            try {
+                $service->extendActiveExpiry($this->identity(), $date, self::receipt());
+                self::fail("A date with {$why} must be refused.");
+            } catch (\InvalidArgumentException $exception) {
+                self::assertSame('Lifecycle expiry must use the storage timestamp format.', $exception->getMessage(), $why);
+            }
+        }
+    }
+
+    public function test_access_status_must_be_one_the_storage_recognises(): void
+    {
+        [$service, $edges] = $this->service();
+        $service->activate($this->identity(), $this->ownership());
+        $edge = array_values($edges->rows)[0];
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageIs('Entitlement access status change is invalid.');
+
+        $service->setAccessStatus([$edge], 'nonsense');
+    }
+
+    public function test_extending_never_moves_an_expiry_earlier_or_leaves_it_where_it_is(): void
+    {
+        [$service, $edges] = $this->service();
+        $service->activate($this->identity(), $this->ownership(['expires_at' => '2027-06-01 00:00:00']));
+
+        // The same instant is no more an extension than an earlier one, so
+        // both sides of the boundary have to be refused.
+        foreach ([
+            'an earlier expiry' => '2027-01-01 00:00:00',
+            'the expiry it already has' => '2027-06-01 00:00:00',
+            'one second earlier' => '2027-05-31 23:59:59',
+        ] as $why => $candidate) {
+            $edges->extendCalls = 0;
+
+            $result = $service->extendActiveExpiry($this->identity(), $candidate, self::receipt());
+
+            self::assertSame('unchanged', $result['action'], $why);
+            self::assertSame(0, $edges->extendCalls, "Storage must not be touched for {$why}.");
+            self::assertSame('2027-06-01 00:00:00', array_values($edges->rows)[0]['expires_at'], $why);
+        }
+
+        // One second later is a real extension, so the guard must not swallow it.
+        self::assertSame(
+            'extended',
+            $service->extendActiveExpiry($this->identity(), '2027-06-01 00:00:01', self::receipt())['action']
+        );
+    }
+
+    public function test_extending_refuses_an_edge_that_is_no_longer_active(): void
+    {
+        [$service, $edges] = $this->service();
+        $service->activate($this->identity(), $this->ownership(['expires_at' => '2027-06-01 00:00:00']));
+        $service->end($this->identity(), 'Owner request');
+        $edges->extendCalls = 0;
+
+        $result = $service->extendActiveExpiry($this->identity(), '2028-01-01 00:00:00', self::receipt());
+
+        self::assertSame('not_active', $result['action']);
+        self::assertSame(0, $edges->extendCalls, 'An ended edge must not reach the extension write.');
+    }
+
+    public function test_a_renewal_successor_requires_a_predecessor_that_has_ended(): void
+    {
+        [$service, $edges] = $this->service();
+        $service->activate($this->identity(), $this->ownership());
+        $before = count($edges->rows);
+
+        $result = $service->createRenewalSuccessor(
+            $this->identity(),
+            77,
+            123,
+            '2028-01-01 00:00:00',
+            self::receipt()
+        );
+
+        self::assertSame('predecessor_not_ended', $result['action']);
+        self::assertCount($before, $edges->rows, 'A live predecessor must not spawn a successor edge.');
+    }
+
+    public function test_ending_something_already_ended_does_not_resync_the_aggregate(): void
+    {
+        [$service, , $grants] = $this->service();
+        $service->activate($this->identity(), $this->ownership());
+        $service->end($this->identity(), 'Owner request');
+        $lookups = $grants->lookups;
+
+        $result = $service->end($this->identity(), 'Owner request');
+
+        self::assertSame('already_ended', $result['action']);
+        self::assertSame($lookups, $grants->lookups, 'A no-op end must not touch the compatibility aggregate.');
+    }
+
+    public function test_a_conflicting_activation_projects_no_compatibility(): void
+    {
+        [$service, , $grants] = $this->service();
+        $service->activate($this->identity(), $this->ownership());
+        $lookups = $grants->lookups;
+
+        $conflict = $service->activate($this->identity(), $this->ownership(['owner' => 'preexisting']));
+
+        self::assertSame('immutable_conflict', $conflict['action']);
+        self::assertSame($lookups, $grants->lookups, 'A rejected activation must project nothing.');
+    }
+
+    public function test_an_existing_edge_keeps_the_owner_and_provenance_it_was_recorded_with(): void
+    {
+        [$service, $edges] = $this->service();
+        $service->activate($this->identity(), [
+            'owner' => 'preexisting',
+            'assignment_provenance' => 'preexisting',
+        ]);
+
+        // Re-observing the provider must reuse what is already recorded rather
+        // than deriving provenance again, or FCHub starts believing it created
+        // access that was already there.
+        $result = $service->activateFromProviderObservation($this->identity(), $this->ownership(), true);
+
+        self::assertSame('replayed', $result['action']);
+        $edge = array_values($edges->rows)[0];
+        self::assertSame('preexisting', $edge['owner']);
+        self::assertSame('preexisting', $edge['assignment_provenance']);
+    }
+
+    private static function receipt(): string
+    {
+        return str_repeat('a', 64);
+    }
+
     private function service(): array
     {
         $edges = new class extends EntitlementEdgeRepository {
@@ -779,6 +980,7 @@ final class EntitlementServiceTest extends PluginTestCase
             public array $transactionOutcomes = [];
             public array $resourceLocks = [];
             public array $provenanceTrace = [];
+            public int $extendCalls = 0;
             public bool $traceProvenanceEvidence = false;
             public bool $unsafeAssignmentEvidence = false;
             public bool $throwOnAssignmentEvidence = false;
@@ -855,6 +1057,10 @@ final class EntitlementServiceTest extends PluginTestCase
 
             public function extendActiveExpiryById(int $edgeId, ?string $currentExpiry, string $newExpiry, string $updatedAt): array
             {
+                // Storage repeats the service's own precondition, so several
+                // defects return the same action while still reaching the
+                // write. Counting the calls is what separates them.
+                $this->extendCalls++;
                 foreach ($this->rows as $key => $row) {
                     if ((int) $row['id'] !== $edgeId || $row['lifecycle'] !== 'active') {
                         continue;
@@ -974,9 +1180,12 @@ final class EntitlementServiceTest extends PluginTestCase
         $grants = new class extends GrantRepository {
             public ?array $grant = null;
             public bool $failWrites = false;
+            /** Every aggregate sync starts by reading the grant, so this counts syncs. */
+            public int $lookups = 0;
 
             public function findByGrantKey(string $grantKey): ?array
             {
+                $this->lookups++;
                 return $this->grant;
             }
 
