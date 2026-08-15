@@ -52,6 +52,15 @@ depending on the cookie reaching the server at all.
 `source` is one of `url_param`, `user_meta`, `cookie`, `geo`, `default` — see
 `ResolverSource`.
 
+Every response — this endpoint and `POST /context`, every status — carries
+`Cache-Control: no-store`. The response is resolved per visitor from their
+cookie, account, and query string, so a cached copy would leak one visitor's
+currency to another; a browser or intermediary that ignored this previously
+silently served a stale response back to the reconciliation fetch described
+below (issue #72). Client code calling this endpoint directly should also pass
+`cache: "no-store"` (or equivalent) rather than relying on the header alone —
+see the note in [Guest Currency Reconciliation](#guest-currency-reconciliation).
+
 </Tab>
 <Tab value="POST /context">
 
@@ -66,7 +75,8 @@ Sets the visitor's currency preference. Saves to cookie and user meta (if logged
 ```
 
 **Response:** Same shape as `GET /context`, plus `code` (a stable outcome slug —
-see below), `message`, `currency`, and `persisted`.
+see below), `message`, `currency`, and `persisted`. Also carries
+`Cache-Control: no-store` — see the note on `GET /context`.
 
 A code that isn't 3 letters is rejected by the REST argument schema (400). A well-formed code not in the base/display currencies whitelist returns 422 (`invalid_currency`).
 
@@ -323,6 +333,22 @@ cookie round-tripping through that layer:
    the server independently re-validates it again via the normal resolver
    chain — a stale or tampered localStorage value can't force an unsupported
    currency.
+
+### The reconciliation fetch must never be cache-servable
+
+Step 3's `fetch()` call passes `cache: "no-store"`, and the endpoint responds
+with `Cache-Control: no-store` (see `GET /context` above) — both are load-bearing,
+not defensive nicety. Confirmed live on issue #72: with the header alone but no
+`cache: "no-store"` on the request, once a given `?currency=X` URL had been
+fetched once in a browser profile, the browser served that same response from
+its own HTTP cache on every later reconciliation attempt — status 200, no real
+round trip — even though the endpoint itself was resolving correctly and a
+fresh direct navigation to the same URL always returned the right answer. The
+page kept silently settling back on the stale currency. If you build your own
+client against this endpoint for the same purpose, set `cache: "no-store"` (or
+your HTTP client's equivalent) rather than relying on the response header
+alone — a response already cached from before the header shipped would still
+be reused without it.
 
 <Separator className="my-8" />
 

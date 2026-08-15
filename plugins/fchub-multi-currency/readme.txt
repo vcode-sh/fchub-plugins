@@ -99,6 +99,7 @@ detects the eventual official release as newer instead of treating this build
 as already current.
 
 * Fixed logged-out visitors seeing their currency choice revert to the default on hosts whose edge/WAF layer strips the guest currency cookie on request paths it hasn't whitelisted. The switcher now also mirrors the choice to localStorage, and the storefront script reconciles it against the page's baked-in currency on load, correcting client-side when the cookie never reached the server. This is disabled automatically alongside cookie persistence, so sites that intentionally turned it off for guests are unaffected.
+* Fixed the reconciliation fix above being silently defeated by the browser's own HTTP cache: once a given `?currency=X` URL had been fetched once, the browser could reuse that cached response on later page loads instead of asking the server again, so the page kept settling back on the stale currency. The reconciliation request now sends `cache: "no-store"`, and the public `GET /context` and `POST /context` REST responses now carry `Cache-Control: no-store`, since both responses are resolved per visitor and must never be cached by the browser or an edge/CDN layer.
 * Added price-formatting fields (symbol, decimals, position, separators, disclosure text) to the public `GET /context` REST response.
 
 = 1.4.4 =

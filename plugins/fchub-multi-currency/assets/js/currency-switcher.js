@@ -169,6 +169,7 @@
 
 		return fetch(`${restUrl}/context`, {
 			method: "POST",
+			cache: "no-store",
 			headers: {
 				"Content-Type": "application/json",
 				"X-WP-Nonce": nonce,

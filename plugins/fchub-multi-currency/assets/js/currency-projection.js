@@ -945,6 +945,17 @@
 	 *
 	 * Bounded to 4s so a slow/hung request can't leave the page hidden behind
 	 * the FOUC-prevention class indefinitely.
+	 *
+	 * cache: "no-store" is load-bearing, not a nicety — confirmed live on issue
+	 * #72 (Rocket.net staging): without it, once a given ?currency=X URL had
+	 * been fetched once in a browser profile, the browser silently served that
+	 * same response from its own HTTP cache on every later reconciliation
+	 * attempt instead of re-checking the server, so the page kept settling back
+	 * on the stale currency even though the endpoint itself was resolving
+	 * correctly. The server sends Cache-Control: no-store too (see
+	 * ContextController::noStore()), but a response already sitting in the
+	 * browser's cache from before that shipped would still be reused without
+	 * this — the request has to actually ask.
 	 */
 	function reconcile() {
 		const restUrl = cfg.restUrl || "/wp-json/fchub-mc/v1";
@@ -953,6 +964,7 @@
 		const timeoutId = hasAbortController ? setTimeout(() => controller.abort(), 4000) : null;
 
 		return fetch(`${restUrl}/context?currency=${encodeURIComponent(storedCurrencyAtLoad)}`, {
+			cache: "no-store",
 			headers: { Accept: "application/json" },
 			signal: controller ? controller.signal : undefined,
 		})

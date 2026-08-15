@@ -17,6 +17,9 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 
 // ─── Extracted from currency-projection.js / currency-switcher.js ───
 
@@ -246,5 +249,51 @@ describe("Issue #72: cookie stripped by host edge/WAF layer for a guest", () => 
 
 		// localStorage agrees with the page already — nothing to reconcile.
 		assert.equal(isReconciliationCandidate(cfg, "EUR"), false);
+	});
+});
+
+// ─── Source invariants: reconcile()'s fetch must never be cache-servable ───
+//
+// Confirmed live on issue #72 (Rocket.net staging): every layer resolved the
+// right currency (localStorage held it, GET /context?currency=X returned it,
+// even the app's own fetch() got a 200) but the page still settled back on the
+// stale currency, because the browser silently served the reconciliation
+// fetch from its own HTTP cache once that exact ?currency=X URL had been
+// fetched once — nothing told it not to. cache: "no-store" is what fixes
+// that, and it's a one-word regression a future edit could silently drop
+// without any of the pure-logic tests above ever noticing (they don't touch
+// fetch() at all). Read the real shipped file rather than re-implementing
+// the call, so this actually fails if the source regresses — a hand-mirrored
+// copy of the fetch call would only prove the copy still has it.
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const projectionSource = readFileSync(path.join(here, "..", "..", "assets", "js", "currency-projection.js"), "utf8");
+const switcherSource = readFileSync(path.join(here, "..", "..", "assets", "js", "currency-switcher.js"), "utf8");
+
+describe("Source invariant: currency-projection.js reconcile() fetch is not cacheable", () => {
+	it("reconcile()'s fetch call to /context?currency= sets cache: \"no-store\"", () => {
+		// Anchored on the query string, which only reconcile()'s fetch call
+		// builds — this can't accidentally match the switcher's POST fetch.
+		const match = projectionSource.match(/fetch\(`\$\{restUrl\}\/context\?currency=[^`]*`,\s*\{([^}]*)\}/s);
+
+		assert.ok(match, "could not find reconcile()'s fetch(...) call in currency-projection.js");
+		assert.match(
+			match[1],
+			/cache:\s*["']no-store["']/,
+			'reconcile()\'s fetch options must include cache: "no-store" — see issue #72 (Rocket.net cache regression)',
+		);
+	});
+});
+
+describe("Source invariant: currency-switcher.js POST /context fetch is not cacheable", () => {
+	it('switchCurrency()\'s fetch call sets cache: "no-store"', () => {
+		const match = switcherSource.match(/fetch\(`\$\{restUrl\}\/context`,\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/s);
+
+		assert.ok(match, "could not find switchCurrency()'s fetch(...) call in currency-switcher.js");
+		assert.match(
+			match[1],
+			/cache:\s*["']no-store["']/,
+			'switchCurrency()\'s fetch options must include cache: "no-store", for consistency with the server\'s Cache-Control: no-store on this same endpoint',
+		);
 	});
 });

@@ -930,6 +930,7 @@ if (!class_exists('WP_REST_Response')) {
     {
         private $data;
         private int $status;
+        private array $headers = [];
 
         public function __construct($data = null, int $status = 200)
         {
@@ -945,6 +946,23 @@ if (!class_exists('WP_REST_Response')) {
         public function get_status(): int
         {
             return $this->status;
+        }
+
+        // Mirrors WP_HTTP_Response::header(), which the real WP_REST_Response
+        // inherits: $replace = true overwrites any existing value for $key,
+        // false appends with a comma per RFC 7230.
+        public function header(string $key, string $value, bool $replace = true): void
+        {
+            if ($replace || !isset($this->headers[$key])) {
+                $this->headers[$key] = $value;
+            } else {
+                $this->headers[$key] .= ', ' . $value;
+            }
+        }
+
+        public function get_headers(): array
+        {
+            return $this->headers;
         }
     }
 }

@@ -371,4 +371,53 @@ final class ContextControllerTest extends TestCase
 
         unset($_COOKIE['fchub_mc_currency'], $_GET['currency']);
     }
+
+    /**
+     * Confirmed live on issue #72 (Rocket.net staging): every layer resolved the
+     * right currency — localStorage held it, this endpoint returned it — but the
+     * page still settled back on the stale currency, because nothing told the
+     * browser this response was visitor-specific, so it silently served a cached
+     * copy of GET /context?currency=X on later requests to the same URL. The
+     * response varies per visitor (cookie, account, query string), so every
+     * response from this controller — both endpoints, every status — must carry
+     * Cache-Control: no-store. See ContextController::noStore().
+     */
+    #[Test]
+    public function testGetResponseIsNeverCacheable(): void
+    {
+        $this->setOption('fchub_mc_settings', ['base_currency' => 'USD']);
+        $this->setWpdbMockRow(null);
+
+        $response = (new ContextController())->get(new \WP_REST_Request('GET', '/'));
+
+        $this->assertSame('no-store', $response->get_headers()['Cache-Control'] ?? null);
+    }
+
+    #[Test]
+    public function testSetSuccessResponseIsNeverCacheable(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency'      => 'USD',
+            'display_currencies' => [['code' => 'EUR']],
+        ]);
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params(['currency' => 'EUR']);
+
+        $response = (new ContextController())->set($request);
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame('no-store', $response->get_headers()['Cache-Control'] ?? null);
+    }
+
+    #[Test]
+    #[DataProvider('outcomeCodeProvider')]
+    public function testEveryOutcomeIsNeverCacheable(callable $buildRequest, int $expectedStatus): void
+    {
+        $request = $buildRequest($this);
+
+        $response = (new ContextController())->set($request);
+
+        $this->assertSame($expectedStatus, $response->get_status());
+        $this->assertSame('no-store', $response->get_headers()['Cache-Control'] ?? null);
+    }
 }

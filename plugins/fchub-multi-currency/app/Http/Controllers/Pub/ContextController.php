@@ -42,6 +42,10 @@ final class ContextController
      * makes this endpoint usable as a client-side reconciliation source when a page
      * was served with a stale cached/cookie-less currency context. See
      * currency-projection.js's reconcile().
+     *
+     * The response varies per visitor (cookie, account, query string), so it must
+     * never be cached — by the browser, by an edge/CDN layer, or by anything in
+     * between. See self::noStore().
      */
     public function get(\WP_REST_Request $request): \WP_REST_Response
     {
@@ -54,7 +58,7 @@ final class ContextController
         $context = $contextService->resolve();
         $pricing = FrontendModule::buildPricingConfig($context, $optionStore);
 
-        return new \WP_REST_Response([
+        return self::noStore(new \WP_REST_Response([
             'data' => [
                 'display_currency'           => $context->displayCurrency->code,
                 'display_currency_name'      => $pricing['displayCurrencyName'],
@@ -70,7 +74,7 @@ final class ContextController
                 'disclosure_enabled'         => $pricing['disclosureEnabled'],
                 'disclosure_text'            => $pricing['disclosureText'],
             ],
-        ]);
+        ]));
     }
 
     public function set(\WP_REST_Request $request): \WP_REST_Response
@@ -189,14 +193,14 @@ final class ContextController
             'source' => 'rest',
         ]);
 
-        return new \WP_REST_Response([
+        return self::noStore(new \WP_REST_Response([
             'data' => [
                 'code'      => self::CODE_SAVED,
                 'message'   => __('Currency preference saved.', 'fchub-multi-currency'),
                 'currency'  => $currencyCode,
                 'persisted' => true,
             ],
-        ]);
+        ]));
     }
 
     /**
@@ -204,7 +208,7 @@ final class ContextController
      */
     private static function failure(string $code, string $message, int $status, array $extra = []): \WP_REST_Response
     {
-        return new \WP_REST_Response([
+        return self::noStore(new \WP_REST_Response([
             'data' => array_merge(
                 [
                     'code'    => $code,
@@ -212,6 +216,24 @@ final class ContextController
                 ],
                 $extra,
             ),
-        ], $status);
+        ], $status));
+    }
+
+    /**
+     * Marks a response as never cacheable. Every response this controller returns
+     * (GET and POST, success and failure) is visitor-specific — resolved from the
+     * request's cookie, logged-in account, and query string — so a cached copy
+     * would serve one visitor's currency to another. This is what a bug on
+     * screenplayunlimited.com/Rocket.net turned out to be: the browser silently
+     * served a stale GET /context?currency=X response from its own HTTP cache once
+     * that exact URL had been fetched once, because nothing told it not to (issue
+     * #72). Applied unconditionally here rather than left to hosts/CDNs to get
+     * right, since the failure mode is silent and visitor-specific to reproduce.
+     */
+    private static function noStore(\WP_REST_Response $response): \WP_REST_Response
+    {
+        $response->header('Cache-Control', 'no-store');
+
+        return $response;
     }
 }
