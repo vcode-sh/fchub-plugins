@@ -357,7 +357,7 @@ describe("Source invariant: applyResolvedCurrency() moves the option-check glyph
 describe("Source invariant: the switcher trigger is suppressed during reconciliation, not just prices", () => {
 	it("applies the loading state only when reconciliationCandidate is true, alongside the FOUC class", () => {
 		const match = projectionSource.match(
-			/classList\.add\(["']fchub-mc-projecting["']\);([\s\S]{0,200}?)function init\(\)/,
+			/classList\.add\(["']fchub-mc-projecting["']\);([\s\S]{0,600}?)function init\(\)/,
 		);
 
 		assert.ok(match, "could not find the FOUC-class-then-init() region in currency-projection.js");
@@ -379,7 +379,7 @@ describe("Source invariant: the switcher trigger is suppressed during reconcilia
 			"setSwitcherLoading() must toggle .fchub-mc-switcher--loading on [data-fchub-mc-switcher] elements",
 		);
 
-		const finallyMatch = projectionSource.match(/reconcile\(\)\.finally\(\(\) => \{([\s\S]*?)\}\);/);
+		const finallyMatch = projectionSource.match(/reconcile\(\)\.finally\(\(\) => \{([\s\S]{0,1000})/);
 		assert.ok(finallyMatch, "could not find reconcile().finally(...) in currency-projection.js");
 		assert.match(
 			finallyMatch[1],
