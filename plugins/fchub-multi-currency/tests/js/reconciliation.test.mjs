@@ -340,6 +340,55 @@ describe("Source invariant: applyResolvedCurrency() moves the option-check glyph
 	});
 });
 
+// ─── Source invariant: the switcher trigger stays neutral during a ───
+// ─── reconciliation candidate window, not just prices ───────────────
+//
+// Confirmed live (issue #72): prices are correctly hidden behind
+// .fchub-mc-projecting while a reconciliation is in flight, but the
+// switcher's own trigger label is server-rendered with whatever currency the
+// page was served with — exactly the value in question — and was displaying
+// it, uncorrected, for the whole multi-second window until reconcile()
+// settled. Fixed by reusing the exact dimmed/non-interactive state
+// currency-switcher.js already applies the moment a visitor picks a new
+// currency (.fchub-mc-switcher--loading), applied only when there's an
+// actual mismatch to investigate (reconciliationCandidate), not on every
+// page load that merely needs price conversion.
+
+describe("Source invariant: the switcher trigger is suppressed during reconciliation, not just prices", () => {
+	it("applies the loading state only when reconciliationCandidate is true, alongside the FOUC class", () => {
+		const match = projectionSource.match(
+			/classList\.add\(["']fchub-mc-projecting["']\);([\s\S]{0,200}?)function init\(\)/,
+		);
+
+		assert.ok(match, "could not find the FOUC-class-then-init() region in currency-projection.js");
+		assert.match(
+			match[1],
+			/if\s*\(reconciliationCandidate\)\s*\{\s*setSwitcherLoading\(true\)/,
+			"the switcher trigger must be marked loading in the same synchronous pass that hides prices, gated on reconciliationCandidate — not unconditionally, since a page that only needs price conversion never has the wrong currency in the trigger",
+		);
+	});
+
+	it("clears the loading state once reconcile() settles, targeting the trigger via [data-fchub-mc-switcher]", () => {
+		const setterMatch = projectionSource.match(
+			/function setSwitcherLoading\(isLoading\) \{([\s\S]*?)\n\t\}/,
+		);
+		assert.ok(setterMatch, "could not find setSwitcherLoading(...) in currency-projection.js");
+		assert.match(
+			setterMatch[1],
+			/data-fchub-mc-switcher\]["']\)[\s\S]*?fchub-mc-switcher--loading/,
+			"setSwitcherLoading() must toggle .fchub-mc-switcher--loading on [data-fchub-mc-switcher] elements",
+		);
+
+		const finallyMatch = projectionSource.match(/reconcile\(\)\.finally\(\(\) => \{([\s\S]*?)\}\);/);
+		assert.ok(finallyMatch, "could not find reconcile().finally(...) in currency-projection.js");
+		assert.match(
+			finallyMatch[1],
+			/setSwitcherLoading\(false\)/,
+			"reconcile()'s finally() must clear the switcher loading state once it settles (success, no-op, or failure) — otherwise the trigger stays dimmed forever",
+		);
+	});
+});
+
 // ─── Source invariants: reconcile()'s timeout and the CSS FOUC fallback ───
 //
 // Confirmed live on a Rocket.net staging tier (issue #72): reconcile()'s fetch

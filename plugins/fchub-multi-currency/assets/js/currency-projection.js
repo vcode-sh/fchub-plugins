@@ -1029,8 +1029,28 @@
 			});
 	}
 
+	/**
+	 * Keeps the switcher's own trigger label out of the picture while a
+	 * reconciliation is in flight, reusing the exact dimmed/non-interactive
+	 * state currency-switcher.js already applies the moment a visitor picks a
+	 * new currency (.fchub-mc-switcher--loading). Without this, prices stay
+	 * correctly hidden behind .fchub-mc-projecting during this window, but the
+	 * trigger — server-rendered with whatever currency the page was served
+	 * with, which is exactly what's in question — displays it anyway until
+	 * reconcile() settles and corrects it, showing the visitor a currency they
+	 * never chose.
+	 */
+	function setSwitcherLoading(isLoading) {
+		document.querySelectorAll("[data-fchub-mc-switcher]").forEach((el) => {
+			el.classList.toggle("fchub-mc-switcher--loading", isLoading);
+		});
+	}
+
 	// Add FOUC prevention class immediately
 	document.documentElement.classList.add("fchub-mc-projecting");
+	if (reconciliationCandidate) {
+		setSwitcherLoading(true);
+	}
 
 	function init() {
 		if (!reconciliationCandidate) {
@@ -1040,10 +1060,19 @@
 			return;
 		}
 
-		// Keep the page hidden behind .fchub-mc-projecting until reconciliation
-		// settles, so a mismatched guest never sees a flash of the wrong currency
-		// before it's corrected.
+		// Keep the page hidden behind .fchub-mc-projecting — and the switcher's
+		// trigger label dimmed via setSwitcherLoading(true) above — until
+		// reconciliation settles, so a mismatched guest never sees a flash of
+		// the wrong currency, in prices or in the switcher itself, before it's
+		// corrected.
 		reconcile().finally(() => {
+			// fchubMcSyncSwitcherDisplay() (called from within reconcile()'s own
+			// success path, before this finally() runs) has already updated the
+			// trigger's content by this point if reconciliation found a change —
+			// lifting the loading state here reveals that corrected label, not
+			// the stale one. On failure/timeout it reveals the original
+			// server-rendered value, same as it always has.
+			setSwitcherLoading(false);
 			projectPrices();
 			observeDynamicUpdates();
 			listenForFluentCartEvents();
