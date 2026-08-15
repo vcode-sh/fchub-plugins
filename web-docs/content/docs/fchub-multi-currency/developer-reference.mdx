@@ -19,31 +19,38 @@ All endpoints use the `fchub-mc/v1` namespace. Admin endpoints require `manage_o
 <Tabs items={['GET /context', 'POST /context', 'GET /rates']}>
 <Tab value="GET /context">
 
-Returns the current resolved currency context.
+Returns the current resolved currency context, including the price-formatting
+metadata a client needs to fully re-render prices (not just the code and rate).
+
+Reads `?currency=` from the query string with top priority in the resolver
+chain — ahead of the cookie, and ahead of a signed-in visitor's saved account
+preference. This makes the endpoint usable for client-side reconciliation:
+`currency-projection.js` calls `GET /context?currency=<code>` to re-resolve a
+saved localStorage preference on hosts that strip the guest cookie, without
+depending on the cookie reaching the server at all.
 
 **Response:**
 
 ```json
 {
-  "display_currency": {
-    "code": "EUR",
-    "name": "Euro",
-    "symbol": "€",
-    "decimals": 2,
-    "position": "right_space"
-  },
-  "base_currency": {
-    "code": "USD",
-    "name": "US Dollar",
-    "symbol": "$",
-    "decimals": 2,
-    "position": "left"
-  },
+  "display_currency": "EUR",
+  "display_currency_name": "Euro",
+  "base_currency": "USD",
   "rate": "0.92140000",
   "source": "cookie",
-  "is_base_display": false
+  "is_base_display": false,
+  "symbol": "€",
+  "decimals": 2,
+  "position": "right_space",
+  "display_decimal_separator": ".",
+  "display_thousand_separator": ",",
+  "disclosure_enabled": true,
+  "disclosure_text": "Prices shown in EUR are approximate. You will be charged in USD."
 }
 ```
+
+`source` is one of `url_param`, `user_meta`, `cookie`, `geo`, `default` — see
+`ResolverSource`.
 
 </Tab>
 <Tab value="POST /context">
@@ -58,9 +65,10 @@ Sets the visitor's currency preference. Saves to cookie and user meta (if logged
 }
 ```
 
-**Response:** Same as `GET /context` with the newly set currency.
+**Response:** Same shape as `GET /context`, plus `code` (a stable outcome slug —
+see below), `message`, `currency`, and `persisted`.
 
-The currency code is validated against the display currencies whitelist. Invalid codes return 400.
+A code that isn't 3 letters is rejected by the REST argument schema (400). A well-formed code not in the base/display currencies whitelist returns 422 (`invalid_currency`).
 
 </Tab>
 <Tab value="GET /rates">
@@ -188,14 +196,21 @@ window.fchubMcInitSwitchers();
 
 // Re-project prices on a specific DOM subtree
 window.fchubMcProjectPrices(document.getElementById('my-container'));
+
+// Update every switcher widget's visible "selected" state to a currency code,
+// without a REST call or page reload. Used internally by currency-projection.js
+// after client-side reconciliation (see below); rarely needed directly.
+window.fchubMcSyncSwitcherDisplay('EUR');
 ```
 
 ### JavaScript Events
 
 | Event | Target | Description |
 |---|---|---|
-| `fchub_mc:context_changed` | `document` | Fired before page reload after currency switch |
+| `fchub_mc:context_changed` | `window` | Fired before page reload after currency switch |
+| `fchub_mc:context_switch_failed` | `window` | Fired when a currency switch is rejected server-side (module disabled, nothing to persist, invalid currency, rate limited). `detail: { currency, message, status, code }` |
 | `fchub_mc:prices_projected` | `document` | Fired after each projection pass |
+| `fchub_mc:context_reconciled` | `window` | Fired after `currency-projection.js` corrects a page served with a stale currency context — see [Guest Currency Reconciliation](#guest-currency-reconciliation) below. `detail: { currency, source }` |
 
 <Separator className="my-8" />
 
@@ -247,11 +262,13 @@ The `fchubMcConfig` object is injected via `wp_localize_script` and available gl
 |---|---|---|
 | `rate` | string | Current exchange rate |
 | `displayCurrency` | string | Display currency code |
+| `displayCurrencyName` | string | Display currency name |
 | `baseCurrency` | string | Base currency code |
 | `decimals` | int | Display currency decimal places |
 | `symbol` | string | Display currency symbol |
 | `position` | string | Symbol position (`left`, `right`, `left_space`, `right_space`) |
 | `isBaseDisplay` | bool | Whether display equals base |
+| `source` | string | How the display currency was resolved: `url_param`, `user_meta`, `cookie`, `geo`, or `default` — see `ResolverSource` |
 | `roundingMode` | string | Rounding mode slug |
 | `roundingPrecision` | int | Rounding precision |
 | `restUrl` | string | REST API base URL |
@@ -263,8 +280,49 @@ The `fchubMcConfig` object is injected via `wp_localize_script` and available gl
 | `baseDecimalSep` | string | Base currency decimal separator |
 | `baseThousandSep` | string | Base currency thousand separator |
 | `baseDecimals` | int | Base currency decimal places |
+| `displayDecSep` | string | Display currency decimal separator |
+| `displayThousandSep` | string | Display currency thousand separator |
 | `disclosureEnabled` | bool | Whether checkout disclosure is active |
 | `disclosureText` | string\|null | Rendered disclosure text with tokens replaced |
+| `guestLocalStorageEnabled` | bool | Whether the guest localStorage fallback is active — mirrors `cookie_enabled`. See [Guest Currency Reconciliation](#guest-currency-reconciliation). |
+
+<Separator className="my-8" />
+
+## Guest Currency Reconciliation
+
+Some hosts run an edge/WAF layer that strips cookies by default on any URL path
+that hasn't been explicitly whitelisted, scoped per-path rather than sitewide.
+On such hosts, a logged-out visitor's `fchub_mc_currency` cookie never reaches
+WordPress on an ordinary page load, so the resolver chain falls through past
+`CookieResolver` to geolocation or the store default — even though the browser
+still has the cookie and the visitor never changed their mind. Signed-in
+visitors are unaffected: their preference lives in user meta, a second,
+independent channel `UserMetaResolver` resolves ahead of the cookie.
+
+As of 1.4.5, the plugin adds a client-side fallback that doesn't depend on the
+cookie round-tripping through that layer:
+
+1. `currency-switcher.js` mirrors a guest's choice into `localStorage`
+   (`fchub_mc_currency`) in addition to the existing cookie/REST persistence,
+   gated on `guestLocalStorageEnabled` (mirrors the `cookie_enabled` setting —
+   a site that disabled guest persistence outright doesn't get it back through
+   a side door).
+2. `currency-projection.js` compares that localStorage value against the page's
+   baked-in `displayCurrency` on load. It only acts when the page's `source` is
+   `cookie`, `geo`, or `default` — never `url_param` or `user_meta`, so an
+   explicit link or a signed-in visitor's saved preference is never
+   second-guessed by a stale local value.
+3. If they disagree, it fetches `GET {restUrl}/context?currency=<code>` — which
+   resolves via the URL query string, not the cookie — reassigns the mutable
+   projection state in place, clears and re-runs price projection, and calls
+   `window.fchubMcSyncSwitcherDisplay()` so the switcher widget's own display
+   catches up too. `fchub_mc:context_reconciled` fires on `window` afterwards.
+4. The localStorage value is validated against the base currency and enabled
+   display currencies baked into the page (mirroring
+   `AllowedCurrencyCheck::isAllowedCurrency()`) before it's ever trusted, and
+   the server independently re-validates it again via the normal resolver
+   chain — a stale or tampered localStorage value can't force an unsupported
+   currency.
 
 <Separator className="my-8" />
 

@@ -11,6 +11,32 @@
 	const nonce = config.nonce || "";
 	const flagBaseUrl = config.flagBaseUrl || "";
 
+	// Mirrors the cookie name (Constants::COOKIE_KEY) — same preference, a second
+	// transport. See STORAGE_KEY in currency-projection.js, which reads this back
+	// and validates it before trusting it.
+	const STORAGE_KEY = "fchub_mc_currency";
+
+	/**
+	 * Mirrors a guest's currency choice into localStorage, in addition to the
+	 * cookie/REST persistence the server already did. Gated on
+	 * guestLocalStorageEnabled (== cookie_enabled) so a site owner who disabled
+	 * guest persistence outright doesn't get it back through the side door.
+	 *
+	 * This exists because some hosts strip cookies on request paths their
+	 * edge/WAF layer hasn't whitelisted (see issue #72): the browser still has
+	 * the cookie, but the server never sees it on a normal page load, so guests
+	 * appear to have their currency reset. localStorage isn't subject to that —
+	 * currency-projection.js reconciles against it on page load.
+	 */
+	function persistToLocalStorage(currencyCode) {
+		if (!config.guestLocalStorageEnabled) return;
+		try {
+			window.localStorage.setItem(STORAGE_KEY, currencyCode);
+		} catch {
+			// Unavailable (private browsing, disabled, quota) — cookie/REST persistence still applies.
+		}
+	}
+
 	const currencyFlagMap = {
 		USD: "us", EUR: "eu", GBP: "gb", JPY: "jp", CHF: "ch", CAD: "ca",
 		AUD: "au", NZD: "nz", SEK: "se", NOK: "no", DKK: "dk", PLN: "pl",
@@ -169,6 +195,8 @@
 					);
 					return;
 				}
+
+				persistToLocalStorage(currencyCode);
 
 				window.dispatchEvent(
 					new CustomEvent("fchub_mc:context_changed", {
@@ -575,6 +603,68 @@
 		});
 	}
 
+	/**
+	 * Updates every switcher widget's visible "selected" state (trigger display,
+	 * aria-selected option, active button) to the given currency code — without
+	 * calling switchCurrency() (no REST call, no reload).
+	 *
+	 * Called by currency-projection.js after it reconciles a stale cached/cookie-less
+	 * page context against a saved localStorage preference, so the switcher's own
+	 * display doesn't keep showing the currency the page was served with.
+	 */
+	function applyResolvedCurrency(currencyCode) {
+		const code = (currencyCode || "").toUpperCase();
+		if (!code) return;
+
+		document.querySelectorAll("[data-fchub-mc-switcher]").forEach((root) => {
+			const trigger = root.querySelector("[data-fchub-mc-trigger]");
+			const dropdown = root.querySelector("[data-fchub-mc-dropdown]");
+			const listbox = dropdown ? dropdown.querySelector("[role='listbox']") : null;
+			if (!trigger || !listbox) return;
+
+			const target = [...listbox.querySelectorAll("[role='option']")].find(
+				(option) => (option.dataset.value || "").toUpperCase() === code,
+			);
+			if (!target) return;
+
+			const currentActive = listbox.querySelector(".fchub-mc-switcher__option--active");
+			if (currentActive && currentActive !== target) {
+				currentActive.classList.remove("fchub-mc-switcher__option--active");
+				currentActive.setAttribute("aria-selected", "false");
+			}
+			target.classList.add("fchub-mc-switcher__option--active");
+			target.setAttribute("aria-selected", "true");
+
+			const triggerFlag = trigger.querySelector(".fchub-mc-switcher__flag");
+			const triggerCode = trigger.querySelector(".fchub-mc-switcher__code");
+			const triggerSymbol = trigger.querySelector(".fchub-mc-switcher__symbol");
+			const triggerName = trigger.querySelector(".fchub-mc-switcher__name");
+			const optionCode = target.querySelector(".fchub-mc-switcher__option-code");
+			const optionSymbol = target.querySelector(".fchub-mc-switcher__option-symbol");
+			const optionName = target.querySelector(".fchub-mc-switcher__option-name");
+
+			if (triggerFlag) {
+				const flagImg = buildFlagImg(code);
+				if (flagImg) {
+					triggerFlag.textContent = "";
+					triggerFlag.appendChild(flagImg);
+				} else {
+					const optionFlag = target.querySelector(".fchub-mc-switcher__flag");
+					if (optionFlag) triggerFlag.innerHTML = optionFlag.innerHTML;
+				}
+			}
+			if (triggerCode && optionCode) triggerCode.textContent = optionCode.textContent;
+			if (triggerSymbol && optionSymbol) triggerSymbol.textContent = optionSymbol.textContent;
+			if (triggerName && optionName) triggerName.textContent = optionName.textContent;
+		});
+
+		document.querySelectorAll("[data-fchub-mc-button-switcher]").forEach((root) => {
+			root.querySelectorAll("[data-value]").forEach((button) => {
+				button.classList.toggle("is-active", (button.dataset.value || "").toUpperCase() === code);
+			});
+		});
+	}
+
 	if (document.readyState === "loading") {
 		document.addEventListener("DOMContentLoaded", initAll);
 	} else {
@@ -583,4 +673,5 @@
 
 	window.fchubMcSwitchCurrency = switchCurrency;
 	window.fchubMcInitSwitchers = initAll;
+	window.fchubMcSyncSwitcherDisplay = applyResolvedCurrency;
 })();

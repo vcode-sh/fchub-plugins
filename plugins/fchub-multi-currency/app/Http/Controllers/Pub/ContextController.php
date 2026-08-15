@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Http\Controllers\Pub;
 
 use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
+use FChubMultiCurrency\Bootstrap\Modules\FrontendModule;
 use FChubMultiCurrency\Domain\Actions\PersistContextAction;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Storage\OptionStore;
@@ -30,6 +31,18 @@ final class ContextController
     public const CODE_INVALID_CURRENCY = 'invalid_currency';
     public const CODE_PERSISTENCE_UNAVAILABLE = 'persistence_unavailable';
 
+    /**
+     * Resolves the currency context for this request and returns it, along with the
+     * price-formatting metadata (symbol, decimals, separators, disclosure text) a
+     * client needs to fully re-render prices — not just the bare code and rate.
+     *
+     * Because UrlParamResolver reads `$_GET` directly with top priority in the
+     * resolver chain (see ContextModule::buildResolverChain), a request such as
+     * `GET /context?currency=EUR` resolves to EUR regardless of any cookie — which
+     * makes this endpoint usable as a client-side reconciliation source when a page
+     * was served with a stale cached/cookie-less currency context. See
+     * currency-projection.js's reconcile().
+     */
     public function get(\WP_REST_Request $request): \WP_REST_Response
     {
         $optionStore = new OptionStore();
@@ -39,14 +52,23 @@ final class ContextController
         );
 
         $context = $contextService->resolve();
+        $pricing = FrontendModule::buildPricingConfig($context, $optionStore);
 
         return new \WP_REST_Response([
             'data' => [
-                'display_currency' => $context->displayCurrency->code,
-                'base_currency'    => $context->baseCurrency->code,
-                'rate'             => $context->rate->rate,
-                'source'           => $context->source->value,
-                'is_base_display'  => $context->isBaseDisplay,
+                'display_currency'           => $context->displayCurrency->code,
+                'display_currency_name'      => $pricing['displayCurrencyName'],
+                'base_currency'              => $context->baseCurrency->code,
+                'rate'                       => $context->rate->rate,
+                'source'                     => $context->source->value,
+                'is_base_display'            => $context->isBaseDisplay,
+                'symbol'                     => $pricing['symbol'],
+                'decimals'                   => $pricing['decimals'],
+                'position'                   => $pricing['position'],
+                'display_decimal_separator'  => $pricing['displayDecSep'],
+                'display_thousand_separator' => $pricing['displayThousandSep'],
+                'disclosure_enabled'         => $pricing['disclosureEnabled'],
+                'disclosure_text'            => $pricing['disclosureText'],
             ],
         ]);
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Tests\Unit\Http\Controllers\Pub;
 
+use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Http\Controllers\Pub\ContextController;
 use FChubMultiCurrency\Tests\Support\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -11,6 +12,15 @@ use PHPUnit\Framework\Attributes\Test;
 
 final class ContextControllerTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // get() resolves through the resolver chain (set() does not) — reset the
+        // static cache so an earlier test file's settings can't leak in here.
+        ContextModule::resetChain();
+    }
+
     #[Test]
     public function testSetReturnsBadRequestForInvalidJsonPayload(): void
     {
@@ -249,5 +259,116 @@ final class ContextControllerTest extends TestCase
         $codes = array_column(self::outcomeCodeProvider(), 2);
 
         $this->assertSame($codes, array_unique($codes), 'Two outcomes share a code, so clients cannot tell them apart.');
+    }
+
+    /**
+     * GET /context carries the full price-formatting metadata (symbol, decimals,
+     * position, separators, disclosure) — not just the code and rate — so a
+     * client-side reconciliation fetch (currency-projection.js's reconcile(), for
+     * issue #72) can fully re-render prices from this response alone.
+     */
+    #[Test]
+    public function testGetReturnsFullPricingMetadataForTheResolvedCurrency(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency'      => 'USD',
+            'display_currencies' => [
+                ['code' => 'EUR', 'name' => 'Euro', 'symbol' => '€', 'decimals' => 2, 'position' => 'right_space'],
+            ],
+        ]);
+        $this->setWpdbMockRow([
+            'base_currency'  => 'USD',
+            'quote_currency' => 'EUR',
+            'rate'           => '0.92000000',
+            'provider'       => 'manual',
+            'fetched_at'     => current_time('mysql'),
+        ]);
+        $_COOKIE['fchub_mc_currency'] = 'EUR';
+
+        $response = (new ContextController())->get(new \WP_REST_Request('GET', '/'));
+        $data = $response->get_data()['data'];
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame('EUR', $data['display_currency']);
+        $this->assertSame('Euro', $data['display_currency_name']);
+        $this->assertSame('USD', $data['base_currency']);
+        $this->assertSame('cookie', $data['source']);
+        $this->assertFalse($data['is_base_display']);
+        $this->assertSame('€', $data['symbol']);
+        $this->assertSame(2, $data['decimals']);
+        $this->assertSame('right_space', $data['position']);
+        $this->assertArrayHasKey('display_decimal_separator', $data);
+        $this->assertArrayHasKey('display_thousand_separator', $data);
+        $this->assertArrayHasKey('disclosure_enabled', $data);
+        $this->assertArrayHasKey('disclosure_text', $data);
+
+        unset($_COOKIE['fchub_mc_currency']);
+    }
+
+    /**
+     * UrlParamResolver already reads $_GET directly with top priority in the
+     * resolver chain, ahead of the cookie — so GET /context?currency=EUR resolves
+     * to EUR regardless of any cookie. This is what makes the endpoint usable for
+     * client-side reconciliation: it isn't dependent on the cookie round-tripping
+     * through a host's caching/WAF layer.
+     */
+    #[Test]
+    public function testGetHonoursUrlParamOverCookieForReconciliation(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency'      => 'USD',
+            'display_currencies' => [
+                ['code' => 'EUR', 'name' => 'Euro', 'symbol' => '€', 'decimals' => 2, 'position' => 'left'],
+                ['code' => 'GBP', 'name' => 'British Pound', 'symbol' => '£', 'decimals' => 2, 'position' => 'left'],
+            ],
+        ]);
+        $this->setWpdbMockRow([
+            'base_currency'  => 'USD',
+            'quote_currency' => 'GBP',
+            'rate'           => '0.79000000',
+            'provider'       => 'manual',
+            'fetched_at'     => current_time('mysql'),
+        ]);
+        $_COOKIE['fchub_mc_currency'] = 'EUR';
+        $_GET['currency'] = 'GBP';
+
+        $response = (new ContextController())->get(new \WP_REST_Request('GET', '/'));
+        $data = $response->get_data()['data'];
+
+        $this->assertSame('GBP', $data['display_currency']);
+        $this->assertSame('url_param', $data['source']);
+
+        unset($_COOKIE['fchub_mc_currency'], $_GET['currency']);
+    }
+
+    #[Test]
+    public function testGetIgnoresDisallowedUrlParamCurrencyAndFallsThroughToCookie(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency'      => 'USD',
+            'display_currencies' => [
+                ['code' => 'EUR', 'name' => 'Euro', 'symbol' => '€', 'decimals' => 2, 'position' => 'left'],
+            ],
+        ]);
+        $this->setWpdbMockRow([
+            'base_currency'  => 'USD',
+            'quote_currency' => 'EUR',
+            'rate'           => '0.92000000',
+            'provider'       => 'manual',
+            'fetched_at'     => current_time('mysql'),
+        ]);
+        $_COOKIE['fchub_mc_currency'] = 'EUR';
+        // Not in display_currencies — AllowedCurrencyCheck must reject it server-side
+        // even though a client would already have filtered it against its own copy
+        // of the currency list before ever making this request.
+        $_GET['currency'] = 'JPY';
+
+        $response = (new ContextController())->get(new \WP_REST_Request('GET', '/'));
+        $data = $response->get_data()['data'];
+
+        $this->assertSame('EUR', $data['display_currency']);
+        $this->assertSame('cookie', $data['source']);
+
+        unset($_COOKIE['fchub_mc_currency'], $_GET['currency']);
     }
 }

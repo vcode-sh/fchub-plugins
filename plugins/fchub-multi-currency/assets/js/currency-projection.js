@@ -15,34 +15,110 @@
  * Handles dynamic content (cart updates, checkout fragments) via MutationObserver
  * and FluentCart custom events.
  *
- * Fires: fchub_mc:prices_projected (after each projection pass)
+ * Also reconciles the page's baked-in currency context against a currency the
+ * visitor previously saved to localStorage (see currency-switcher.js). This
+ * covers hosts whose edge/WAF layer strips the guest currency cookie on request
+ * paths it hasn't whitelisted (issue #72): the server then resolves the page to
+ * the default currency even though the visitor picked something else. Since
+ * REST paths on such hosts are typically exempted, reconciliation fetches
+ * GET {restUrl}/context?currency=<code> — which resolves via the URL query
+ * string, not the cookie — and re-projects with the corrected context.
+ *
+ * Fires: fchub_mc:prices_projected (after each projection pass),
+ *        fchub_mc:context_reconciled (after a successful reconciliation)
  */
 (() => {
 	const cfg = window.fchubMcConfig || {};
-	const rate = parseFloat(cfg.rate || "1");
 
-	// Bail out if no conversion needed
-	if (!cfg.displayCurrency || !cfg.baseCurrency) return;
-	if (cfg.isBaseDisplay) return;
-	if (cfg.displayCurrency === cfg.baseCurrency) return;
-	if (!rate || !Number.isFinite(rate) || rate === 1) return;
+	// Mirrors the cookie name (Constants::COOKIE_KEY) — see currency-switcher.js,
+	// which writes this after a successful guest switch.
+	const STORAGE_KEY = "fchub_mc_currency";
 
-	// Display currency config
-	const decimals = Math.max(0, Math.min(20, parseInt(cfg.decimals, 10) || 2));
-	const symbol = cfg.symbol || cfg.displayCurrency;
-	const position = cfg.position || "left";
+	// Source values ContextModule's resolver chain never places below a cookie:
+	// an explicit ?currency= link (url_param) or a signed-in visitor's saved
+	// account preference (user_meta). A localStorage value must never
+	// second-guess either — only the sources a stripped cookie could have
+	// caused the page to fall through to.
+	const RECONCILABLE_SOURCES = ["cookie", "geo", "default"];
+
+	// Mutable projection parameters — reassigned in place by reconcile() below if
+	// it finds the cached/baked-in context stale. Every function in this file
+	// that formats or converts a price closes over these bindings by reference,
+	// so reassigning them here is enough to make a later re-projection pass use
+	// the corrected values without threading state through every function.
+	let rate = parseFloat(cfg.rate || "1");
+	let decimals = Math.max(0, Math.min(20, parseInt(cfg.decimals, 10) || 2));
+	let symbol = cfg.symbol || cfg.displayCurrency;
+	let position = cfg.position || "left";
+	let displayCode = cfg.displayCurrency;
+	let isBaseDisplay = !!cfg.isBaseDisplay;
+	let displayDecSep = cfg.displayDecSep || ".";
+	let displayThousandSep = cfg.displayThousandSep || ",";
+
+	// Site-wide settings — unaffected by which currency ends up resolved.
 	const roundingMode = cfg.roundingMode || "half_up";
-	const displayCode = cfg.displayCurrency;
 	const baseCode = cfg.baseCurrencyCode || cfg.baseCurrency;
 
-	// Base currency parsing config
+	// Base currency parsing config — describes how prices are already written in
+	// the server-rendered HTML, so this never changes on reconciliation either.
 	const baseSign = cfg.baseCurrencySign || "$";
 	const baseDecSep = cfg.baseDecimalSep || ".";
 	const baseThousandSep = cfg.baseThousandSep || ",";
 
-	// Display currency formatting config (for output)
-	const displayDecSep = cfg.displayDecSep || ".";
-	const displayThousandSep = cfg.displayThousandSep || ",";
+	/**
+	 * Whether the current (possibly reconciled) state calls for price conversion.
+	 */
+	function needsProjection() {
+		return !!(
+			cfg.baseCurrency &&
+			displayCode &&
+			!isBaseDisplay &&
+			displayCode !== cfg.baseCurrency &&
+			rate &&
+			Number.isFinite(rate) &&
+			rate !== 1
+		);
+	}
+
+	/**
+	 * Mirrors AllowedCurrencyCheck::isAllowedCurrency() server-side: a value read
+	 * back from localStorage is untrusted input until checked against the base
+	 * currency and the enabled display currencies baked into this page load.
+	 */
+	function isAllowedCurrencyCode(code) {
+		if (!code) return false;
+		if (code === (cfg.baseCurrency || "").toUpperCase()) return true;
+		const currencies = Array.isArray(cfg.currencies) ? cfg.currencies : [];
+		return currencies.some(
+			(currency) => currency && typeof currency === "object" && (currency.code || "").toUpperCase() === code,
+		);
+	}
+
+	function readStoredCurrency() {
+		if (!cfg.guestLocalStorageEnabled) return null;
+		try {
+			const stored = window.localStorage.getItem(STORAGE_KEY);
+			if (!stored) return null;
+			const code = stored.toUpperCase();
+			return isAllowedCurrencyCode(code) ? code : null;
+		} catch {
+			return null;
+		}
+	}
+
+	// Computed once up front, before the bail-out below, so a guest whose saved
+	// currency disagrees with this (possibly stale) page load isn't skipped by
+	// the "nothing to project" fast path.
+	const storedCurrencyAtLoad = readStoredCurrency();
+	const reconciliationCandidate =
+		!!storedCurrencyAtLoad &&
+		storedCurrencyAtLoad !== cfg.displayCurrency &&
+		RECONCILABLE_SOURCES.indexOf(cfg.source || "") !== -1;
+
+	// Bail out entirely if there's nothing to do — no conversion needed on the
+	// page as served, and no reason to suspect that's wrong. Preserves the
+	// original zero-cost fast path for genuinely single-currency stores.
+	if (!needsProjection() && !reconciliationCandidate) return;
 
 	// Flag to suppress MutationObserver during our own DOM changes
 	let projecting = false;
@@ -451,6 +527,12 @@
 	 * Placed after checkout order summary and inside cart drawer.
 	 */
 	function injectDisclosures() {
+		// Cleared and re-injected on every call (cheap — a handful of small divs)
+		// rather than skipped-if-present, so a reconciled context (which may change
+		// disclosureEnabled/disclosureText, since the template can embed the display
+		// currency and rate — see CheckoutDisclosureService) doesn't leave stale text.
+		document.querySelectorAll(`[${DISCLOSURE_ATTR}]`).forEach((el) => el.remove());
+
 		if (cfg.disclosureEnabled === false) return;
 		const text =
 			cfg.disclosureText ||
@@ -466,7 +548,6 @@
 
 		const injectAfter = (anchor, extraClass) => {
 			if (!anchor || !anchor.parentNode) return;
-			if (anchor.parentNode.querySelector(`[${DISCLOSURE_ATTR}]`)) return;
 			try {
 				anchor.insertAdjacentElement("afterend", makeNotice(extraClass));
 			} catch {
@@ -706,6 +787,18 @@
 	 * Main projection: find all price elements and convert them.
 	 */
 	function projectPrices(root) {
+		if (!needsProjection()) {
+			// Reached when reconciliation (see below) concluded the visitor is
+			// actually in the base currency after all. Any previously-projected
+			// elements were already restored by the clearProjectionMarkers() call
+			// that precedes reconciliation's re-projection, so there's nothing to
+			// convert here — just clean up anything currency-dependent and reveal
+			// the page.
+			injectDisclosures();
+			document.documentElement.classList.remove("fchub-mc-projecting");
+			return 0;
+		}
+
 		root = root || document;
 		projecting = true;
 
@@ -843,14 +936,89 @@
 		window.addEventListener("fchub_mc:context_changed", () => reproject(100));
 	}
 
+	/**
+	 * Re-resolves the currency context via the REST API for the localStorage
+	 * currency found at load, and applies it in place if the server actually
+	 * agrees it differs from what the page was served with. A network failure,
+	 * timeout, or a server response that turns out to match the page already
+	 * leaves the mutable projection state untouched.
+	 *
+	 * Bounded to 4s so a slow/hung request can't leave the page hidden behind
+	 * the FOUC-prevention class indefinitely.
+	 */
+	function reconcile() {
+		const restUrl = cfg.restUrl || "/wp-json/fchub-mc/v1";
+		const hasAbortController = typeof AbortController !== "undefined";
+		const controller = hasAbortController ? new AbortController() : null;
+		const timeoutId = hasAbortController ? setTimeout(() => controller.abort(), 4000) : null;
+
+		return fetch(`${restUrl}/context?currency=${encodeURIComponent(storedCurrencyAtLoad)}`, {
+			headers: { Accept: "application/json" },
+			signal: controller ? controller.signal : undefined,
+		})
+			.then((response) => (response.ok ? response.json() : null))
+			.then((payload) => {
+				const data = payload && typeof payload === "object" ? payload.data : null;
+				if (!data || !data.display_currency) return false;
+
+				// The server may itself decline the stored value (e.g. it was removed
+				// from the currency list since it was saved) and resolve to whatever
+				// the rest of the chain lands on — only apply it if it's actually
+				// different from what's already on the page.
+				if (data.display_currency === displayCode && !!data.is_base_display === isBaseDisplay) {
+					return false;
+				}
+
+				rate = parseFloat(data.rate || "1");
+				decimals = Math.max(0, Math.min(20, parseInt(data.decimals, 10) || 2));
+				symbol = data.symbol || data.display_currency;
+				position = data.position || "left";
+				displayCode = data.display_currency;
+				isBaseDisplay = !!data.is_base_display;
+				displayDecSep = data.display_decimal_separator || ".";
+				displayThousandSep = data.display_thousand_separator || ",";
+				cfg.disclosureEnabled = !!data.disclosure_enabled;
+				cfg.disclosureText = data.disclosure_text || null;
+
+				clearProjectionMarkers();
+
+				if (typeof window.fchubMcSyncSwitcherDisplay === "function") {
+					window.fchubMcSyncSwitcherDisplay(data.display_currency);
+				}
+
+				window.dispatchEvent(
+					new CustomEvent("fchub_mc:context_reconciled", {
+						detail: { currency: data.display_currency, source: data.source || "" },
+					}),
+				);
+
+				return true;
+			})
+			.catch(() => false)
+			.finally(() => {
+				if (timeoutId) clearTimeout(timeoutId);
+			});
+	}
+
 	// Add FOUC prevention class immediately
 	document.documentElement.classList.add("fchub-mc-projecting");
 
-	// Initial projection
 	function init() {
-		projectPrices();
-		observeDynamicUpdates();
-		listenForFluentCartEvents();
+		if (!reconciliationCandidate) {
+			projectPrices();
+			observeDynamicUpdates();
+			listenForFluentCartEvents();
+			return;
+		}
+
+		// Keep the page hidden behind .fchub-mc-projecting until reconciliation
+		// settles, so a mismatched guest never sees a flash of the wrong currency
+		// before it's corrected.
+		reconcile().finally(() => {
+			projectPrices();
+			observeDynamicUpdates();
+			listenForFluentCartEvents();
+		});
 	}
 
 	if (document.readyState === "loading") {

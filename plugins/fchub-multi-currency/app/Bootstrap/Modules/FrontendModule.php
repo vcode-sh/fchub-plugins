@@ -7,6 +7,7 @@ namespace FChubMultiCurrency\Bootstrap\Modules;
 use FChubMultiCurrency\Bootstrap\ModuleContract;
 use FChubMultiCurrency\Domain\Services\CheckoutDisclosureService;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
+use FChubMultiCurrency\Domain\ValueObjects\CurrencyContext;
 use FChubMultiCurrency\Frontend\CurrencySwitcherRenderer;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Constants;
@@ -83,31 +84,56 @@ final class FrontendModule implements ModuleContract
         $fcSettings = CurrencySettings::get();
         $isCommaDecimal = self::shopUsesCommaDecimal($fcSettings);
 
-        $config = [
-            'rate'                  => $context->rate->rateAsFloat(),
-            'displayCurrency'       => $context->displayCurrency->code,
-            'displayCurrencyName'   => $context->displayCurrency->name,
-            'baseCurrency'          => $context->baseCurrency->code,
-            'decimals'              => $context->displayCurrency->decimals,
-            'symbol'                => html_entity_decode($context->displayCurrency->symbol, ENT_QUOTES, 'UTF-8'),
-            'position'              => $context->displayCurrency->position->value,
-            'isBaseDisplay'         => $context->isBaseDisplay,
-            'roundingMode'          => $optionStore->get('rounding_mode', 'half_up'),
-            'restUrl'               => rest_url(Constants::REST_NAMESPACE),
-            'nonce'                 => wp_create_nonce('wp_rest'),
-            'currencies'            => $optionStore->get('display_currencies', []),
-            'flagBaseUrl'           => FCHUB_MC_URL . 'assets/flags/4x3/',
-            'baseCurrencySign'      => html_entity_decode($fcSettings['currency_sign'] ?? '$', ENT_QUOTES, 'UTF-8'),
-            'baseCurrencyPosition'  => $fcSettings['currency_position'] ?? 'before',
-            'baseCurrencyCode'      => $fcSettings['currency'] ?? 'USD',
-            'baseDecimalSep'        => $isCommaDecimal ? ',' : '.',
-            'baseThousandSep'       => $isCommaDecimal ? '.' : ',',
-            'baseDecimals'          => ($fcSettings['is_zero_decimal'] ?? false) ? 0 : 2,
-            'displayDecSep'         => self::resolveDisplaySep($context, $optionStore, 'decimal_separator', match ($context->displayCurrency->position->value) {
+        return array_merge(self::buildPricingConfig($context, $optionStore), [
+            'roundingMode'             => $optionStore->get('rounding_mode', 'half_up'),
+            'restUrl'                  => rest_url(Constants::REST_NAMESPACE),
+            'nonce'                    => wp_create_nonce('wp_rest'),
+            'currencies'               => $optionStore->get('display_currencies', []),
+            'flagBaseUrl'              => FCHUB_MC_URL . 'assets/flags/4x3/',
+            'baseCurrencySign'         => html_entity_decode($fcSettings['currency_sign'] ?? '$', ENT_QUOTES, 'UTF-8'),
+            'baseCurrencyPosition'     => $fcSettings['currency_position'] ?? 'before',
+            'baseCurrencyCode'         => $fcSettings['currency'] ?? 'USD',
+            'baseDecimalSep'           => $isCommaDecimal ? ',' : '.',
+            'baseThousandSep'          => $isCommaDecimal ? '.' : ',',
+            'baseDecimals'             => ($fcSettings['is_zero_decimal'] ?? false) ? 0 : 2,
+            // Whether a guest's currency choice may additionally be mirrored to
+            // localStorage on the client, and reconciled against it on load. Tied to
+            // cookie_enabled: if the site owner disabled guest persistence outright,
+            // localStorage must not become a silent back door around that choice.
+            // See PublicRoutes GET /context and currency-projection.js reconcile().
+            'guestLocalStorageEnabled' => $optionStore->get('cookie_enabled', 'yes') === 'yes',
+        ]);
+    }
+
+    /**
+     * The subset of the frontend config that depends on which CurrencyContext was
+     * resolved (as opposed to site-wide settings like restUrl or the base currency's
+     * parsing config). Shared with ContextController::get() so a client-side
+     * reconciliation fetch of GET /context receives the same shape of data it would
+     * have gotten from the localized page config, just for a different currency.
+     *
+     * @return array<string, mixed>
+     */
+    public static function buildPricingConfig(CurrencyContext $context, OptionStore $optionStore): array
+    {
+        $disclosureService = new CheckoutDisclosureService($optionStore);
+        $disclosure = $disclosureService->getDisclosure($context);
+
+        return [
+            'rate'                => $context->rate->rateAsFloat(),
+            'displayCurrency'     => $context->displayCurrency->code,
+            'displayCurrencyName' => $context->displayCurrency->name,
+            'baseCurrency'        => $context->baseCurrency->code,
+            'decimals'            => $context->displayCurrency->decimals,
+            'symbol'              => html_entity_decode($context->displayCurrency->symbol, ENT_QUOTES, 'UTF-8'),
+            'position'            => $context->displayCurrency->position->value,
+            'isBaseDisplay'       => $context->isBaseDisplay,
+            'source'              => $context->source->value,
+            'displayDecSep'       => self::resolveDisplaySep($context, $optionStore, 'decimal_separator', match ($context->displayCurrency->position->value) {
                 'right', 'right_space' => ',',
                 default                => '.',
             }),
-            'displayThousandSep'    => self::resolveDisplaySep(
+            'displayThousandSep'  => self::resolveDisplaySep(
                 $context,
                 $optionStore,
                 'thousand_separator',
@@ -116,14 +142,9 @@ final class FrontendModule implements ModuleContract
                     default                => ',',
                 },
             ),
+            'disclosureEnabled'   => $disclosure !== null,
+            'disclosureText'      => $disclosure,
         ];
-
-        $disclosureService = new CheckoutDisclosureService($optionStore);
-        $disclosure = $disclosureService->getDisclosure($context);
-        $config['disclosureEnabled'] = $disclosure !== null;
-        $config['disclosureText'] = $disclosure;
-
-        return $config;
     }
 
     /**
@@ -144,7 +165,7 @@ final class FrontendModule implements ModuleContract
     }
 
     private static function resolveDisplaySep(
-        \FChubMultiCurrency\Domain\ValueObjects\CurrencyContext $context,
+        CurrencyContext $context,
         OptionStore $optionStore,
         string $field,
         string $fallback,
