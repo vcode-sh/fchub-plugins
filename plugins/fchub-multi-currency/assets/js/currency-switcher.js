@@ -636,6 +636,21 @@
 			target.classList.add("fchub-mc-switcher__option--active");
 			target.setAttribute("aria-selected", "true");
 
+			// The visible checkmark (CurrencySwitcherRenderer's
+			// show_active_indicator) is a separate glyph baked into each
+			// option's own .fchub-mc-switcher__option-check span at render
+			// time — it isn't driven by the --active class or aria-selected
+			// above, so it has to be moved explicitly or the dropdown keeps
+			// showing whichever currency the page was served with as
+			// "checked" even after the trigger label and prices have both
+			// already updated correctly.
+			if (currentActive && currentActive !== target) {
+				const previousCheck = currentActive.querySelector(".fchub-mc-switcher__option-check");
+				if (previousCheck) previousCheck.textContent = "";
+			}
+			const targetCheck = target.querySelector(".fchub-mc-switcher__option-check");
+			if (targetCheck) targetCheck.textContent = "✓";
+
 			const triggerFlag = trigger.querySelector(".fchub-mc-switcher__flag");
 			const triggerCode = trigger.querySelector(".fchub-mc-switcher__code");
 			const triggerSymbol = trigger.querySelector(".fchub-mc-switcher__symbol");

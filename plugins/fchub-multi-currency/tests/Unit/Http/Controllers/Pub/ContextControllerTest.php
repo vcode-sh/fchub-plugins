@@ -420,4 +420,59 @@ final class ContextControllerTest extends TestCase
         $this->assertSame($expectedStatus, $response->get_status());
         $this->assertSame('no-store', $response->get_headers()['Cache-Control'] ?? null);
     }
+
+    /**
+     * Temporary diagnostic instrumentation for issue #72 (see Support\Profiler).
+     * Gated behind an explicit opt-in query param so ordinary traffic — and every
+     * other test in this file that doesn't set it — never sees a `_profile` key.
+     */
+    #[Test]
+    public function testGetOmitsProfileByDefault(): void
+    {
+        $this->setOption('fchub_mc_settings', ['base_currency' => 'USD']);
+        $this->setWpdbMockRow(null);
+
+        $response = (new ContextController())->get(new \WP_REST_Request('GET', '/'));
+
+        $this->assertArrayNotHasKey('_profile', $response->get_data()['data']);
+    }
+
+    #[Test]
+    public function testGetIncludesTimingBreakdownWhenDebugTimingRequested(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency'      => 'USD',
+            'display_currencies' => [['code' => 'EUR', 'name' => 'Euro', 'symbol' => '€']],
+        ]);
+        $this->setWpdbMockRow([
+            'base_currency'  => 'USD',
+            'quote_currency' => 'EUR',
+            'rate'           => '0.92000000',
+            'provider'       => 'manual',
+            'fetched_at'     => current_time('mysql'),
+        ]);
+        $_COOKIE['fchub_mc_currency'] = 'EUR';
+
+        $request = new \WP_REST_Request('GET', '/');
+        $request->set_param('_debug_timing', '1');
+
+        $response = (new ContextController())->get($request);
+        $data = $response->get_data()['data'];
+
+        $this->assertArrayHasKey('_profile', $data);
+        $labels = array_column($data['_profile'], 'label');
+
+        // The controller-level stages always appear...
+        $this->assertContains('get_start', $labels);
+        $this->assertContains('chain_built', $labels);
+        $this->assertContains('context_resolved', $labels);
+        $this->assertContains('pricing_built', $labels);
+        // ...and since EUR != base here, the rate lookup actually runs, so its
+        // marks must appear too — this is the specific breakdown issue #72 needs
+        // (cache hit/miss vs. DB fallback), not just total round-trip time.
+        $this->assertContains('rate_lookup_start', $labels);
+        $this->assertContains('rate_db_query_done', $labels);
+
+        unset($_COOKIE['fchub_mc_currency']);
+    }
 }

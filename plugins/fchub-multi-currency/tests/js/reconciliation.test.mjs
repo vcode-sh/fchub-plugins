@@ -299,6 +299,47 @@ describe("Source invariant: currency-switcher.js POST /context fetch is not cach
 	});
 });
 
+// ─── Source invariant: applyResolvedCurrency() moves the dropdown's ───
+// ─── checkmark glyph, not just the trigger label and --active class ───
+//
+// Confirmed live (issue #72): after reconciliation corrects a stale-cached
+// page, the switcher's trigger label and the projected prices both correctly
+// show the reconciled currency, but opening the dropdown still shows the
+// *stale* currency as checked. Root cause: CurrencySwitcherRenderer bakes the
+// visible checkmark into each option's own .fchub-mc-switcher__option-check
+// span as static content at render time (see show_active_indicator) — it
+// isn't driven by the --active class or aria-selected, so moving those two
+// alone (which applyResolvedCurrency already did) leaves the actual glyph
+// behind on whichever option the page was served with as active.
+
+describe("Source invariant: applyResolvedCurrency() moves the option-check glyph", () => {
+	const match = switcherSource.match(
+		/function applyResolvedCurrency\(currencyCode\) \{([\s\S]*?)\n\tif \(document\.readyState/,
+	);
+
+	it("could find applyResolvedCurrency()'s body in currency-switcher.js", () => {
+		assert.ok(match, "could not find applyResolvedCurrency(...) in currency-switcher.js");
+	});
+
+	const body = match ? match[1] : "";
+
+	it("clears the outgoing active option's checkmark", () => {
+		assert.match(
+			body,
+			/option-check["']\)[\s\S]{0,80}?\.textContent\s*=\s*["']["']/,
+			"applyResolvedCurrency() must clear the previous active option's .fchub-mc-switcher__option-check content, or the stale currency keeps showing as checked",
+		);
+	});
+
+	it("sets the incoming target option's checkmark", () => {
+		assert.match(
+			body,
+			/option-check["']\)[\s\S]{0,80}?\.textContent\s*=\s*["'][^"']+["']/,
+			"applyResolvedCurrency() must set the target option's .fchub-mc-switcher__option-check content to the checkmark glyph",
+		);
+	});
+});
+
 // ─── Source invariants: reconcile()'s timeout and the CSS FOUC fallback ───
 //
 // Confirmed live on a Rocket.net staging tier (issue #72): reconcile()'s fetch
