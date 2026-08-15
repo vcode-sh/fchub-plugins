@@ -73,10 +73,10 @@
 	// it was aborted. 12s clears that observed worst case with real headroom for
 	// queuing to compound further under heavier load, while staying short enough
 	// that a visitor isn't waiting a long time for a client-side correction to a
-	// cached page. currency-switcher.css's fchub-mc-fouc-fallback animation-delay
-	// must stay comfortably longer than this value — it exists to guarantee the
-	// page never hides content forever if JS itself is what's broken, not to
-	// race this timeout, so it must never win that race under normal operation.
+	// cached page. Note this bounds the network wait only — prices and the
+	// switcher trigger are both shown immediately (dimmed) rather than hidden
+	// for this whole duration; see .fchub-mc-reconciling in
+	// currency-switcher.css and the reconciliation branch of init() below.
 	const RECONCILE_TIMEOUT_MS = 12000;
 
 	// Mutable projection parameters — reassigned in place by reconcile() below if
@@ -1177,14 +1177,15 @@
 	if (reconciliationCandidate) {
 		setSwitcherLoading(true);
 		// Show the visitor's own choice immediately — not the page's possibly-
-		// stale server-rendered value. Prices stay hidden behind
-		// .fchub-mc-projecting until reconcile() actually confirms the
-		// rate/decimals/symbol needed to convert them, but the switcher itself
-		// must never show anything other than what the visitor actually
-		// picked, for the entire wait (issue #72 UX requirement — the
-		// dimmed-but-stale-text approach this replaced still showed a
-		// currency the visitor didn't choose, just faded).
+		// stale server-rendered value — and keep showing it for the entire
+		// wait (issue #72 UX requirement).
 		syncTriggerToCode(storedCurrencyAtLoad);
+		// Dim prices instead of hiding them for the same reason: a continuous,
+		// dimmed "old" price the visitor can still see reads as "in progress";
+		// several seconds of blank space reads as broken or finished, when
+		// reconciliation has actually just started. See the CSS comment on
+		// .fchub-mc-reconciling.
+		document.documentElement.classList.add("fchub-mc-reconciling");
 		debugLog("switcher_loading_applied", {
 			triggerCodeAtThisPoint: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
 		});
@@ -1201,11 +1202,24 @@
 
 		debugLog("init_reconciliation_branch");
 
-		// Keep the page hidden behind .fchub-mc-projecting — and the switcher's
-		// trigger label dimmed via setSwitcherLoading(true) above — until
-		// reconciliation settles, so a mismatched guest never sees a flash of
-		// the wrong currency, in prices or in the switcher itself, before it's
-		// corrected.
+		// Project immediately with whatever (possibly stale) values the page
+		// was served with — dimmed via .fchub-mc-reconciling above — rather
+		// than leaving prices unprojected and hidden for the whole wait.
+		// reconcile() below then swaps this out for the corrected currency:
+		// if it finds a genuine change, clearProjectionMarkers() (in its own
+		// .then(), above) and this projectPrices() call happen back to back
+		// in the same synchronous pass once it settles, so the visible
+		// transition is one atomic swap from old-dimmed to new-normal, never
+		// an intermediate raw or blank flash. If it finds no change (or
+		// fails/times out), these same already-correct prices are simply
+		// left in place and un-dimmed.
+		projectPrices();
+		observeDynamicUpdates();
+		listenForFluentCartEvents();
+		debugLog("initial_stale_projection_done", {
+			projectedCount: document.querySelectorAll("[data-fchub-mc-projected]").length,
+		});
+
 		reconcile().finally(() => {
 			// fchubMcSyncSwitcherDisplay() (called from within reconcile()'s own
 			// success path, before this finally() runs) has already updated the
@@ -1217,9 +1231,8 @@
 				triggerCodeAtThisPoint: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
 			});
 			setSwitcherLoading(false);
+			document.documentElement.classList.remove("fchub-mc-reconciling");
 			projectPrices();
-			observeDynamicUpdates();
-			listenForFluentCartEvents();
 			debugLog("init_reconciliation_branch_complete", {
 				triggerCodeFinal: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
 			});

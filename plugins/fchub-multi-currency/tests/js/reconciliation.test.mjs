@@ -448,6 +448,68 @@ describe("Source invariant: the trigger syncs to the visitor's choice immediatel
 	});
 });
 
+// ─── Source invariant: prices are dimmed, not hidden, during a ───────
+// ─── reconciliation — no blank gap in the middle of the wait ─────────
+//
+// Confirmed by the site owner watching it directly on production (issue
+// #72): prices going from the old values to fully blank the moment the page
+// finishes reloading, staying blank for the whole multi-second wait, then
+// appearing, reads as "finished" partway through a wait that has actually
+// just started. Wanted instead: no blank state — old prices stay visible,
+// dimmed the same way the switcher trigger already is, swapping directly to
+// the new values in one atomic transition once reconciliation completes.
+
+describe("Source invariant: prices dim during reconciliation instead of going blank", () => {
+	it("projects prices immediately in the reconciliation branch, not deferred until reconcile() settles", () => {
+		const match = projectionSource.match(/debugLog\("init_reconciliation_branch"\);([\s\S]{0,1100}?)reconcile\(\)\.finally/);
+		assert.ok(match, "could not find the reconciliation branch of init() in currency-projection.js");
+		assert.match(
+			match[1],
+			/\bprojectPrices\(\)/,
+			"projectPrices() must run immediately in the reconciliation branch (using whatever possibly-stale values the page was served with) rather than waiting for reconcile() to settle — otherwise prices have nothing to show and stay hidden for the whole wait",
+		);
+	});
+
+	it("applies .fchub-mc-reconciling (dimming) rather than relying on .fchub-mc-projecting (hiding) for the reconciliation wait", () => {
+		const match = projectionSource.match(
+			/if\s*\(reconciliationCandidate\)\s*\{([\s\S]{0,900}?)\n\t\}/,
+		);
+		assert.ok(match, "could not find the `if (reconciliationCandidate) { ... }` block in currency-projection.js");
+		assert.match(
+			match[1],
+			/classList\.add\(["']fchub-mc-reconciling["']\)/,
+			"the reconciliation-pending state must add a dedicated .fchub-mc-reconciling class for CSS to dim prices with — distinct from .fchub-mc-projecting, which hides them and is still needed for the plain (non-reconciliation) FOUC-prevention path",
+		);
+	});
+
+	it("clears .fchub-mc-reconciling once reconcile() settles, immediately before the final projectPrices() pass", () => {
+		const finallyMatch = projectionSource.match(/reconcile\(\)\.finally\(\(\) => \{([\s\S]{0,1000})/);
+		assert.ok(finallyMatch, "could not find reconcile().finally(...) in currency-projection.js");
+		assert.match(
+			finallyMatch[1],
+			/classList\.remove\(["']fchub-mc-reconciling["']\)[\s\S]*?projectPrices\(\)/,
+			"finally() must remove .fchub-mc-reconciling and then call projectPrices() in the same synchronous pass, so the visible change is one atomic swap from dimmed-old to normal-new, not two separately-painted steps",
+		);
+	});
+
+	it("CSS dims price elements during reconciliation (opacity), it does not hide them (visibility)", () => {
+		// Anchored on the selector actually being styled (not just the class
+		// name, which also appears in prose comments elsewhere in the file).
+		const match = switcherCssSource.match(/\.fchub-mc-reconciling \.fct-item-price[\s\S]*?\{([\s\S]*?)\}/);
+		assert.ok(match, "could not find a .fchub-mc-reconciling rule in currency-switcher.css");
+		assert.doesNotMatch(
+			match[1],
+			/visibility\s*:\s*hidden/,
+			".fchub-mc-reconciling must not hide price elements — that's exactly the blank-gap behavior this fix replaces",
+		);
+		assert.match(
+			match[1],
+			/opacity\s*:\s*0\.\d+/,
+			".fchub-mc-reconciling must dim price elements via opacity, matching the switcher trigger's own .fchub-mc-switcher--loading treatment",
+		);
+	});
+});
+
 // ─── Source invariants: reconcile()'s timeout and the CSS FOUC fallback ───
 //
 // Confirmed live on a Rocket.net staging tier (issue #72): reconcile()'s fetch
