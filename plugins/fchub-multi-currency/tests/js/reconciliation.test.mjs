@@ -357,7 +357,7 @@ describe("Source invariant: applyResolvedCurrency() moves the option-check glyph
 describe("Source invariant: the switcher trigger is suppressed during reconciliation, not just prices", () => {
 	it("applies the loading state only when reconciliationCandidate is true, alongside the FOUC class", () => {
 		const match = projectionSource.match(
-			/classList\.add\(["']fchub-mc-projecting["']\);([\s\S]{0,600}?)function init\(\)/,
+			/classList\.add\(["']fchub-mc-projecting["']\);([\s\S]{0,2000}?)function init\(\)/,
 		);
 
 		assert.ok(match, "could not find the FOUC-class-then-init() region in currency-projection.js");
@@ -385,6 +385,65 @@ describe("Source invariant: the switcher trigger is suppressed during reconcilia
 			finallyMatch[1],
 			/setSwitcherLoading\(false\)/,
 			"reconcile()'s finally() must clear the switcher loading state once it settles (success, no-op, or failure) — otherwise the trigger stays dimmed forever",
+		);
+	});
+});
+
+// ─── Source invariant: the trigger shows the visitor's own choice — ───
+// ─── never a stale value — for the entire reconciliation wait ─────────
+//
+// Confirmed live via the sessionStorage trace on production (issue #72):
+// setSwitcherLoading(true) correctly dimmed the trigger immediately, but its
+// TEXT stayed the page's stale server-rendered value (e.g. "AUD") for the
+// whole ~5.6s wait, only flipping to the correct value ("CHF") the instant
+// reconcile() finally resolved. A dimmed-but-wrong value is still a wrong
+// value on screen. Per the site owner's explicit, non-negotiable spec: the
+// trigger must show the visitor's own localStorage choice immediately and
+// throughout, never the stale cfg value and never blank — only prices (which
+// are genuinely invalid until reconciled) may be hidden during this window.
+
+describe("Source invariant: the trigger syncs to the visitor's choice immediately, not just prices", () => {
+	it("syncs the trigger to storedCurrencyAtLoad in the same synchronous pass that applies the loading state", () => {
+		const match = projectionSource.match(
+			/if\s*\(reconciliationCandidate\)\s*\{([\s\S]{0,900}?)\n\t\}/,
+		);
+		assert.ok(match, "could not find the `if (reconciliationCandidate) { ... }` block in currency-projection.js");
+		assert.match(
+			match[1],
+			/setSwitcherLoading\(true\)[\s\S]*?syncTriggerToCode\(storedCurrencyAtLoad\)/,
+			"the trigger must be synced to storedCurrencyAtLoad (the visitor's own choice) immediately when the loading state is applied — not left showing the stale cfg-baked value until reconcile() resolves",
+		);
+	});
+
+	it("syncTriggerToCode() does not depend on currency-switcher.js having executed yet", () => {
+		// Confirmed live: script tag order on this site prints
+		// currency-projection.js before currency-switcher.js, both
+		// synchronous — window.fchubMcSyncSwitcherDisplay is not reliably
+		// defined at the point syncTriggerToCode() must run. It has to be
+		// self-contained.
+		const match = projectionSource.match(/function syncTriggerToCode\(code\) \{([\s\S]*?)\n\t\}/);
+		assert.ok(match, "could not find syncTriggerToCode(...) in currency-projection.js");
+		assert.doesNotMatch(
+			match[1],
+			/fchubMcSyncSwitcherDisplay/,
+			"syncTriggerToCode() must not depend on window.fchubMcSyncSwitcherDisplay — that global isn't reliably defined this early given this site's actual script order",
+		);
+		assert.match(
+			match[1],
+			/data-fchub-mc-switcher\]["']\)/,
+			"syncTriggerToCode() must locate the trigger itself via [data-fchub-mc-switcher], not rely on another script having already found it",
+		);
+	});
+
+	it("reverts the optimistic sync if the server confirms the original page value was correct after all", () => {
+		const match = projectionSource.match(
+			/data\.display_currency === displayCode[\s\S]{0,1200}?return false;/,
+		);
+		assert.ok(match, "could not find the 'server agrees, no change' branch in currency-projection.js");
+		assert.match(
+			match[0],
+			/data\.display_currency\s*!==\s*storedCurrencyAtLoad[\s\S]*?fchubMcSyncSwitcherDisplay/,
+			"when the server confirms the page's original value was right all along, and that differs from the optimistic localStorage guess already shown, the trigger must be corrected back — the visitor's guess must never silently win over what the server actually says",
 		);
 	});
 });

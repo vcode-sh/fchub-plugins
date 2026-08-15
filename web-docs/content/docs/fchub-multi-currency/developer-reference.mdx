@@ -321,12 +321,23 @@ cookie round-tripping through that layer:
    baked-in `displayCurrency` on load. It only acts when the page's `source` is
    `cookie`, `geo`, or `default` — never `url_param` or `user_meta`, so an
    explicit link or a signed-in visitor's saved preference is never
-   second-guessed by a stale local value.
-3. If they disagree, it fetches `GET {restUrl}/context?currency=<code>` — which
+   second-guessed by a stale local value. The same symptom this also covers a
+   full-page/edge cache (Cloudflare, Rocket.net's own edge tier, etc.) serving
+   a shared, anonymous-visitor snapshot of the page — the visitor's cookie
+   never gets stripped in that case, it's simply irrelevant to what HTML the
+   cache returns, since the request never reaches WordPress/PHP at all.
+3. If they disagree, the switcher's trigger is immediately synced to the
+   localStorage value — the visitor's own choice, not the page's stale
+   baked-in one — and dimmed/non-interactive (`fchub-mc-switcher--loading`)
+   for the duration; only prices, genuinely invalid until reconciled, are
+   hidden. It then fetches `GET {restUrl}/context?currency=<code>` — which
    resolves via the URL query string, not the cookie — reassigns the mutable
    projection state in place, clears and re-runs price projection, and calls
-   `window.fchubMcSyncSwitcherDisplay()` so the switcher widget's own display
-   catches up too. `fchub_mc:context_reconciled` fires on `window` afterwards.
+   `window.fchubMcSyncSwitcherDisplay()` again to reflect whatever the server
+   actually confirmed (normally the same value already shown; if the server
+   disagrees with the visitor's saved choice — rare — this corrects the
+   trigger to match the server instead). `fchub_mc:context_reconciled` fires
+   on `window` afterwards.
 4. The localStorage value is validated against the base currency and enabled
    display currencies baked into the page (mirroring
    `AllowedCurrencyCheck::isAllowedCurrency()`) before it's ever trusted, and

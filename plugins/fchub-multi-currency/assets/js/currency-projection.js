@@ -1043,13 +1043,25 @@
 
 				// The server may itself decline the stored value (e.g. it was removed
 				// from the currency list since it was saved) and resolve to whatever
-				// the rest of the chain lands on — only apply it if it's actually
-				// different from what's already on the page.
+				// the rest of the chain lands on — only apply it as a price-projection
+				// change if it's actually different from what's already on the page.
 				if (data.display_currency === displayCode && !!data.is_base_display === isBaseDisplay) {
 					debugLog("reconcile_server_agrees_no_change", {
 						serverDisplayCurrency: data.display_currency,
 						serverSource: data.source,
 					});
+
+					// The server just confirmed the page's original (stale-looking)
+					// value was actually correct — rare, but means the trigger's
+					// optimistic sync to the visitor's localStorage guess (see
+					// syncTriggerToCode() above) was wrong. The visitor's guess never
+					// gets to silently win over what the server actually says: correct
+					// the trigger back. No price-projection state changes here since
+					// displayCode/rate/etc. were already right.
+					if (data.display_currency !== storedCurrencyAtLoad && typeof window.fchubMcSyncSwitcherDisplay === "function") {
+						window.fchubMcSyncSwitcherDisplay(data.display_currency);
+					}
+
 					return false;
 				}
 
@@ -1103,12 +1115,7 @@
 	 * Keeps the switcher's own trigger label out of the picture while a
 	 * reconciliation is in flight, reusing the exact dimmed/non-interactive
 	 * state currency-switcher.js already applies the moment a visitor picks a
-	 * new currency (.fchub-mc-switcher--loading). Without this, prices stay
-	 * correctly hidden behind .fchub-mc-projecting during this window, but the
-	 * trigger — server-rendered with whatever currency the page was served
-	 * with, which is exactly what's in question — displays it anyway until
-	 * reconcile() settles and corrects it, showing the visitor a currency they
-	 * never chose.
+	 * new currency (.fchub-mc-switcher--loading).
 	 */
 	function setSwitcherLoading(isLoading) {
 		document.querySelectorAll("[data-fchub-mc-switcher]").forEach((el) => {
@@ -1116,10 +1123,68 @@
 		});
 	}
 
+	/**
+	 * Updates the trigger's visible flag/code/symbol/name to a given currency
+	 * code, copying from that currency's own already-rendered dropdown option
+	 * (server-escaped, correctly formatted) — the same technique
+	 * currency-switcher.js's applyResolvedCurrency() uses for its fallback
+	 * flag path. Duplicated here rather than calling
+	 * window.fchubMcSyncSwitcherDisplay because currency-switcher.js has not
+	 * necessarily executed yet at the point this needs to run: on this site,
+	 * script tag order prints currency-projection.js before
+	 * currency-switcher.js, both synchronous, so that global isn't reliably
+	 * defined this early — confirmed live, not assumed. The trigger is
+	 * non-interactive (pointer-events: none) for the whole window this runs
+	 * in, so the dropdown's own active-option/checkmark state — which
+	 * applyResolvedCurrency() also updates — is never visible during this
+	 * window and doesn't need duplicating here.
+	 *
+	 * Required so the switcher always shows the visitor's own choice, never
+	 * the page's possibly-stale server-rendered value, for the entire
+	 * reconciliation wait — not just once reconcile() eventually resolves
+	 * (issue #72).
+	 */
+	function syncTriggerToCode(code) {
+		document.querySelectorAll("[data-fchub-mc-switcher]").forEach((root) => {
+			const trigger = root.querySelector("[data-fchub-mc-trigger]");
+			const dropdown = root.querySelector("[data-fchub-mc-dropdown]");
+			const listbox = dropdown ? dropdown.querySelector("[role='listbox']") : null;
+			if (!trigger || !listbox) return;
+
+			const target = [...listbox.querySelectorAll("[role='option']")].find(
+				(option) => (option.dataset.value || "").toUpperCase() === code,
+			);
+			if (!target) return;
+
+			const triggerFlag = trigger.querySelector(".fchub-mc-switcher__flag");
+			const triggerCode = trigger.querySelector(".fchub-mc-switcher__code");
+			const triggerSymbol = trigger.querySelector(".fchub-mc-switcher__symbol");
+			const triggerName = trigger.querySelector(".fchub-mc-switcher__name");
+			const optionFlag = target.querySelector(".fchub-mc-switcher__flag");
+			const optionCode = target.querySelector(".fchub-mc-switcher__option-code");
+			const optionSymbol = target.querySelector(".fchub-mc-switcher__option-symbol");
+			const optionName = target.querySelector(".fchub-mc-switcher__option-name");
+
+			if (triggerFlag && optionFlag) triggerFlag.innerHTML = optionFlag.innerHTML;
+			if (triggerCode && optionCode) triggerCode.textContent = optionCode.textContent;
+			if (triggerSymbol && optionSymbol) triggerSymbol.textContent = optionSymbol.textContent;
+			if (triggerName && optionName) triggerName.textContent = optionName.textContent;
+		});
+	}
+
 	// Add FOUC prevention class immediately
 	document.documentElement.classList.add("fchub-mc-projecting");
 	if (reconciliationCandidate) {
 		setSwitcherLoading(true);
+		// Show the visitor's own choice immediately — not the page's possibly-
+		// stale server-rendered value. Prices stay hidden behind
+		// .fchub-mc-projecting until reconcile() actually confirms the
+		// rate/decimals/symbol needed to convert them, but the switcher itself
+		// must never show anything other than what the visitor actually
+		// picked, for the entire wait (issue #72 UX requirement — the
+		// dimmed-but-stale-text approach this replaced still showed a
+		// currency the visitor didn't choose, just faded).
+		syncTriggerToCode(storedCurrencyAtLoad);
 		debugLog("switcher_loading_applied", {
 			triggerCodeAtThisPoint: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
 		});
