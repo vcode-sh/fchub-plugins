@@ -585,11 +585,26 @@
     visibility: hidden;
 }
 
-/* Safety fallback — remove FOUC class after 2s in case JS fails */
+/*
+ * Safety fallback — force-reveal after 15s if .fchub-mc-projecting is never
+ * removed at all (an uncaught runtime error, a browser quirk — not the normal
+ * path). This must NOT race a legitimate, still-in-flight reconciliation:
+ * currency-projection.js's reconcile() already removes the class itself the
+ * moment it settles — success, no-op, or its own bounded timeout (see
+ * RECONCILE_TIMEOUT_MS in currency-projection.js, 12s worst case, sized off a
+ * real measurement on a slow host — issue #72). This fallback's only job is
+ * guaranteeing the page never hides content forever if JS is what's broken,
+ * so it stays well behind that bound rather than on its own shorter clock.
+ * Previously a flat 2s, which fired WHILE reconcile() was still legitimately
+ * in flight on a slow host, force-revealing raw unconverted base-currency
+ * prices on every reconciliation regardless of whether JS was working
+ * correctly. If RECONCILE_TIMEOUT_MS ever changes, keep this ahead of it with
+ * real margin.
+ */
 @keyframes fchub-mc-fouc-fallback {
     to { visibility: visible; }
 }
 .fchub-mc-projecting .fct-item-price,
 .fchub-mc-projecting .fct-compare-price {
-    animation: fchub-mc-fouc-fallback 0s 2s forwards;
+    animation: fchub-mc-fouc-fallback 0s 15s forwards;
 }

@@ -41,6 +41,23 @@
 	// caused the page to fall through to.
 	const RECONCILABLE_SOURCES = ["cookie", "geo", "default"];
 
+	// Worst-case wait for reconcile()'s fetch before giving up and leaving the
+	// page on whatever currency it was served with. This is inherently a guess
+	// about hosts we don't control, so it's sized off a real measurement rather
+	// than the happy path: confirmed live on a Rocket.net staging tier (issue
+	// #72) that this endpoint can take several seconds under ordinary page-load
+	// contention — a concurrent, unrelated admin-ajax.php call on the same page
+	// load alone took 5.4s fighting for the same PHP-FPM worker pool, and this
+	// endpoint's own fetch was still in flight past the previous 4s bound when
+	// it was aborted. 12s clears that observed worst case with real headroom for
+	// queuing to compound further under heavier load, while staying short enough
+	// that a visitor isn't waiting a long time for a client-side correction to a
+	// cached page. currency-switcher.css's fchub-mc-fouc-fallback animation-delay
+	// must stay comfortably longer than this value — it exists to guarantee the
+	// page never hides content forever if JS itself is what's broken, not to
+	// race this timeout, so it must never win that race under normal operation.
+	const RECONCILE_TIMEOUT_MS = 12000;
+
 	// Mutable projection parameters — reassigned in place by reconcile() below if
 	// it finds the cached/baked-in context stale. Every function in this file
 	// that formats or converts a price closes over these bindings by reference,
@@ -943,8 +960,8 @@
 	 * timeout, or a server response that turns out to match the page already
 	 * leaves the mutable projection state untouched.
 	 *
-	 * Bounded to 4s so a slow/hung request can't leave the page hidden behind
-	 * the FOUC-prevention class indefinitely.
+	 * Bounded to RECONCILE_TIMEOUT_MS so a slow/hung request can't leave the
+	 * page hidden behind the FOUC-prevention class indefinitely.
 	 *
 	 * cache: "no-store" is load-bearing, not a nicety — confirmed live on issue
 	 * #72 (Rocket.net staging): without it, once a given ?currency=X URL had
@@ -961,7 +978,7 @@
 		const restUrl = cfg.restUrl || "/wp-json/fchub-mc/v1";
 		const hasAbortController = typeof AbortController !== "undefined";
 		const controller = hasAbortController ? new AbortController() : null;
-		const timeoutId = hasAbortController ? setTimeout(() => controller.abort(), 4000) : null;
+		const timeoutId = hasAbortController ? setTimeout(() => controller.abort(), RECONCILE_TIMEOUT_MS) : null;
 
 		return fetch(`${restUrl}/context?currency=${encodeURIComponent(storedCurrencyAtLoad)}`, {
 			cache: "no-store",

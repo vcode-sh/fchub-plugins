@@ -350,6 +350,30 @@ your HTTP client's equivalent) rather than relying on the response header
 alone — a response already cached from before the header shipped would still
 be reused without it.
 
+### The reconciliation timeout is sized for real host latency, not the happy path
+
+`reconcile()` bounds its fetch with an `AbortController` — `RECONCILE_TIMEOUT_MS`,
+currently 12s — past which it gives up and leaves the page on whatever currency
+it was served with, rather than hanging indefinitely. This isn't a nicety
+figure. Confirmed live on a Rocket.net staging tier: `GET /context` can take
+several seconds under ordinary page-load conditions, because it competes with
+the rest of the page's own PHP-driven requests (other plugins' AJAX calls
+included) for the same PHP-FPM worker pool — a concurrent, unrelated
+`admin-ajax.php` call on the same page load alone took 5.4s. A timeout sized off
+an isolated, uncontended measurement of this endpoint (which responds in a few
+hundred ms on its own) will intermittently abort before a legitimate response
+arrives on a busy or resource-constrained host, silently defeating
+reconciliation with no error surfaced anywhere.
+
+The CSS safety-net fallback (`fchub-mc-fouc-fallback` in
+`currency-switcher.css`, force-revealing prices if `.fchub-mc-projecting` is
+never removed at all) is set well behind this bound — 15s — specifically so it
+never fires while a legitimate reconciliation is still in flight. It exists
+only to guarantee the page doesn't hide content forever if JavaScript itself is
+broken, not to race `RECONCILE_TIMEOUT_MS` on a shorter clock. If you tune
+`RECONCILE_TIMEOUT_MS` for your own hosting environment, keep the CSS value
+ahead of it with real margin.
+
 <Separator className="my-8" />
 
 ## Feature Flags

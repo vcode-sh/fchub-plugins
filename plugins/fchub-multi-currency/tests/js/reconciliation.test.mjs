@@ -269,6 +269,7 @@ describe("Issue #72: cookie stripped by host edge/WAF layer for a guest", () => 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const projectionSource = readFileSync(path.join(here, "..", "..", "assets", "js", "currency-projection.js"), "utf8");
 const switcherSource = readFileSync(path.join(here, "..", "..", "assets", "js", "currency-switcher.js"), "utf8");
+const switcherCssSource = readFileSync(path.join(here, "..", "..", "assets", "css", "currency-switcher.css"), "utf8");
 
 describe("Source invariant: currency-projection.js reconcile() fetch is not cacheable", () => {
 	it("reconcile()'s fetch call to /context?currency= sets cache: \"no-store\"", () => {
@@ -294,6 +295,63 @@ describe("Source invariant: currency-switcher.js POST /context fetch is not cach
 			match[1],
 			/cache:\s*["']no-store["']/,
 			'switchCurrency()\'s fetch options must include cache: "no-store", for consistency with the server\'s Cache-Control: no-store on this same endpoint',
+		);
+	});
+});
+
+// ─── Source invariants: reconcile()'s timeout and the CSS FOUC fallback ───
+//
+// Confirmed live on a Rocket.net staging tier (issue #72): reconcile()'s fetch
+// was still in flight past the previous 4s AbortController bound, because it
+// competes with the rest of the page's own PHP-driven requests for the same
+// PHP-FPM worker pool — a concurrent, unrelated admin-ajax.php call on the same
+// page load alone took 5.4s. Separately, the CSS safety-net fallback that
+// force-reveals prices if JS never removes .fchub-mc-projecting was a flat 2s,
+// firing WHILE that same legitimate reconciliation was still in flight and
+// force-revealing raw, unconverted base-currency prices regardless of whether
+// JS was working correctly. Both numbers are guesses about hosts this project
+// doesn't control, so what's actually checkable and worth guarding here isn't
+// "is 12000 the right number" (nobody can prove that in a unit test) but the
+// two invariants a regression could silently break: the timeout has real
+// headroom over the observed worst case, and the CSS fallback can never win a
+// race against a reconcile() call that's behaving normally.
+
+function readReconcileTimeoutMs() {
+	const match = projectionSource.match(/RECONCILE_TIMEOUT_MS\s*=\s*(\d+)/);
+	assert.ok(match, "could not find RECONCILE_TIMEOUT_MS in currency-projection.js");
+	return Number(match[1]);
+}
+
+describe("Source invariant: reconcile()'s timeout clears observed real-world PHP latency", () => {
+	it("RECONCILE_TIMEOUT_MS has real headroom over the 5.4s observed live on issue #72", () => {
+		const timeoutMs = readReconcileTimeoutMs();
+
+		// Not "greater than 5400" — that would clear the one measurement with no
+		// margin at all. Queuing for a starved PHP-FPM pool compounds under
+		// heavier load than the single sample taken live, so the bound needs
+		// headroom above it, not just past it.
+		assert.ok(
+			timeoutMs >= 10000,
+			`RECONCILE_TIMEOUT_MS (${timeoutMs}ms) should keep meaningful headroom over the 5.4s worst case observed live (issue #72), not just clear it`,
+		);
+	});
+});
+
+describe("Source invariant: the CSS FOUC fallback never races an in-flight reconciliation", () => {
+	it("fchub-mc-fouc-fallback's animation-delay is longer than RECONCILE_TIMEOUT_MS, with real margin", () => {
+		const jsTimeoutMs = readReconcileTimeoutMs();
+
+		const cssMatch = switcherCssSource.match(/animation:\s*fchub-mc-fouc-fallback\s+0s\s+([\d.]+)s\s+forwards/);
+		assert.ok(cssMatch, "could not find the fchub-mc-fouc-fallback animation-delay in currency-switcher.css");
+		const cssDelayMs = Number(cssMatch[1]) * 1000;
+
+		assert.ok(
+			cssDelayMs > jsTimeoutMs,
+			`CSS FOUC fallback (${cssDelayMs}ms) must fire after reconcile()'s own worst-case bound (${jsTimeoutMs}ms) — otherwise it force-reveals raw base-currency prices while a legitimate reconciliation is still in flight (issue #72)`,
+		);
+		assert.ok(
+			cssDelayMs - jsTimeoutMs >= 2000,
+			`CSS FOUC fallback (${cssDelayMs}ms) should clear RECONCILE_TIMEOUT_MS (${jsTimeoutMs}ms) with at least 2s of margin, not just technically come after it — the JS still has to run its .finally() callback and a full projectPrices() pass after the fetch settles`,
 		);
 	});
 });
