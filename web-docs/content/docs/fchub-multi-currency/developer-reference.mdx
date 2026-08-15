@@ -299,7 +299,7 @@ still has the cookie and the visitor never changed their mind. Signed-in
 visitors are unaffected: their preference lives in user meta, a second,
 independent channel `UserMetaResolver` resolves ahead of the cookie.
 
-As of 1.4.5, the plugin adds a client-side fallback that doesn't depend on the
+The plugin adds a client-side fallback that doesn't depend on the
 cookie round-tripping through that layer:
 
 1. `currency-switcher.js` mirrors a guest's choice into `localStorage`

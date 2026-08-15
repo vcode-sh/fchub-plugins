@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, currency, exchange-rates, ecommerce
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.4.5
+Stable tag: 1.4.4
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -91,7 +91,12 @@ The failed response is not persisted. Customer prices continue to use the last g
 
 == Changelog ==
 
-= 1.4.5 =
+= Unreleased (local patch on top of 1.4.4, issue #72) =
+
+Not an official release. Applied locally ahead of the next official update; the
+plugin version is intentionally left at 1.4.4 so the update checker still
+detects the eventual official release as newer instead of treating this build
+as already current.
 
 * Fixed logged-out visitors seeing their currency choice revert to the default on hosts whose edge/WAF layer strips the guest currency cookie on request paths it hasn't whitelisted. The switcher now also mirrors the choice to localStorage, and the storefront script reconciles it against the page's baked-in currency on load, correcting client-side when the cookie never reached the server. This is disabled automatically alongside cookie persistence, so sites that intentionally turned it off for guests are unaffected.
 * Added price-formatting fields (symbol, decimals, position, separators, disclosure text) to the public `GET /context` REST response.
