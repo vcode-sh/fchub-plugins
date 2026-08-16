@@ -1,3 +1,104 @@
+### v1.4.5
+
+*Released 17 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.5)
+
+The cookie was fine. The cached HTML was confidently remembering somebody else.
+
+Reported by [@ManniGH](https://github.com/ManniGH) in
+[#72](https://github.com/vcode-sh/fchub-plugins/issues/72), then chased through
+Rocket.net's edge cache and contributed back in
+[PR #149](https://github.com/vcode-sh/fchub-plugins/pull/149). That production
+investigation established the boundary the plugin had to own. Thank you for doing
+the awkward bit on a real shop, where bugs develop rather better manners than they
+do in a local demo.
+
+#### Cached pages now recover the visitor's actual currency
+
+An edge cache can serve HTML generated before it ever sees the visitor's currency
+cookie. The page therefore arrived in the store default even though the browser
+still held the visitor's choice. Asking every host to exempt every sales page was
+technically possible in the same way that maintaining a spreadsheet of fires is a
+fire-safety system.
+
+The storefront now checks the existing `fchub_mc_currency` cookie and, when cached
+HTML disagrees, resolves a fresh context through the cache-safe `GET /context`
+endpoint before projecting prices. The cookie remains the only browser preference
+store: there is no localStorage shadow state to drift, expire differently or win a
+future argument with the server.
+
+Recovery updates the whole surface, not merely the first price it finds:
+
+- product prices, ranges, variants, subscriptions, filters, totals and receipt amounts;
+- dropdown labels, flags, active ticks, button switchers and rate footers;
+- Current Currency, Exchange Rate and Currency Context blocks;
+- base-currency choices, expired URL preferences, missing cookies and malformed cookies.
+
+An explicit valid URL preference and a signed-in account preference still outrank
+cookie recovery. A recovery response is rejected unless its currency and positive
+rate belong to the configured set, and an older response cannot overwrite a choice
+the visitor made while the request was in flight.
+
+#### A successful request now has to mean a successful save
+
+Guest requests no longer send a REST nonce baked into cached HTML. Signed-in
+requests still use normal WordPress cookie authentication and the current nonce.
+The switcher reloads only after the server confirms `persisted: true`; a failed
+cookie header, failed user-meta write, disabled persistence channel or decorative
+`2xx` response leaves the page in place and reports the real outcome.
+
+The configured URL preference is removed only after the replacement choice is
+stored. Context responses are explicitly `no-store`, so neither a browser nor an
+intermediary gets to recycle one visitor's answer for the next.
+
+#### Exchange rates are snapshots, not a collection of optimistic rows
+
+Manual mode now has an actual rate editor and a dedicated save action. Manual and
+remote updates both require one positive, plain-decimal rate for every configured
+quote currency, then persist the set with one timestamp and one multi-row write.
+
+If a provider omits a currency, returns zero, scientific notation or malformed
+data, or if the database rejects the write, the previous database rows and cache
+remain untouched. The success hook fires only after persistence. Generic refresh
+is unavailable in Manual mode, so yesterday's values can no longer acquire today's
+timestamp by pressing a button with confidence.
+
+Removed currencies are rejected by context resolution and omitted from the public
+rates endpoint even when historical rows still exist. Stale rates are used only
+when **Last known rate** is explicitly selected; the safer **Base currency** policy
+also rejects future-dated rates rather than treating time travel as freshness.
+
+#### FluentCart remains the money authority
+
+Multi-Currency now takes the base currency and store separators from FluentCart's
+canonical currency API everywhere. Saving the add-on panel cannot restore an old
+second base currency, automatic display separators follow FluentCart's number
+format, and PHP helpers keep FluentCart's cent-based amount contract.
+
+Price projection also handles negative half-up and half-down ties symmetrically,
+keeps the minus sign before the currency, honours zero-decimal currencies and an
+explicitly disabled thousands separator, and leaves FluentCart's variant source
+attributes unchanged. Repeated variation events therefore reproject from the base
+price instead of converting yesterday's conversion again. Compound interest is
+lovely; compound price conversion less so.
+
+#### Orders remember checkout, not whatever happened later
+
+The display currency and exchange rate are captured while the customer's checkout
+request is active. A later paid event, webhook or admin request cannot overwrite
+that snapshot with another context. Guest orders receive the same protection, and
+the order keeps no conversion snapshot when stale-rate policy correctly falls back
+to the store base currency.
+
+#### The tests now exercise what ships
+
+The CI lane runs the actual browser JavaScript for cached-context recovery,
+switcher failures, Manual rate editing and FluentCart price projection. The PHP
+suite challenges incomplete snapshots, failed persistence, removed currencies,
+stale boundaries, checkout timing and cent-based formatting. Tests that copied
+implementation branches were removed; green theatre already has enough funding.
+
+<Separator className="my-8" />
+
 ### v1.4.4
 
 *Released 14 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.4)

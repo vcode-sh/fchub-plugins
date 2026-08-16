@@ -93,13 +93,19 @@ The failed response is not persisted. Customer prices continue to use the last g
 
 = 1.4.5 =
 
-* Reconciled cached storefront pages with the visitor's current currency cookie without adding a second browser preference store.
-* Kept prices, switchers, flags and currency context blocks in sync across base-currency, stale URL and malformed-cookie fallbacks.
-* Stopped expired guest nonces and failed persistence writes from being reported as successful currency changes.
+* Fixed guest currency choices on edge-cached pages. Cached HTML is now reconciled with the existing `fchub_mc_currency` cookie, without host-specific page exclusions or a second browser preference store.
+* Kept prices, ranges, variants, subscriptions, switchers, flags and currency context blocks on the same recovered currency, including base-currency, stale-URL and malformed-cookie fallbacks.
+* Stopped stale guest nonces, failed cookie or account writes and bare successful HTTP responses from being reported as saved currency changes.
+* Added proper Manual rate editing and saved manual or remote rates as complete snapshots. If one configured currency is missing, invalid or cannot be persisted, every previous rate remains active.
+* Prevented Manual mode from refreshing old rates into a new timestamp, delayed cache updates until database success, and excluded removed currencies from public rate and context responses.
+* Made FluentCart the authority for the store base currency, number format and cent-based price helpers. Also fixed signed rounding, zero-decimal output and repeat variant updates that could compound converted prices.
+* Captured display currency and rate during checkout so a later payment event cannot replace the customer's choice with an admin, webhook or another request's context.
+* Added browser-behaviour tests for the shipped JavaScript to CI, covering cached-page recovery, switch failures, price projection and Manual rate editing rather than merely admiring the source code.
+* Thanks to @ManniGH for the production report, Rocket.net investigation and PR #149 that drove the cached-page work in #72.
 
 = 1.4.4 =
 
-* Fixed converted prices reading 100x too high in stores whose FluentCart number format uses a comma decimal separator. The frontend was told the decimal separator by the wrong setting, so a base price of "20,00" was parsed as 2000 before conversion.
+* Fixed converted prices reading 100x too high in stores whose FluentCart number format uses a comma decimal separator. The frontend was told the decimal separator by the wrong setting, so a base price of "20,00" was parsed as 2000 before conversion. Thanks to @zellfusion for tracing the mismatch and supplying the exact reproduction in #142.
 
 = 1.4.3 =
 
