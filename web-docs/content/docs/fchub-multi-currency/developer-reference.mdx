@@ -324,10 +324,22 @@ resolves the correct currency in this one request, for every visitor, without
 depending on the cookie at all:
 
 ```javascript
-// Simplified — see buildReloadUrl() in currency-switcher.js
+// Simplified — see buildReloadUrl() and switchCurrency() in currency-switcher.js
 const url = new URL(window.location.href);
 url.searchParams.set(cfg.urlParamKey, currencyCode); // "currency" by default
-window.location.href = url.toString();
+
+// Not window.location.href = url.toString() — that navigates to a new URL,
+// and any navigation to a new URL always opens a fresh history entry, which
+// the browser always scrolls to the top regardless of where the visitor was
+// on the page (confirmed live: this regressed scroll position on long pages).
+// replaceState() rewrites the *current* entry's URL in place with no
+// navigation, so the reload() that follows reloads that same entry instead
+// of navigating to a new one — preserving scroll position exactly the way a
+// plain reload() always did before this parameter existed. UrlParamResolver
+// resolves the same query string either way; only the browser API used to
+// get there differs.
+window.history.replaceState(window.history.state, "", url.toString());
+window.location.reload();
 ```
 
 Because `RECONCILABLE_SOURCES` excludes `url_param` (see below), a page that

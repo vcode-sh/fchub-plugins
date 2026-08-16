@@ -771,7 +771,7 @@ describe("Source invariant: switchCurrency() reloads via a URL-param URL, not a 
 	});
 
 	it("switchCurrency()'s success branch calls buildReloadUrl() and falls back to reload() only when it returns null", () => {
-		const match = switcherSource.match(/persistToLocalStorage\(currencyCode\);([\s\S]{0,700}?)\n\t\t\t\}\)/);
+		const match = switcherSource.match(/persistToLocalStorage\(currencyCode\);([\s\S]{0,1500}?)\n\t\t\t\}\)/);
 		assert.ok(match, "could not find switchCurrency()'s success branch in currency-switcher.js");
 		assert.match(
 			match[1],
@@ -780,8 +780,47 @@ describe("Source invariant: switchCurrency() reloads via a URL-param URL, not a 
 		);
 		assert.match(
 			match[1],
-			/if\s*\(reloadUrl\)\s*\{\s*window\.location\.href\s*=\s*reloadUrl;\s*\}\s*else\s*\{\s*window\.location\.reload\(\);\s*\}/,
-			"switchCurrency() must navigate to the URL-param reload URL when buildReloadUrl() returns one, and fall back to window.location.reload() only when it returns null (urlParamEnabled is false)",
+			/if\s*\(reloadUrl\)\s*\{/,
+			"switchCurrency() must branch on whether buildReloadUrl() returned a URL",
+		);
+		assert.match(
+			match[1],
+			/\}\s*else\s*\{\s*window\.location\.reload\(\);\s*\}/,
+			"switchCurrency() must fall back to window.location.reload() only when buildReloadUrl() returns null (urlParamEnabled is false)",
+		);
+	});
+
+	// A visitor who switches currency scrolled down a long page must land back
+	// in the same place, not jump to the top — confirmed live (issue #72
+	// follow-up): assigning window.location.href always performs a fresh
+	// navigation, which always creates a new history entry, and a new entry
+	// always starts scrolled to the top regardless of where the visitor was.
+	// The plugin's original plain window.location.reload() (predating this
+	// currency param) never had this problem, because reload() re-requests the
+	// *current* history entry rather than navigating to a new one.
+	it("reaches the reload URL via history.replaceState() + reload() — never a direct window.location.href assignment — to preserve scroll position", () => {
+		const match = switcherSource.match(/if\s*\(reloadUrl\)\s*\{([\s\S]{0,1100}?)\n\t\t\t\t\}\s*else/);
+		assert.ok(match, "could not find the `if (reloadUrl) { ... } else { ... }` branch in currency-switcher.js");
+
+		const codeOnly = match[1]
+			.split("\n")
+			.filter((line) => !line.trim().startsWith("//"))
+			.join("\n");
+
+		assert.doesNotMatch(
+			codeOnly,
+			/window\.location\.href\s*=/,
+			"must not assign window.location.href for the URL-param reload path — that performs a fresh navigation, which always creates a new history entry starting scrolled to the top, regressing scroll position on long pages",
+		);
+		assert.match(
+			codeOnly,
+			/window\.history\.replaceState\(window\.history\.state,\s*["']["'],\s*reloadUrl\);/,
+			"must rewrite the current history entry's URL in place via history.replaceState() before reloading — this is what lets the following reload() reload the existing entry (preserving scroll) instead of navigating to a new one",
+		);
+		assert.match(
+			codeOnly,
+			/window\.location\.reload\(\);/,
+			"must call window.location.reload() after replaceState() — reloading the (now currency-bearing) current entry, not creating a new one",
 		);
 	});
 });

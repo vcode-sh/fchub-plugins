@@ -257,7 +257,21 @@
 				const reloadUrl = buildReloadUrl(currencyCode);
 				debugLog("switch_success_navigating", { currencyCode, reloadUrl });
 				if (reloadUrl) {
-					window.location.href = reloadUrl;
+					// history.replaceState() + reload(), not
+					// window.location.href = reloadUrl. Assigning href performs a
+					// fresh navigation, which always creates a new history entry —
+					// and a new entry starts scrolled to the top, regardless of
+					// where the visitor was on the page before switching.
+					// replaceState() rewrites the *current* entry's URL in place
+					// (no navigation, nothing loads yet), so the following
+					// reload() reloads that same entry rather than navigating to a
+					// new one — preserving scroll position exactly the way the
+					// plugin's original plain reload() always did before this
+					// currency param existed. Server-side resolution is
+					// unaffected either way: UrlParamResolver reads the same
+					// query string regardless of which browser API put it there.
+					window.history.replaceState(window.history.state, "", reloadUrl);
+					window.location.reload();
 				} else {
 					window.location.reload();
 				}
