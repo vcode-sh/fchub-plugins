@@ -355,16 +355,16 @@ describe("Source invariant: applyResolvedCurrency() moves the option-check glyph
 // page load that merely needs price conversion.
 
 describe("Source invariant: the switcher trigger is suppressed during reconciliation, not just prices", () => {
-	it("applies the loading state only when reconciliationCandidate is true, alongside the FOUC class", () => {
+	it("applies the loading state only when reconciliationCandidate is true, in the else branch of the FOUC-class decision", () => {
 		const match = projectionSource.match(
-			/classList\.add\(["']fchub-mc-projecting["']\);([\s\S]{0,2000}?)function init\(\)/,
+			/if\s*\(!reconciliationCandidate\)\s*\{[\s\S]{0,300}?\}\s*else\s*\{([\s\S]{0,900}?)\n\t\}/,
 		);
 
-		assert.ok(match, "could not find the FOUC-class-then-init() region in currency-projection.js");
+		assert.ok(match, "could not find the `if (!reconciliationCandidate) { ... } else { ... }` FOUC-class/loading-state block in currency-projection.js");
 		assert.match(
 			match[1],
-			/if\s*\(reconciliationCandidate\)\s*\{\s*setSwitcherLoading\(true\)/,
-			"the switcher trigger must be marked loading in the same synchronous pass that hides prices, gated on reconciliationCandidate — not unconditionally, since a page that only needs price conversion never has the wrong currency in the trigger",
+			/setSwitcherLoading\(true\)/,
+			"the switcher trigger must be marked loading in the else branch (reconciliationCandidate true) of the same decision that decides whether to hide prices — not unconditionally, since a page that only needs price conversion never has the wrong currency in the trigger",
 		);
 	});
 
@@ -405,9 +405,9 @@ describe("Source invariant: the switcher trigger is suppressed during reconcilia
 describe("Source invariant: the trigger syncs to the visitor's choice immediately, not just prices", () => {
 	it("syncs the trigger to storedCurrencyAtLoad in the same synchronous pass that applies the loading state", () => {
 		const match = projectionSource.match(
-			/if\s*\(reconciliationCandidate\)\s*\{([\s\S]{0,900}?)\n\t\}/,
+			/if\s*\(!reconciliationCandidate\)\s*\{[\s\S]{0,300}?\}\s*else\s*\{([\s\S]{0,900}?)\n\t\}/,
 		);
-		assert.ok(match, "could not find the `if (reconciliationCandidate) { ... }` block in currency-projection.js");
+		assert.ok(match, "could not find the `if (!reconciliationCandidate) { ... } else { ... }` block in currency-projection.js");
 		assert.match(
 			match[1],
 			/setSwitcherLoading\(true\)[\s\S]*?syncTriggerToCode\(storedCurrencyAtLoad\)/,
@@ -448,64 +448,73 @@ describe("Source invariant: the trigger syncs to the visitor's choice immediatel
 	});
 });
 
-// ─── Source invariant: prices are dimmed, not hidden, during a ───────
-// ─── reconciliation — no blank gap in the middle of the wait ─────────
+// ─── Source invariant: prices are left completely untouched during a ───
+// ─── reconciliation — no hide, no dim, no transition of any kind ────────
 //
-// Confirmed by the site owner watching it directly on production (issue
-// #72): prices going from the old values to fully blank the moment the page
-// finishes reloading, staying blank for the whole multi-second wait, then
-// appearing, reads as "finished" partway through a wait that has actually
-// just started. Wanted instead: no blank state — old prices stay visible,
-// dimmed the same way the switcher trigger already is, swapping directly to
-// the new values in one atomic transition once reconciliation completes.
+// Confirmed directly by the site owner against how a normal (non-reconciling)
+// page already behaves (issue #72). Two earlier approaches were both
+// rejected on direct observation: hiding prices for the whole wait (reads as
+// "finished" partway through a wait that just started) and dimming them
+// (still a visible transition on prices themselves). Final spec: prices get
+// no CSS treatment and no projection pass at all until reconcile() settles,
+// at which point they go directly from untouched-old to converted-new in a
+// single pass — exactly mirroring how .fchub-mc-projecting already behaves
+// for a plain page with no reconciliation involved: one hide-then-reveal
+// cycle, nothing more, no intermediate state a visitor can perceive.
 
-describe("Source invariant: prices dim during reconciliation instead of going blank", () => {
-	it("projects prices immediately in the reconciliation branch, not deferred until reconcile() settles", () => {
-		const match = projectionSource.match(/debugLog\("init_reconciliation_branch"\);([\s\S]{0,1100}?)reconcile\(\)\.finally/);
-		assert.ok(match, "could not find the reconciliation branch of init() in currency-projection.js");
-		assert.match(
-			match[1],
-			/\bprojectPrices\(\)/,
-			"projectPrices() must run immediately in the reconciliation branch (using whatever possibly-stale values the page was served with) rather than waiting for reconcile() to settle — otherwise prices have nothing to show and stay hidden for the whole wait",
-		);
-	});
-
-	it("applies .fchub-mc-reconciling (dimming) rather than relying on .fchub-mc-projecting (hiding) for the reconciliation wait", () => {
+describe("Source invariant: prices are untouched (no hide, no dim) during reconciliation", () => {
+	it("does not add .fchub-mc-projecting when reconciliationCandidate is true — only for the plain path", () => {
 		const match = projectionSource.match(
-			/if\s*\(reconciliationCandidate\)\s*\{([\s\S]{0,900}?)\n\t\}/,
+			/if\s*\(!reconciliationCandidate\)\s*\{([\s\S]{0,200}?)\}\s*else\s*\{/,
 		);
-		assert.ok(match, "could not find the `if (reconciliationCandidate) { ... }` block in currency-projection.js");
+		assert.ok(match, "could not find the `if (!reconciliationCandidate) { ... } else { ... }` FOUC-class block in currency-projection.js");
 		assert.match(
 			match[1],
-			/classList\.add\(["']fchub-mc-reconciling["']\)/,
-			"the reconciliation-pending state must add a dedicated .fchub-mc-reconciling class for CSS to dim prices with — distinct from .fchub-mc-projecting, which hides them and is still needed for the plain (non-reconciliation) FOUC-prevention path",
+			/classList\.add\(["']fchub-mc-projecting["']\)/,
+			".fchub-mc-projecting must only be added for the plain (non-reconciliation) path — adding it unconditionally would hide prices for the whole reconciliation wait again",
 		);
 	});
 
-	it("clears .fchub-mc-reconciling once reconcile() settles, immediately before the final projectPrices() pass", () => {
+	it("does not call projectPrices() (or any other price-touching class) in the reconciliation branch before reconcile() settles", () => {
+		const match = projectionSource.match(/debugLog\("init_reconciliation_branch"\);([\s\S]{0,900}?)reconcile\(\)\.finally/);
+		assert.ok(match, "could not find the reconciliation branch of init() in currency-projection.js, or something now runs between it and reconcile().finally");
+
+		// Strip // comment lines first — the region's own explanatory comment
+		// legitimately mentions "projectPrices()" and the class names in prose
+		// (to say they DON'T happen here), which would otherwise false-positive
+		// against a naive substring/regex check.
+		const codeOnly = match[1]
+			.split("\n")
+			.filter((line) => !line.trim().startsWith("//"))
+			.join("\n");
+
+		assert.doesNotMatch(
+			codeOnly,
+			/projectPrices\(\)|classList\.add\(["']fchub-mc-(projecting|reconciling)["']\)/,
+			"nothing must touch prices between entering the reconciliation branch and reconcile() settling — no projection pass, no hide class, no dim class. Prices must stay exactly as server-rendered until the atomic swap in finally()",
+		);
+	});
+
+	it("projects prices for the first time only in reconcile()'s finally(), once it has actually settled", () => {
 		const finallyMatch = projectionSource.match(/reconcile\(\)\.finally\(\(\) => \{([\s\S]{0,1000})/);
 		assert.ok(finallyMatch, "could not find reconcile().finally(...) in currency-projection.js");
 		assert.match(
 			finallyMatch[1],
-			/classList\.remove\(["']fchub-mc-reconciling["']\)[\s\S]*?projectPrices\(\)/,
-			"finally() must remove .fchub-mc-reconciling and then call projectPrices() in the same synchronous pass, so the visible change is one atomic swap from dimmed-old to normal-new, not two separately-painted steps",
+			/\bprojectPrices\(\)/,
+			"finally() must call projectPrices() — this is the one and only point prices are touched during a reconciliation, converting them directly from whatever the server rendered to the final settled values",
 		);
 	});
 
-	it("CSS dims price elements during reconciliation (opacity), it does not hide them (visibility)", () => {
-		// Anchored on the selector actually being styled (not just the class
-		// name, which also appears in prose comments elsewhere in the file).
-		const match = switcherCssSource.match(/\.fchub-mc-reconciling \.fct-item-price[\s\S]*?\{([\s\S]*?)\}/);
-		assert.ok(match, "could not find a .fchub-mc-reconciling rule in currency-switcher.css");
+	it("no .fchub-mc-reconciling class exists anywhere (JS or CSS) — the dimming approach was fully removed, not just reduced", () => {
 		assert.doesNotMatch(
-			match[1],
-			/visibility\s*:\s*hidden/,
-			".fchub-mc-reconciling must not hide price elements — that's exactly the blank-gap behavior this fix replaces",
+			projectionSource,
+			/fchub-mc-reconciling/,
+			"currency-projection.js must not reference .fchub-mc-reconciling — dimming was rejected outright, not just toned down",
 		);
-		assert.match(
-			match[1],
-			/opacity\s*:\s*0\.\d+/,
-			".fchub-mc-reconciling must dim price elements via opacity, matching the switcher trigger's own .fchub-mc-switcher--loading treatment",
+		assert.doesNotMatch(
+			switcherCssSource,
+			/fchub-mc-reconciling/,
+			"currency-switcher.css must not define .fchub-mc-reconciling — dimming was rejected outright, not just toned down",
 		);
 	});
 });

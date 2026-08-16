@@ -588,18 +588,18 @@
 /*
  * Safety fallback — force-reveal after 15s if .fchub-mc-projecting is never
  * removed at all (an uncaught runtime error, a browser quirk — not the
- * normal path). This class's hidden treatment is only ever meant to last for
- * the single synchronous pass projectPrices() takes to convert prices —
- * normally milliseconds. It is NOT how the multi-second reconciliation wait
- * is handled: currency-projection.js projects immediately (with whatever
- * possibly-stale values it has) and dims via .fchub-mc-reconciling below
- * instead of leaving this class's hidden treatment up for that whole wait
- * (issue #72 — a previous version did exactly that, and force-revealing raw
- * unconverted prices via an earlier, shorter version of this same fallback
- * timer made it worse, showing base-currency prices mid-reconciliation
- * regardless of whether JS was working correctly). So this 15s is a generous
- * true last resort for JS never reaching the point that removes the class at
- * all, not a bound racing anything else's timing.
+ * normal path). This class is only ever applied for the plain
+ * (non-reconciliation) FOUC-prevention path — see currency-projection.js,
+ * which only adds it there — where its hidden treatment is meant to last for
+ * a single synchronous pass of projectPrices(), normally milliseconds. It is
+ * NOT used during a reconciliation wait at all: prices are left completely
+ * untouched (no hide, no dim, nothing) until reconcile() settles and
+ * projects them once, directly to the final values (issue #72 — earlier
+ * versions tried hiding, then dimming, prices for that whole wait; the site
+ * owner ruled out any visible transition on prices themselves, however
+ * subtle). So this 15s is a generous true last resort for the plain path's
+ * JS never reaching the point that removes the class at all, not a bound
+ * racing anything reconciliation-related.
  */
 @keyframes fchub-mc-fouc-fallback {
     to { visibility: visible; }
@@ -607,35 +607,4 @@
 .fchub-mc-projecting .fct-item-price,
 .fchub-mc-projecting .fct-compare-price {
     animation: fchub-mc-fouc-fallback 0s 15s forwards;
-}
-
-/*
- * Reconciliation in progress — dim, don't hide. currency-projection.js
- * applies .fchub-mc-reconciling (instead of relying on .fchub-mc-projecting's
- * hidden treatment above) specifically while a localStorage/cookie mismatch
- * is being resolved, because there IS a real price to show in that case: the
- * page's own script already projects it immediately using whatever
- * (possibly stale) values it was served with. Hiding that for the whole
- * multi-second reconciliation wait reads as broken or finished, when
- * reconciliation has actually just started (issue #72) — matches the
- * switcher trigger's own .fchub-mc-switcher--loading dim. Removed the moment
- * reconcile() settles, at which point the final prices replace these in the
- * same synchronous pass (clearProjectionMarkers() + projectPrices()), so the
- * visible transition is a single atomic swap, never an intermediate raw or
- * blank flash.
- */
-.fchub-mc-reconciling .fct-item-price,
-.fchub-mc-reconciling .fct-compare-price,
-.fchub-mc-reconciling .fct-min-price,
-.fchub-mc-reconciling .fct-max-price,
-.fchub-mc-reconciling .fct-cart-item-price,
-.fchub-mc-reconciling .fct-cart-item-total,
-.fchub-mc-reconciling .fct_summary_value,
-.fchub-mc-reconciling .fct_line_item_price,
-.fchub-mc-reconciling .fct_line_item_total,
-.fchub-mc-reconciling .fct_promo_price,
-.fchub-mc-reconciling .fluent-cart-pricing-table-variant-price,
-.fchub-mc-reconciling .fluent-cart-pricing-table-variant-compare-price,
-.fchub-mc-reconciling [data-fchub-mc-base] {
-    opacity: 0.6;
 }

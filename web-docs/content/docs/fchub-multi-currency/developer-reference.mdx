@@ -329,10 +329,15 @@ cookie round-tripping through that layer:
 3. If they disagree, the switcher's trigger is immediately synced to the
    localStorage value — the visitor's own choice, not the page's stale
    baked-in one — and dimmed/non-interactive (`fchub-mc-switcher--loading`)
-   for the duration; only prices, genuinely invalid until reconciled, are
-   hidden. It then fetches `GET {restUrl}/context?currency=<code>` — which
-   resolves via the URL query string, not the cookie — reassigns the mutable
-   projection state in place, clears and re-runs price projection, and calls
+   for the duration. Prices, by contrast, are left completely untouched — no
+   hiding, no dimming, no projection pass at all — until reconciliation
+   actually completes, at which point they go directly from whatever the
+   page originally rendered to the corrected, converted values in one step.
+   Only the trigger shows a loading state during the wait; prices get none.
+   The fetch itself is `GET {restUrl}/context?currency=<code>` — which
+   resolves via the URL query string, not the cookie — and on response,
+   reassigns the mutable projection state in place, clears and runs price
+   projection for the first time, and calls
    `window.fchubMcSyncSwitcherDisplay()` again to reflect whatever the server
    actually confirmed (normally the same value already shown; if the server
    disagrees with the visitor's saved choice — rare — this corrects the

@@ -73,10 +73,11 @@
 	// it was aborted. 12s clears that observed worst case with real headroom for
 	// queuing to compound further under heavier load, while staying short enough
 	// that a visitor isn't waiting a long time for a client-side correction to a
-	// cached page. Note this bounds the network wait only — prices and the
-	// switcher trigger are both shown immediately (dimmed) rather than hidden
-	// for this whole duration; see .fchub-mc-reconciling in
-	// currency-switcher.css and the reconciliation branch of init() below.
+	// cached page. Note this bounds the network wait only — the switcher
+	// trigger shows the visitor's own choice throughout this whole duration
+	// (see syncTriggerToCode() below), but prices are left completely
+	// untouched until reconcile() actually settles; see the reconciliation
+	// branch of init() below.
 	const RECONCILE_TIMEOUT_MS = 12000;
 
 	// Mutable projection parameters — reassigned in place by reconcile() below if
@@ -1172,20 +1173,23 @@
 		});
 	}
 
-	// Add FOUC prevention class immediately
-	document.documentElement.classList.add("fchub-mc-projecting");
-	if (reconciliationCandidate) {
+	// Add FOUC prevention class immediately — but only for the plain
+	// (non-reconciliation) path. Prices must not be touched at all while a
+	// reconciliation is pending: no hide, no dim, nothing — confirmed against
+	// how a normal (non-reconciling) page already behaves, where
+	// .fchub-mc-projecting does one hide-then-reveal cycle and nothing more.
+	// They stay exactly as the server rendered them until reconcile() settles
+	// and projects them once, directly to the final values, in a single
+	// atomic pass — see the reconciliation branch of init() below.
+	if (!reconciliationCandidate) {
+		document.documentElement.classList.add("fchub-mc-projecting");
+	} else {
 		setSwitcherLoading(true);
 		// Show the visitor's own choice immediately — not the page's possibly-
 		// stale server-rendered value — and keep showing it for the entire
-		// wait (issue #72 UX requirement).
+		// wait (issue #72 UX requirement). This is the ONLY visible loading
+		// treatment during reconciliation; prices get none at all (see above).
 		syncTriggerToCode(storedCurrencyAtLoad);
-		// Dim prices instead of hiding them for the same reason: a continuous,
-		// dimmed "old" price the visitor can still see reads as "in progress";
-		// several seconds of blank space reads as broken or finished, when
-		// reconciliation has actually just started. See the CSS comment on
-		// .fchub-mc-reconciling.
-		document.documentElement.classList.add("fchub-mc-reconciling");
 		debugLog("switcher_loading_applied", {
 			triggerCodeAtThisPoint: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
 		});
@@ -1202,24 +1206,16 @@
 
 		debugLog("init_reconciliation_branch");
 
-		// Project immediately with whatever (possibly stale) values the page
-		// was served with — dimmed via .fchub-mc-reconciling above — rather
-		// than leaving prices unprojected and hidden for the whole wait.
-		// reconcile() below then swaps this out for the corrected currency:
-		// if it finds a genuine change, clearProjectionMarkers() (in its own
-		// .then(), above) and this projectPrices() call happen back to back
-		// in the same synchronous pass once it settles, so the visible
-		// transition is one atomic swap from old-dimmed to new-normal, never
-		// an intermediate raw or blank flash. If it finds no change (or
-		// fails/times out), these same already-correct prices are simply
-		// left in place and un-dimmed.
-		projectPrices();
-		observeDynamicUpdates();
-		listenForFluentCartEvents();
-		debugLog("initial_stale_projection_done", {
-			projectedCount: document.querySelectorAll("[data-fchub-mc-projected]").length,
-		});
-
+		// Deliberately do nothing to prices here — no projectPrices() call, no
+		// hide/dim class, nothing. They stay exactly as the server rendered
+		// them (unconverted base-currency figures) until reconcile() settles
+		// below. Its finally() is the only place prices get touched during
+		// this whole window: clearProjectionMarkers() (in its own .then(),
+		// above — a no-op here since nothing has been projected/marked yet)
+		// and this first-ever projectPrices() call happen back to back in the
+		// same synchronous pass, so the visible change is one atomic swap
+		// straight from untouched-old to converted-new — never an
+		// intermediate hidden, dimmed, or partially-updated state.
 		reconcile().finally(() => {
 			// fchubMcSyncSwitcherDisplay() (called from within reconcile()'s own
 			// success path, before this finally() runs) has already updated the
@@ -1231,8 +1227,9 @@
 				triggerCodeAtThisPoint: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
 			});
 			setSwitcherLoading(false);
-			document.documentElement.classList.remove("fchub-mc-reconciling");
 			projectPrices();
+			observeDynamicUpdates();
+			listenForFluentCartEvents();
 			debugLog("init_reconciliation_branch_complete", {
 				triggerCodeFinal: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
 			});
