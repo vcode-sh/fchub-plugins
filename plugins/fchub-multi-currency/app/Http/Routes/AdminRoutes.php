@@ -28,6 +28,12 @@ final class AdminRoutes
             'permission_callback' => [self::class, 'canManage'],
         ]);
 
+        register_rest_route(Constants::REST_NAMESPACE, '/admin/rates/manual', [
+            'methods'             => 'POST',
+            'callback'            => [new RatesAdminController(), 'saveManual'],
+            'permission_callback' => [self::class, 'canManage'],
+        ]);
+
         register_rest_route(Constants::REST_NAMESPACE, '/admin/settings', [
             [
                 'methods'             => 'GET',

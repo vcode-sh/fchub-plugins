@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Domain\Resolvers;
 
+use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
+
 defined('ABSPATH') || exit;
 
 final class UserMetaResolver
 {
-    use AllowedCurrencyCheck;
-
     public function resolve(string $baseCurrencyCode, array $enabledCurrencies): ?string
     {
         $userId = get_current_user_id();
@@ -26,7 +26,7 @@ final class UserMetaResolver
 
         $code = strtoupper($preference);
 
-        if (!$this->isAllowedCurrency($code, $baseCurrencyCode, $enabledCurrencies)) {
+        if (!SelectableCurrencyCodes::from($baseCurrencyCode, $enabledCurrencies)->contains($code)) {
             return null;
         }
 

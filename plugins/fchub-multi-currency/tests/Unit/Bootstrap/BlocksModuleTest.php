@@ -87,7 +87,6 @@ final class BlocksModuleTest extends TestCase
     {
         $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
         $prop = $ref->getProperty('cachedChain');
-        $prop->setAccessible(true);
         $prop->setValue(null, null);
     }
 }

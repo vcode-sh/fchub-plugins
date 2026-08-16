@@ -94,4 +94,50 @@ final class ExchangeRateRepository
 
         return true;
     }
+
+    /**
+     * @param array<ExchangeRate> $rates
+     */
+    public function insertMany(array $rates): bool
+    {
+        if ($rates === []) {
+            return true;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . Constants::TABLE_RATE_HISTORY;
+        $rows = array_fill(0, count($rates), '(%s, %s, %s, %s, %s)');
+        $values = [$table];
+
+        foreach ($rates as $rate) {
+            array_push(
+                $values,
+                $rate->baseCurrency,
+                $rate->quoteCurrency,
+                $rate->rate,
+                $rate->provider->value,
+                $rate->fetchedAt,
+            );
+        }
+
+        // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The row placeholders are generated here; every value still passes through wpdb::prepare().
+        $query = $wpdb->prepare(
+            'INSERT INTO %i (base_currency, quote_currency, rate, provider, fetched_at) VALUES '
+                . implode(', ', $rows),
+            ...$values,
+        );
+        // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared -- A single already-prepared multi-row INSERT keeps one exchange-rate snapshot atomic.
+        $result = $wpdb->query($query);
+        if ($result === false) {
+            Logger::error('Failed to insert exchange-rate snapshot', [
+                'db_error' => $wpdb->last_error ?? '',
+                'count' => count($rates),
+            ]);
+            return false;
+        }
+
+        return true;
+    }
 }

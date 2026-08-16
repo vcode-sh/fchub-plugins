@@ -125,6 +125,23 @@ test('PHPUnit consumes the plugin list selected before matrix expansion', () => 
   assert.doesNotMatch(phpunit, /Check for changes/)
 })
 
+test('Multi-Currency browser behavior tests run in the plugin matrix', () => {
+  const phpunit = job(ci, 'phpunit')
+  const jobSteps = steps(phpunit)
+  const node = jobSteps.find((entry) => entry.name === 'Setup Node.js for Multi-Currency')
+  const behavior = jobSteps.find((entry) => entry.name === 'Run Multi-Currency browser behavior tests')
+
+  assert.ok(node, 'Expected a pinned Node.js setup for Multi-Currency')
+  assert.ok(behavior, 'Expected the Multi-Currency browser behavior suite')
+  assert.match(node.body, /if: matrix\.php_version == '8\.5' && matrix\.plugin == 'fchub-multi-currency'/)
+  assert.match(node.body, /uses: actions\/setup-node@v7/)
+  assert.match(node.body, /node-version: '26'/)
+  assert.match(behavior.body, /if: matrix\.php_version == '8\.5' && matrix\.plugin == 'fchub-multi-currency'/)
+  assert.match(behavior.body, /working-directory: plugins\/\$\{\{ matrix\.plugin \}\}/)
+  assert.match(behavior.body, /node --test tests\/js\/\*\.test\.mjs/)
+  assert.ok(node.at < behavior.at, 'Node.js must be configured before the behavior suite runs')
+})
+
 test('Only the scope job diffs commits, with full history and a full-run fallback', () => {
   const names = [...ci.matchAll(/^ {2}([a-z0-9-]+):$/gm)].map((m) => m[1])
   assert.ok(names.length > 0, 'Expected to find jobs in ci.yml')

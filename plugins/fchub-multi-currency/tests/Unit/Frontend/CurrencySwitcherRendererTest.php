@@ -7,6 +7,7 @@ namespace FChubMultiCurrency\Tests\Unit\Frontend;
 use FChubMultiCurrency\Bootstrap\Modules\FrontendModule;
 use FChubMultiCurrency\Frontend\CurrencySwitcherRenderer;
 use FChubMultiCurrency\Tests\Support\TestCase;
+use FluentCart\Api\CurrencySettings;
 use PHPUnit\Framework\Attributes\Test;
 
 final class CurrencySwitcherRendererTest extends TestCase
@@ -15,6 +16,7 @@ final class CurrencySwitcherRendererTest extends TestCase
     {
         parent::setUp();
         $this->resetContextModuleCache();
+        CurrencySettings::setMock(['currency' => 'EUR']);
 
         $this->setOption('fchub_mc_settings', [
             'enabled'             => 'yes',
@@ -104,6 +106,24 @@ final class CurrencySwitcherRendererTest extends TestCase
     }
 
     #[Test]
+    public function testBaseCurrencyKeepsAHiddenFooterPlaceholderForCacheRecovery(): void
+    {
+        $this->setWpdbMockRow(null);
+        \FChubMultiCurrency\Domain\Services\CurrencyContextService::reset();
+
+        $html = FrontendModule::renderSwitcher([
+            'show_rate_badge' => 'yes',
+            'show_rate_value' => 'no',
+            'show_context_note' => 'no',
+        ]);
+
+        $this->assertStringContainsString(
+            'class="fchub-mc-switcher__footer" data-fchub-mc-switcher-footer hidden></span>',
+            $html,
+        );
+    }
+
+    #[Test]
     public function testRendererSupportsSymbolAndDropdownDirectionConfiguration(): void
     {
         $html = FrontendModule::renderSwitcher([
@@ -142,6 +162,10 @@ final class CurrencySwitcherRendererTest extends TestCase
 
         $this->assertStringContainsString('1 EUR = 1.10000000 USD', $html);
         $this->assertStringContainsString('Display prices only. Checkout is charged in EUR.', $html);
+        $this->assertStringContainsString('data-fchub-mc-show-rate-badge="1"', $html);
+        $this->assertStringContainsString('data-fchub-mc-show-rate-value="1"', $html);
+        $this->assertStringContainsString('data-fchub-mc-show-context-note="1"', $html);
+        $this->assertStringContainsString('data-fchub-mc-switcher-footer', $html);
     }
 
     #[Test]
@@ -168,7 +192,6 @@ final class CurrencySwitcherRendererTest extends TestCase
     {
         $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
         $prop = $ref->getProperty('cachedChain');
-        $prop->setAccessible(true);
         $prop->setValue(null, null);
     }
 }

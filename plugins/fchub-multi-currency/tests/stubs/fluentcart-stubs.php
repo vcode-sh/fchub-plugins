@@ -41,6 +41,11 @@ final class CurrenciesHelper
             'JPY' => true,
         ];
     }
+
+    public static function isZeroDecimal(string $currencyCode): bool
+    {
+        return isset(self::zeroDecimalCurrencies()[strtoupper($currencyCode)]);
+    }
 }
 
 class Helper
@@ -149,9 +154,9 @@ final class CurrencySettings
      *
      * @return array<string, mixed>
      */
-    public static function get(): array
+    public static function get(string $key = ''): mixed
     {
-        return array_merge([
+        $settings = array_merge([
             'currency_separator' => 'dot',
             'decimal_separator'  => '.',
             'currency_sign'      => '$',
@@ -159,10 +164,20 @@ final class CurrencySettings
             'currency'           => 'USD',
             'is_zero_decimal'    => false,
         ], self::$mock);
+
+        return $key !== '' ? ($settings[$key] ?? null) : $settings;
     }
 
-    public static function getPriceHtml(float $price, string $currencyCode = 'USD'): string
+    public static function getPriceHtml(
+        float $price,
+        string $currencyCode = 'USD',
+        bool $showDecimal = true,
+    ): string
     {
-        return sprintf('%s %s', $currencyCode, number_format($price, 2, '.', ''));
+        return sprintf(
+            '%s %s',
+            $currencyCode,
+            number_format($price / 100, $showDecimal ? 2 : 0, '.', ''),
+        );
     }
 }

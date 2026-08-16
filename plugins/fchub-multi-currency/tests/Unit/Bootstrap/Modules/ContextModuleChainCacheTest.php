@@ -18,7 +18,6 @@ final class ContextModuleChainCacheTest extends TestCase
         // Reset the static cached chain before each test
         $ref = new \ReflectionClass(ContextModule::class);
         $prop = $ref->getProperty('cachedChain');
-        $prop->setAccessible(true);
         $prop->setValue(null, null);
 
         $_GET = [];

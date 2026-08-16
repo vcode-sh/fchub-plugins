@@ -24,7 +24,10 @@ abstract class TestCase extends BaseTestCase
         $GLOBALS['wp_transients'] = [];
         $GLOBALS['wp_mock_is_admin'] = false;
         $GLOBALS['wp_mock_cookies'] = [];
+        $GLOBALS['fchub_mc_setcookie_calls'] = [];
+        $GLOBALS['fchub_mc_setcookie_result'] = true;
         $GLOBALS['wp_mock_user_meta'] = [];
+        $GLOBALS['wp_mock_update_user_meta_result'] = null;
         $GLOBALS['wp_mock_post_meta'] = [];
         $GLOBALS['wp_cache_store'] = [];
         $GLOBALS['wp_registered_scripts'] = [];
@@ -32,6 +35,7 @@ abstract class TestCase extends BaseTestCase
         $GLOBALS['wp_enqueued_scripts'] = [];
         $GLOBALS['wp_enqueued_styles'] = [];
         $GLOBALS['wp_localized_scripts'] = [];
+        $GLOBALS['wp_inline_scripts'] = [];
         $GLOBALS['wp_registered_blocks'] = [];
         $GLOBALS['wp_registered_block_patterns'] = [];
         $GLOBALS['wp_registered_block_pattern_categories'] = [];

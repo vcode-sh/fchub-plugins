@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, currency, exchange-rates, ecommerce
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.4.4
+Stable tag: 1.4.5
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -90,6 +90,12 @@ No. Manual is the no-network default. A scheduled refresh is created only after 
 The failed response is not persisted. Customer prices continue to use the last good or manually entered rates according to the configured stale-rate fallback.
 
 == Changelog ==
+
+= 1.4.5 =
+
+* Reconciled cached storefront pages with the visitor's current currency cookie without adding a second browser preference store.
+* Kept prices, switchers, flags and currency context blocks in sync across base-currency, stale URL and malformed-cookie fallbacks.
+* Stopped expired guest nonces and failed persistence writes from being reported as successful currency changes.
 
 = 1.4.4 =
 

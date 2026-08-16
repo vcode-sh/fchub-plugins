@@ -4,7 +4,7 @@
  * Plugin Name: FCHub Multi-Currency
  * Plugin URI: https://fchub.co/docs/fchub-multi-currency
  * Description: Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure
- * Version: 1.4.4
+ * Version: 1.4.5
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -21,7 +21,7 @@ declare(strict_types=1);
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_MC_VERSION', '1.4.4');
+define('FCHUB_MC_VERSION', '1.4.5');
 define('FCHUB_MC_FILE', __FILE__);
 define('FCHUB_MC_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_MC_URL', plugin_dir_url(__FILE__));
@@ -159,66 +159,17 @@ add_action('admin_notices', function () {
  * Public API: Format a base-currency price in the visitor's display currency.
  *
  * Other FCHub plugins can call this to render multi-currency aware prices:
- *   fchub_mc_format_price(9.99) → "€9.34"
+ *   fchub_mc_format_price(999) → "€9.34"
  *
  * Falls back to FluentCart's default formatting when multi-currency is inactive
  * or the visitor is browsing in the base currency.
  *
- * @param float $basePrice Price in the store's base currency
+ * @param float $basePrice Price in FluentCart's cent-based storage unit
  * @return string Formatted price HTML
  */
 function fchub_mc_format_price(float $basePrice): string
 {
-    if (!defined('FLUENTCART_VERSION')) {
-        return (string) $basePrice;
-    }
-
-    if (!FChubMultiCurrency\Support\Hooks::isEnabled()) {
-        return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
-    }
-
-    $optionStore = new FChubMultiCurrency\Storage\OptionStore();
-
-    // Reuse the already-resolved context if available (avoids rebuilding the full
-    // resolver chain + DB queries on every call in a product listing loop)
-    $context = FChubMultiCurrency\Domain\Services\CurrencyContextService::getResolved();
-
-    if ($context === null) {
-        $contextService = new FChubMultiCurrency\Domain\Services\CurrencyContextService(
-            FChubMultiCurrency\Bootstrap\Modules\ContextModule::buildResolverChain($optionStore),
-            $optionStore,
-        );
-        $context = $contextService->resolve();
-    }
-
-    if ($context->isBaseDisplay) {
-        return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
-    }
-
-    $converted = function_exists('bcmul')
-        ? (float) bcmul((string) $basePrice, $context->rate->rate, 8)
-        : ((float) $basePrice * (float) $context->rate->rate);
-
-    $roundingMode = FChubMultiCurrency\Domain\Enums\RoundingMode::tryFrom(
-        $optionStore->get('rounding_mode', 'half_up'),
-    ) ?? FChubMultiCurrency\Domain\Enums\RoundingMode::HalfUp;
-    $decimals = $context->displayCurrency->decimals;
-
-    $rounded = match ($roundingMode) {
-        FChubMultiCurrency\Domain\Enums\RoundingMode::None => (float) (
-            (
-                $converted >= 0
-                    ? floor($converted * (10 ** $decimals))
-                    : ceil($converted * (10 ** $decimals))
-            ) / (10 ** $decimals)
-        ),
-        FChubMultiCurrency\Domain\Enums\RoundingMode::HalfUp   => round($converted, $decimals, PHP_ROUND_HALF_UP),
-        FChubMultiCurrency\Domain\Enums\RoundingMode::HalfDown => round($converted, $decimals, PHP_ROUND_HALF_DOWN),
-        FChubMultiCurrency\Domain\Enums\RoundingMode::Ceil     => (float) (ceil($converted * (10 ** $decimals)) / (10 ** $decimals)),
-        FChubMultiCurrency\Domain\Enums\RoundingMode::Floor    => (float) (floor($converted * (10 ** $decimals)) / (10 ** $decimals)),
-    };
-
-    return \FluentCart\Api\CurrencySettings::getPriceHtml($rounded, $context->displayCurrency->code);
+    return FChubMultiCurrency\Integration\PublicPriceApi::formatPrice($basePrice);
 }
 
 /**
@@ -232,18 +183,7 @@ function fchub_mc_format_price(float $basePrice): string
  */
 function fchub_mc_get_order_display_currency(int $orderId): ?string
 {
-    if (!defined('FLUENTCART_VERSION')) {
-        return null;
-    }
-
-    /** @var \FluentCart\App\Models\Order|null $order */
-    $order = \FluentCart\App\Models\Order::query()->find($orderId);
-    if (!$order) {
-        return null;
-    }
-
-    $currency = $order->getMeta('_fchub_mc_display_currency');
-    return $currency ? (string) $currency : null;
+    return FChubMultiCurrency\Integration\PublicPriceApi::getOrderDisplayCurrency($orderId);
 }
 
 /**
@@ -252,31 +192,13 @@ function fchub_mc_get_order_display_currency(int $orderId): ?string
  * Uses the exchange rate that was captured at checkout time for that order.
  * Falls back to base currency formatting if no multicurrency data exists.
  *
- *   fchub_mc_format_order_price(99.99, 42) → "€84.99"
+ *   fchub_mc_format_order_price(9999, 42) → "€84.99"
  *
- * @param float $basePrice Price in the store's base currency (decimal, not cents)
+ * @param float $basePrice Price in FluentCart's cent-based storage unit
  * @param int $orderId FluentCart order ID
  * @return string Formatted price HTML
  */
 function fchub_mc_format_order_price(float $basePrice, int $orderId): string
 {
-    if (!defined('FLUENTCART_VERSION')) {
-        return (string) $basePrice;
-    }
-
-    /** @var \FluentCart\App\Models\Order|null $order */
-    $order = \FluentCart\App\Models\Order::query()->find($orderId);
-    if (!$order) {
-        return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
-    }
-
-    $displayCurrency = $order->getMeta('_fchub_mc_display_currency');
-    $rate = $order->getMeta('_fchub_mc_rate');
-
-    if (!$displayCurrency || !$rate) {
-        return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
-    }
-
-    $converted = $basePrice * (float) $rate;
-    return \FluentCart\Api\CurrencySettings::getPriceHtml(round($converted, 2), $displayCurrency);
+    return FChubMultiCurrency\Integration\PublicPriceApi::formatOrderPrice($basePrice, $orderId);
 }

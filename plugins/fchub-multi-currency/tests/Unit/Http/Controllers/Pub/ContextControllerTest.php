@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Tests\Unit\Http\Controllers\Pub;
 
+use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
+use FChubMultiCurrency\Domain\ValueObjects\Currency;
+use FChubMultiCurrency\Domain\ValueObjects\CurrencyContext;
 use FChubMultiCurrency\Http\Controllers\Pub\ContextController;
 use FChubMultiCurrency\Tests\Support\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -11,6 +14,183 @@ use PHPUnit\Framework\Attributes\Test;
 
 final class ContextControllerTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        ContextModule::resetChain();
+    }
+
+    #[Test]
+    public function testGetRecoversAnAllowedCookieCurrencyWithoutThePublicUrlResolver(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency' => 'USD',
+            'url_param_enabled' => 'no',
+            'url_param_key' => 'money',
+            'display_currencies' => [[
+                'code' => 'EUR',
+                'name' => 'Euro',
+                'symbol' => '&euro;',
+                'decimals' => 2,
+                'position' => 'right_space',
+                'decimal_separator' => ',',
+                'thousand_separator' => '.',
+            ]],
+        ]);
+        $this->setWpdbMockRow([
+            'base_currency' => 'USD',
+            'quote_currency' => 'EUR',
+            'rate' => '0.92000000',
+            'provider' => 'manual',
+            'fetched_at' => current_time('mysql'),
+        ]);
+
+        $request = new \WP_REST_Request('GET', '/');
+        $request->set_param('currency', 'eur');
+
+        $response = (new ContextController())->get($request);
+        $data = $response->get_data()['data'];
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame('EUR', $data['display_currency']);
+        $this->assertSame('cookie', $data['source']);
+        $this->assertSame('EUR', $data['context']['displayCurrency']);
+        $this->assertSame('Euro', $data['context']['displayCurrencyName']);
+        $this->assertSame('€', $data['context']['symbol']);
+        $this->assertSame(0.92, $data['context']['rate']);
+        $this->assertSame(',', $data['context']['displayDecSep']);
+        $this->assertSame('.', $data['context']['displayThousandSep']);
+        $this->assertFalse($data['context']['isBaseDisplay']);
+        $this->assertArrayHasKey('presentation', $data['context']);
+        $this->assertStringContainsString('alt="EUR"', $data['context']['presentation']['flag']);
+        $this->assertArrayNotHasKey('rateValue', $data['context']);
+        $this->assertSame('no-store', $response->get_headers()['Cache-Control']);
+    }
+
+    #[Test]
+    public function testExplicitRecoveryHonoursThePublicContextFilter(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency' => 'USD',
+            'display_currencies' => [[
+                'code' => 'EUR',
+                'name' => 'Euro',
+                'symbol' => '€',
+                'decimals' => 2,
+                'position' => 'right_space',
+            ]],
+        ]);
+        $this->setWpdbMockRow([
+            'base_currency' => 'USD',
+            'quote_currency' => 'EUR',
+            'rate' => '0.92000000',
+            'provider' => 'manual',
+            'fetched_at' => current_time('mysql'),
+        ]);
+        add_filter('fchub_mc/context', static function (CurrencyContext $context): CurrencyContext {
+            return new CurrencyContext(
+                displayCurrency: new Currency(
+                    code: $context->displayCurrency->code,
+                    name: 'Filtered Euro',
+                    symbol: $context->displayCurrency->symbol,
+                    decimals: $context->displayCurrency->decimals,
+                    position: $context->displayCurrency->position,
+                ),
+                baseCurrency: $context->baseCurrency,
+                rate: $context->rate,
+                source: $context->source,
+                isBaseDisplay: $context->isBaseDisplay,
+            );
+        });
+        $request = new \WP_REST_Request('GET', '/');
+        $request->set_param('currency', 'EUR');
+
+        $response = (new ContextController())->get($request);
+
+        $this->assertSame('Filtered Euro', $response->get_data()['data']['context']['displayCurrencyName']);
+    }
+
+    #[Test]
+    public function testGetPreservesLegacyFieldsAndAddsTheBrowserContextForNormalResolution(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency' => 'USD',
+            'default_display_currency' => 'EUR',
+            'display_currencies' => [[
+                'code' => 'EUR',
+                'name' => 'Euro',
+                'symbol' => '€',
+                'decimals' => 2,
+                'position' => 'right_space',
+            ]],
+        ]);
+        $this->setWpdbMockRow([
+            'base_currency' => 'USD',
+            'quote_currency' => 'EUR',
+            'rate' => '0.92000000',
+            'provider' => 'manual',
+            'fetched_at' => current_time('mysql'),
+        ]);
+
+        $response = (new ContextController())->get(new \WP_REST_Request('GET', '/'));
+        $data = $response->get_data()['data'];
+
+        $this->assertSame('EUR', $data['display_currency']);
+        $this->assertSame('USD', $data['base_currency']);
+        $this->assertSame('0.92000000', $data['rate']);
+        $this->assertSame('default', $data['source']);
+        $this->assertFalse($data['is_base_display']);
+        $this->assertSame('EUR', $data['context']['displayCurrency']);
+        $this->assertSame('no-store', $response->get_headers()['Cache-Control']);
+    }
+
+    #[Test]
+    public function testGetRecoversTheBaseCurrencyInsteadOfTreatingRateOneAsNoop(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency' => 'USD',
+            'default_display_currency' => 'EUR',
+            'display_currencies' => [[
+                'code' => 'EUR',
+                'name' => 'Euro',
+                'symbol' => '€',
+                'decimals' => 2,
+                'position' => 'right_space',
+            ]],
+        ]);
+
+        $request = new \WP_REST_Request('GET', '/');
+        $request->set_param('currency', 'USD');
+
+        $response = (new ContextController())->get($request);
+        $data = $response->get_data()['data'];
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame('USD', $data['display_currency']);
+        $this->assertSame('cookie', $data['source']);
+        $this->assertSame(1.0, $data['context']['rate']);
+        $this->assertTrue($data['context']['isBaseDisplay']);
+    }
+
+    #[Test]
+    public function testGetRejectsAnUnknownRecoveryCurrencyWithoutCachingTheFailure(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency' => 'USD',
+            'display_currencies' => [['code' => 'EUR']],
+        ]);
+
+        $request = new \WP_REST_Request('GET', '/');
+        $request->set_param('currency', 'GBP');
+
+        $response = (new ContextController())->get($request);
+
+        $this->assertSame(422, $response->get_status());
+        $this->assertSame(ContextController::CODE_INVALID_CURRENCY, $response->get_data()['data']['code']);
+        $this->assertSame('no-store', $response->get_headers()['Cache-Control']);
+    }
+
     #[Test]
     public function testSetReturnsBadRequestForInvalidJsonPayload(): void
     {
@@ -88,6 +268,26 @@ final class ContextControllerTest extends TestCase
         $this->assertSame('EUR', $data['data']['currency']);
         $this->assertStringContainsString('Cookie persistence is disabled', $data['data']['message']);
         $this->assertHookNotFired('fchub_mc/context_switched');
+    }
+
+    #[Test]
+    public function testSetReportsFailureWhenTheCookieHeaderCannotBeWritten(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency' => 'USD',
+            'cookie_enabled' => 'yes',
+            'display_currencies' => [['code' => 'EUR']],
+        ]);
+        $GLOBALS['fchub_mc_setcookie_result'] = false;
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params(['currency' => 'EUR']);
+
+        $response = (new ContextController())->set($request);
+        $data = $response->get_data()['data'];
+
+        $this->assertSame(409, $response->get_status());
+        $this->assertSame(ContextController::CODE_PERSISTENCE_UNAVAILABLE, $data['code']);
+        $this->assertFalse($data['persisted']);
     }
 
     #[Test]
@@ -241,6 +441,7 @@ final class ContextControllerTest extends TestCase
         $this->assertSame($expectedStatus, $response->get_status());
         $this->assertSame($expectedCode, $data['data']['code']);
         $this->assertNotSame('', $data['data']['message']);
+        $this->assertSame('no-store', $response->get_headers()['Cache-Control']);
     }
 
     #[Test]

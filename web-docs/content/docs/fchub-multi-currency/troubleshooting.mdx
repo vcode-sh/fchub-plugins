@@ -34,9 +34,9 @@ import { Separator } from '@/components/ui/separator';
   <Accordion title="Prices showing in base currency despite switching">
     If you've switched to EUR but prices still show in USD, the context resolution may be failing. Check:
 
-    1. **Cookie blocked** — some caching plugins strip cookies. Verify the `fchub_mc_currency` cookie exists in your browser
-    2. **Full page cache** — if your host serves cached HTML, the projection script config may have the wrong currency. Exclude the `fchub_mc_currency` cookie from cache key or use a cache-busting URL parameter
-    3. **REST API blocked** — the `POST /fchub-mc/v1/context` call may be failing. Check the Network tab in dev tools for 403 or 404 responses
+    1. **Cookie blocked** — verify the `fchub_mc_currency` cookie exists in the browser. There is nothing to recover when the browser refuses to store the preference.
+    2. **Recovery request blocked** — cached pages are repaired through `GET /fchub-mc/v1/context`, with browser and intermediary caching disabled. Check the Network tab for a failed request.
+    3. **Old HTML still cached after an update** — purge the page or edge cache once so it serves the recovery runtime added in 1.4.5. Per-page cache exclusions are not required after that.
   </Accordion>
 </Accordions>
 
@@ -56,12 +56,16 @@ import { Separator } from '@/components/ui/separator';
     Also check that the cron event is scheduled: look for `fchub_mc_refresh_rates` in a cron inspector plugin like WP Crontrol.
   </Accordion>
   <Accordion title="Manual refresh returns an error">
-    The **Refresh Now** button calls `POST /fchub-mc/v1/admin/rates/refresh`. If it returns 500:
+    The **Refresh Now** button calls `POST /fchub-mc/v1/admin/rates/refresh` for remote providers. If it returns 409, Manual rates is the saved provider; use **Save Manual Rates** instead.
+
+    If it returns 500:
 
     1. **API key invalid** — check your rate provider API key in settings
     2. **Provider down** — the external API may be temporarily unavailable
     3. **Lock contention** — another refresh is already running (120-second lock). Wait and try again
     4. **Empty rates** — the provider returned no rates. Check your base currency is supported by the provider
+    5. **Incomplete snapshot** — the provider does not cover one of your configured display currencies. Remove that currency or use a provider that supports the complete set
+    6. **Persistence failure** — the database rejected the snapshot. The previous rates remain active; check the FluentCart logs for the database error
   </Accordion>
   <Accordion title="Stale rate warning in admin">
     A yellow admin notice appears when any rate exceeds the stale threshold. This means the cron job hasn't successfully refreshed rates recently.
@@ -103,9 +107,9 @@ import { Separator } from '@/components/ui/separator';
     After selecting a currency, the page reloads but the old currency appears.
 
     1. **Cookie blocked** — check that the `fchub_mc_currency` cookie is being set. Some privacy plugins or browser settings may block it
-    2. **REST API error** — the `POST /context` call may be failing. Check the Network tab
-    3. **Cache serving stale HTML** — full page cache may serve the old page. Clear cache or exclude the cookie
-    4. **Nonce expired** — if the page was open for a long time, the WP REST nonce may have expired. Reload the page and try again
+    2. **REST API error** — `POST /context` must return `persisted: true`. The switcher deliberately stays put when the server could not save anything.
+    3. **Recovery API unavailable** — an edge-cached page may initially contain another currency, but `GET /context` should correct it before projection. A firewall rule blocking WordPress REST requests rather spoils that plan.
+    4. **Account request rejected** — signed-in visitors use the current WordPress REST nonce. Reload a genuinely old account page if its nonce has expired; guest requests intentionally send no nonce.
   </Accordion>
   <Accordion title="No-JS fallback works, but does not remember the selection">
     The fallback form submits without JavaScript, but it still needs some persistence path.

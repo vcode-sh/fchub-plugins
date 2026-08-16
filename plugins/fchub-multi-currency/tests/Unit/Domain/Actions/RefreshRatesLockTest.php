@@ -21,21 +21,25 @@ final class RefreshRatesLockTest extends TestCase
     {
         $this->setOption('fchub_mc_settings', [
             'base_currency'      => 'USD',
-            'rate_provider'      => 'manual',
+            'rate_provider'      => 'exchange_rate_api',
+            'rate_provider_api_key' => 'api-key',
             'display_currencies' => [
                 ['code' => 'EUR'],
             ],
         ]);
 
-        $this->setWpdbMockResults([
-            [
-                'base_currency'  => 'USD',
-                'quote_currency' => 'EUR',
-                'rate'           => '0.92000000',
-                'provider'       => 'manual',
-                'fetched_at'     => gmdate('Y-m-d H:i:s'),
+        $body = (string) json_encode([
+            'result' => 'success',
+            'conversion_rates' => [
+                'USD' => '1.00000000',
+                'EUR' => '0.92000000',
             ],
         ]);
+        $GLOBALS['wp_mock_remote_response'] = [
+            'body' => $body,
+            'response' => ['code' => 200],
+        ];
+        $GLOBALS['wp_mock_remote_body'] = $body;
     }
 
     #[Test]
@@ -134,17 +138,20 @@ final class RefreshRatesLockTest extends TestCase
     #[Test]
     public function testLockReleasedEvenOnProviderFailure(): void
     {
-        // Configure settings with a provider that will fail
         $this->setOption('fchub_mc_settings', [
             'base_currency'      => 'USD',
-            'rate_provider'      => 'manual',
+            'rate_provider'      => 'exchange_rate_api',
+            'rate_provider_api_key' => 'api-key',
             'display_currencies' => [
                 ['code' => 'EUR'],
             ],
         ]);
-
-        // Empty results = no rates returned
-        $this->setWpdbMockResults([]);
+        $body = '{"result":"error"}';
+        $GLOBALS['wp_mock_remote_response'] = [
+            'body' => $body,
+            'response' => ['code' => 200],
+        ];
+        $GLOBALS['wp_mock_remote_body'] = $body;
 
         $result = $this->makeAction()->execute();
 

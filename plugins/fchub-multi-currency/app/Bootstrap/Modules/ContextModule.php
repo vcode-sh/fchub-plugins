@@ -7,6 +7,7 @@ namespace FChubMultiCurrency\Bootstrap\Modules;
 use FChubMultiCurrency\Bootstrap\ModuleContract;
 use FChubMultiCurrency\Domain\Actions\PersistContextAction;
 use FChubMultiCurrency\Domain\Enums\ResolverSource;
+use FChubMultiCurrency\Domain\Enums\StaleRateFallback;
 use FChubMultiCurrency\Domain\Resolvers\CookieResolver;
 use FChubMultiCurrency\Domain\Resolvers\GeoResolver;
 use FChubMultiCurrency\Domain\Resolvers\ResolverChain;
@@ -16,6 +17,7 @@ use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Domain\Services\ExchangeRateService;
 use FChubMultiCurrency\Domain\ValueObjects\Currency;
 use FChubMultiCurrency\Domain\ValueObjects\CurrencyContext;
+use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Frontend\CurrencySwitcherRenderer;
 use FChubMultiCurrency\Storage\ExchangeRateRepository;
 use FChubMultiCurrency\Storage\OptionStore;
@@ -25,6 +27,8 @@ use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Support\EventLogger;
 use FChubMultiCurrency\Support\FeatureFlags;
 use FChubMultiCurrency\Support\Hooks;
+use FluentCart\Api\CurrencySettings;
+use FluentCart\App\Helpers\CurrenciesHelper;
 
 defined('ABSPATH') || exit;
 
@@ -71,7 +75,7 @@ final class ContextModule implements ModuleContract
         }
 
         $optionStore = new OptionStore();
-        $allowedCodes = CurrencySwitcherRenderer::allowedCurrencyCodes($optionStore);
+        $allowedCodes = SelectableCurrencyCodes::fromSettings($optionStore->all())->all();
         $currencyCode = strtoupper($submitted);
 
         if (!in_array($currencyCode, $allowedCodes, true)) {
@@ -142,7 +146,7 @@ final class ContextModule implements ModuleContract
         $existingPref = get_user_meta($user->ID, '_fchub_mc_currency', true);
 
         if (!$existingPref) {
-            $allowedCodes = CurrencySwitcherRenderer::allowedCurrencyCodes($optionStore);
+            $allowedCodes = SelectableCurrencyCodes::fromSettings($optionStore->all())->all();
             $code = strtoupper($guestCurrency);
 
             if (!in_array($code, $allowedCodes, true)) {
@@ -171,7 +175,9 @@ final class ContextModule implements ModuleContract
             new RatesCacheStore(),
         );
 
-        $staleFallback = $settings['stale_fallback'] ?? 'base';
+        $staleFallback = StaleRateFallback::tryFrom((string) ($settings['stale_fallback'] ?? 'base'))
+            ?? StaleRateFallback::Base;
+        $maxRateAge = max(1, (int) ($settings['stale_threshold_hrs'] ?? 24)) * HOUR_IN_SECONDS;
 
         $chain = new ResolverChain();
 
@@ -179,25 +185,25 @@ final class ContextModule implements ModuleContract
         if (($settings['url_param_enabled'] ?? 'yes') === 'yes') {
             $paramKey = $settings['url_param_key'] ?? 'currency';
             $urlResolver = new UrlParamResolver($paramKey);
-            $chain->add(ResolverSource::UrlParam, self::wrapResolver($urlResolver, $rateService, $rateRepo, $staleFallback, ResolverSource::UrlParam));
+            $chain->add(ResolverSource::UrlParam, self::wrapResolver($urlResolver, $rateService, $maxRateAge, $staleFallback, ResolverSource::UrlParam));
         }
 
         // Priority 2: Logged-in user meta
         if (($settings['account_persistence_enabled'] ?? 'yes') === 'yes') {
             $userMetaResolver = new UserMetaResolver();
-            $chain->add(ResolverSource::UserMeta, self::wrapResolver($userMetaResolver, $rateService, $rateRepo, $staleFallback, ResolverSource::UserMeta));
+            $chain->add(ResolverSource::UserMeta, self::wrapResolver($userMetaResolver, $rateService, $maxRateAge, $staleFallback, ResolverSource::UserMeta));
         }
 
         // Priority 3: Guest cookie
         if (($settings['cookie_enabled'] ?? 'yes') === 'yes') {
             $cookieResolver = new CookieResolver();
-            $chain->add(ResolverSource::Cookie, self::wrapResolver($cookieResolver, $rateService, $rateRepo, $staleFallback, ResolverSource::Cookie));
+            $chain->add(ResolverSource::Cookie, self::wrapResolver($cookieResolver, $rateService, $maxRateAge, $staleFallback, ResolverSource::Cookie));
         }
 
         // Priority 4: Geolocation (feature-flagged)
         if (($settings['geo_enabled'] ?? 'no') === 'yes' && FeatureFlags::isEnabled('geo_resolver')) {
             $geoResolver = new GeoResolver();
-            $chain->add(ResolverSource::Geo, self::wrapResolver($geoResolver, $rateService, $rateRepo, $staleFallback, ResolverSource::Geo));
+            $chain->add(ResolverSource::Geo, self::wrapResolver($geoResolver, $rateService, $maxRateAge, $staleFallback, ResolverSource::Geo));
         }
 
         // Priority 5: Default (uses default_display_currency setting, falls back to base)
@@ -208,7 +214,7 @@ final class ContextModule implements ModuleContract
         ) use (
             $defaultCurrency,
             $rateService,
-            $rateRepo,
+            $maxRateAge,
             $staleFallback
         ) {
             $baseCode = strtoupper($baseCurrencyCode);
@@ -222,7 +228,7 @@ final class ContextModule implements ModuleContract
                 $baseCode,
                 $enabledCurrencies,
                 $rateService,
-                $rateRepo,
+                $maxRateAge,
                 $staleFallback,
                 ResolverSource::Fallback,
             );
@@ -234,6 +240,32 @@ final class ContextModule implements ModuleContract
     }
 
     /**
+     * Resolves a validated browser cookie without consulting public URL settings.
+     */
+    public static function resolveCookiePreference(OptionStore $optionStore, string $currencyCode): CurrencyContext
+    {
+        $settings = $optionStore->all();
+        $baseCode = strtoupper((string) ($settings['base_currency'] ?? 'USD'));
+        $currencies = is_array($settings['display_currencies'] ?? null)
+            ? $settings['display_currencies']
+            : [];
+        $rateService = new ExchangeRateService(new ExchangeRateRepository(), new RatesCacheStore());
+        $maxRateAge = max(1, (int) ($settings['stale_threshold_hrs'] ?? 24)) * HOUR_IN_SECONDS;
+        $staleFallback = StaleRateFallback::tryFrom((string) ($settings['stale_fallback'] ?? 'base'))
+            ?? StaleRateFallback::Base;
+
+        return self::buildContextFromCode(
+            strtoupper($currencyCode),
+            $baseCode,
+            $currencies,
+            $rateService,
+            $maxRateAge,
+            $staleFallback,
+            ResolverSource::Cookie,
+        );
+    }
+
+    /**
      * Wraps a resolver that returns ?string into a callable that returns ?CurrencyContext.
      *
      * @param object $resolver Any resolver with a resolve(string, array): ?string method
@@ -241,8 +273,8 @@ final class ContextModule implements ModuleContract
     private static function wrapResolver(
         object $resolver,
         ExchangeRateService $rateService,
-        ExchangeRateRepository $rateRepo,
-        string $staleFallback,
+        int $maxRateAge,
+        StaleRateFallback $staleFallback,
         ResolverSource $source,
     ): callable {
         return function (
@@ -251,7 +283,7 @@ final class ContextModule implements ModuleContract
         ) use (
             $resolver,
             $rateService,
-            $rateRepo,
+            $maxRateAge,
             $staleFallback,
             $source
         ): ?CurrencyContext {
@@ -266,7 +298,7 @@ final class ContextModule implements ModuleContract
                 $baseCurrencyCode,
                 $enabledCurrencies,
                 $rateService,
-                $rateRepo,
+                $maxRateAge,
                 $staleFallback,
                 $source,
             );
@@ -281,28 +313,31 @@ final class ContextModule implements ModuleContract
         string $baseCurrencyCode,
         array $enabledCurrencies,
         ExchangeRateService $rateService,
-        ExchangeRateRepository $rateRepo,
-        string $staleFallback,
+        int $maxRateAge,
+        StaleRateFallback $staleFallback,
         ResolverSource $source,
     ): CurrencyContext {
         $resolvedCode = strtoupper($code);
         $baseCode = strtoupper($baseCurrencyCode);
-        $baseCurrency = self::findCurrency($baseCode, $enabledCurrencies);
+        $baseCurrency = self::findBaseCurrency($baseCode, $enabledCurrencies);
+
+        if (!SelectableCurrencyCodes::from($baseCode, $enabledCurrencies)->contains($resolvedCode)) {
+            return CurrencyContext::baseOnly($baseCurrency, $source);
+        }
 
         if ($resolvedCode === $baseCode) {
-            return CurrencyContext::baseOnly($baseCurrency);
+            return CurrencyContext::baseOnly($baseCurrency, $source);
         }
 
-        $displayCurrency = self::findCurrency($resolvedCode, $enabledCurrencies);
-        $rate = $rateService->getRate($baseCode, $resolvedCode);
-
-        if ($rate === null && $staleFallback === 'last_known') {
-            // If stale_fallback is 'last_known', try the most recent DB rate even if stale.
-            $rate = $rateRepo->findLatest($baseCode, $resolvedCode);
+        $displayCurrency = self::findConfiguredCurrency($resolvedCode, $enabledCurrencies);
+        if ($displayCurrency === null) {
+            return CurrencyContext::baseOnly($baseCurrency, $source);
         }
+
+        $rate = $rateService->getUsableRate($baseCode, $resolvedCode, $maxRateAge, $staleFallback);
 
         if ($rate === null) {
-            return CurrencyContext::baseOnly($baseCurrency);
+            return CurrencyContext::baseOnly($baseCurrency, $source);
         }
 
         return new CurrencyContext(
@@ -317,7 +352,7 @@ final class ContextModule implements ModuleContract
     /**
      * @param array<int|string, mixed> $enabledCurrencies
      */
-    private static function findCurrency(string $code, array $enabledCurrencies): Currency
+    private static function findConfiguredCurrency(string $code, array $enabledCurrencies): ?Currency
     {
         foreach ($enabledCurrencies as $currencyData) {
             if (is_array($currencyData) && strtoupper($currencyData['code'] ?? '') === strtoupper($code)) {
@@ -325,12 +360,36 @@ final class ContextModule implements ModuleContract
             }
         }
 
+        return null;
+    }
+
+    /**
+     * @param array<int|string, mixed> $enabledCurrencies
+     */
+    private static function findBaseCurrency(string $code, array $enabledCurrencies): Currency
+    {
+        $configured = self::findConfiguredCurrency($code, $enabledCurrencies);
+        if ($configured !== null) {
+            return $configured;
+        }
+
+        $settings = CurrencySettings::get();
+        $currencies = CurrenciesHelper::getCurrencies();
+        $signs = CurrenciesHelper::getCurrencySigns();
+        $zeroDecimal = CurrenciesHelper::zeroDecimalCurrencies();
+        $position = match ((string) ($settings['currency_position'] ?? 'before')) {
+            'after', 'right' => 'right',
+            'after_space', 'right_space' => 'right_space',
+            'before_space', 'left_space' => 'left_space',
+            default => 'left',
+        };
+
         return Currency::from([
-            'code'     => $code,
-            'name'     => $code,
-            'symbol'   => $code,
-            'decimals' => 2,
-            'position' => 'left',
+            'code' => $code,
+            'name' => $currencies[$code] ?? $code,
+            'symbol' => $signs[$code] ?? $settings['currency_sign'] ?? $code,
+            'decimals' => isset($zeroDecimal[$code]) ? 0 : 2,
+            'position' => $position,
         ]);
     }
 }

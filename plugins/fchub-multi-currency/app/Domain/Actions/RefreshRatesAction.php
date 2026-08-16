@@ -8,6 +8,7 @@ use FChubMultiCurrency\Domain\Enums\RateProvider;
 use FChubMultiCurrency\Domain\Providers\ProviderContract;
 use FChubMultiCurrency\Domain\Providers\ProviderRegistry;
 use FChubMultiCurrency\Domain\ValueObjects\ExchangeRate;
+use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Storage\ExchangeRateRepository;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Storage\RatesCacheStore;
@@ -26,118 +27,61 @@ final class RefreshRatesAction
 
     public function execute(): bool
     {
+        $optionStore = new OptionStore();
+        $settings = $optionStore->all();
+
+        if (!ProviderRegistry::usesRemoteProvider($optionStore)) {
+            EventLogger::log('rates_refresh_skipped_manual', get_current_user_id());
+            return false;
+        }
+
+        $baseCurrency = strtoupper((string) ($settings['base_currency'] ?? 'USD'));
+        $quoteCodes = SelectableCurrencyCodes::fromSettings($settings)->quoteCurrencies();
+        if ($quoteCodes === []) {
+            Logger::error('Rate refresh has no configured quote currencies');
+            EventLogger::log('rates_refresh_failed', get_current_user_id(), [
+                'reason' => 'no_quotes',
+            ]);
+            return false;
+        }
+
         if (!$this->acquireLock()) {
             EventLogger::log('rates_refresh_skipped_lock', get_current_user_id());
             return false;
         }
 
         try {
-            $optionStore = new OptionStore();
-            $settings = $optionStore->all();
-            $baseCurrency = $settings['base_currency'] ?? 'USD';
-            $displayCurrencies = $settings['display_currencies'] ?? [];
-
             $provider = ProviderRegistry::resolve($optionStore);
+            $rates = $this->fetchProviderRates($provider, $baseCurrency);
+            if ($rates === null) {
+                return false;
+            }
 
-            try {
-                $rates = $provider->fetchRates($baseCurrency);
-            } catch (\Throwable $e) {
-                Logger::error('Rate refresh failed: provider threw an exception', [
-                    'provider' => $provider->name(),
-                    'error'    => $e->getMessage(),
-                ]);
+            $snapshot = $this->buildSnapshot($rates, $quoteCodes, $baseCurrency, $provider);
+            if ($snapshot === null) {
                 EventLogger::log('rates_refresh_failed', get_current_user_id(), [
                     'provider' => $provider->name(),
-                    'reason' => 'exception',
+                    'reason' => 'incomplete_snapshot',
                 ]);
                 return false;
             }
 
-            if (empty($rates)) {
-                Logger::error('Rate refresh returned empty rates', [
+            if (!$this->repository->insertMany($snapshot)) {
+                Logger::error('Rate refresh snapshot could not be persisted', [
                     'provider' => $provider->name(),
                 ]);
                 EventLogger::log('rates_refresh_failed', get_current_user_id(), [
                     'provider' => $provider->name(),
-                    'reason' => 'empty',
+                    'reason' => 'persistence',
                 ]);
                 return false;
             }
 
-            $now = gmdate('Y-m-d H:i:s');
-            $providerEnum = RateProvider::tryFrom($provider->name()) ?? RateProvider::Manual;
-
-            // Track requested quote codes so an entirely invalid response is a failed refresh.
-            $quoteCodes = [];
-            foreach ($displayCurrencies as $currency) {
-                $code = is_array($currency) ? ($currency['code'] ?? '') : $currency;
-                if ($code !== '' && $code !== $baseCurrency) {
-                    $quoteCodes[] = $code;
-                }
-            }
-
-            $persistedCount = 0;
-
-            foreach ($displayCurrencies as $currency) {
-                $code = is_array($currency) ? ($currency['code'] ?? '') : $currency;
-
-                if ($code === '' || $code === $baseCurrency || !isset($rates[$code])) {
-                    continue;
-                }
-
-                // Guard against non-numeric rates (NaN, Infinity, strings)
-                $rateStr = (string) $rates[$code];
-                if (!is_numeric($rateStr) || preg_match('/[eE]/', $rateStr)) {
-                    Logger::error('Skipping non-numeric rate', [
-                        'currency' => $code,
-                        'rate'     => $rates[$code],
-                        'provider' => $provider->name(),
-                    ]);
-                    continue;
-                }
-
-                // Guard against zero or negative rates from provider
-                $isInvalidRate = function_exists('bccomp')
-                    ? (bccomp($rateStr, '0', 10) <= 0)
-                    : ((float) $rateStr <= 0.0);
-
-                if ($isInvalidRate) {
-                    Logger::error('Skipping invalid rate (zero or negative)', [
-                        'currency' => $code,
-                        'rate'     => $rates[$code],
-                        'provider' => $provider->name(),
-                    ]);
-                    continue;
-                }
-
-                $rate = ExchangeRate::from([
-                    'base_currency'  => $baseCurrency,
-                    'quote_currency' => $code,
-                    'rate'           => $rates[$code],
-                    'provider'       => $providerEnum->value,
-                    'fetched_at'     => $now,
-                ]);
-
-                if (!$this->repository->insert($rate)) {
-                    continue;
-                }
-
-                $this->cache->delete($baseCurrency, $code);
+            foreach ($snapshot as $rate) {
                 $this->cache->set($rate);
-                $persistedCount++;
             }
 
-            if ($quoteCodes !== [] && $persistedCount === 0) {
-                Logger::error('Rate refresh contained no usable configured rates', [
-                    'provider' => $provider->name(),
-                ]);
-                EventLogger::log('rates_refresh_failed', get_current_user_id(), [
-                    'provider' => $provider->name(),
-                    'reason' => 'invalid_rates',
-                ]);
-                return false;
-            }
-
+            $persistedCount = count($snapshot);
             do_action('fchub_mc/rates_refreshed', $baseCurrency, $persistedCount);
             EventLogger::log('rates_refreshed', get_current_user_id(), [
                 'base_currency' => $baseCurrency,
@@ -153,6 +97,102 @@ final class RefreshRatesAction
         } finally {
             $this->releaseLock();
         }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function fetchProviderRates(ProviderContract $provider, string $baseCurrency): ?array
+    {
+        try {
+            $rates = $provider->fetchRates($baseCurrency);
+        } catch (\Throwable $exception) {
+            Logger::error('Rate refresh failed: provider threw an exception', [
+                'provider' => $provider->name(),
+                'error' => $exception->getMessage(),
+            ]);
+            EventLogger::log('rates_refresh_failed', get_current_user_id(), [
+                'provider' => $provider->name(),
+                'reason' => 'exception',
+            ]);
+            return null;
+        }
+
+        if ($rates === []) {
+            Logger::error('Rate refresh returned empty rates', [
+                'provider' => $provider->name(),
+            ]);
+            EventLogger::log('rates_refresh_failed', get_current_user_id(), [
+                'provider' => $provider->name(),
+                'reason' => 'empty',
+            ]);
+            return null;
+        }
+
+        return $rates;
+    }
+
+    /**
+     * @param array<string, mixed> $rates
+     * @param string[] $quoteCodes
+     * @return ExchangeRate[]|null
+     */
+    private function buildSnapshot(
+        array $rates,
+        array $quoteCodes,
+        string $baseCurrency,
+        ProviderContract $provider,
+    ): ?array {
+        $fetchedAt = gmdate('Y-m-d H:i:s');
+        $providerEnum = RateProvider::tryFrom($provider->name()) ?? RateProvider::Manual;
+        $snapshot = [];
+
+        foreach ($quoteCodes as $code) {
+            if (!array_key_exists($code, $rates)) {
+                Logger::error('Rate refresh omitted a configured currency', [
+                    'currency' => $code,
+                    'provider' => $provider->name(),
+                ]);
+                return null;
+            }
+
+            $rate = self::normalizeProviderRate($rates[$code]);
+            if ($rate === null) {
+                Logger::error('Rate refresh returned an invalid configured rate', [
+                    'currency' => $code,
+                    'provider' => $provider->name(),
+                ]);
+                return null;
+            }
+
+            $snapshot[] = new ExchangeRate(
+                baseCurrency: $baseCurrency,
+                quoteCurrency: $code,
+                rate: $rate,
+                provider: $providerEnum,
+                fetchedAt: $fetchedAt,
+            );
+        }
+
+        return $snapshot;
+    }
+
+    private static function normalizeProviderRate(mixed $rate): ?string
+    {
+        if (!is_int($rate) && !is_float($rate) && !is_string($rate)) {
+            return null;
+        }
+
+        $rate = trim((string) $rate);
+        if ($rate === '' || !is_numeric($rate) || preg_match('/[eE]/', $rate) === 1) {
+            return null;
+        }
+
+        $isPositive = function_exists('bccomp')
+            ? bccomp($rate, '0', 10) > 0
+            : (float) $rate > 0.0;
+
+        return $isPositive ? $rate : null;
     }
 
     private function acquireLock(): bool

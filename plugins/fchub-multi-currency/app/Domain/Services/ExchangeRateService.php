@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Domain\Services;
 
+use FChubMultiCurrency\Domain\Enums\StaleRateFallback;
 use FChubMultiCurrency\Domain\ValueObjects\ExchangeRate;
 use FChubMultiCurrency\Storage\ExchangeRateRepository;
 use FChubMultiCurrency\Storage\RatesCacheStore;
@@ -43,5 +44,20 @@ final class ExchangeRateService
         }
 
         return $rate;
+    }
+
+    public function getUsableRate(
+        string $baseCurrency,
+        string $quoteCurrency,
+        int $maxAgeSeconds,
+        StaleRateFallback $fallback,
+    ): ?ExchangeRate {
+        $rate = $this->getRate($baseCurrency, $quoteCurrency);
+
+        if ($rate === null || !$rate->isStale($maxAgeSeconds)) {
+            return $rate;
+        }
+
+        return $fallback === StaleRateFallback::LastKnown ? $rate : null;
     }
 }

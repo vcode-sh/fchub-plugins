@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Integration;
 
+use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Constants;
-use FluentCart\Framework\Support\Arr;
 
 defined('ABSPATH') || exit;
 
@@ -24,8 +24,7 @@ final class MultiCurrencySettings
      */
     public static function getSettings(): array
     {
-        $saved = get_option(Constants::OPTION_SETTINGS, []);
-        return wp_parse_args(is_array($saved) ? $saved : [], Constants::DEFAULT_SETTINGS);
+        return (new OptionStore())->all();
     }
 
     public static function getGlobalSettings($settings, $args): array
@@ -82,13 +81,18 @@ final class MultiCurrencySettings
 
     public static function saveGlobalSettings($args): void
     {
-        $integration = Arr::get($args, 'integration', []);
+        $integration = is_array($args) && is_array($args['integration'] ?? null)
+            ? $args['integration']
+            : [];
+        $optionStore = new OptionStore();
         $settings    = self::getSettings();
-        $settings['enabled'] = Arr::get($integration, 'enabled', 'yes') === 'yes' ? 'yes' : 'no';
-        $settings['checkout_disclosure_enabled'] = Arr::get($integration, 'checkout_disclosure_enabled', 'yes') === 'yes' ? 'yes' : 'no';
-        $settings['fluentcrm_enabled'] = Arr::get($integration, 'fluentcrm_enabled', 'yes') === 'yes' ? 'yes' : 'no';
+        $settings['enabled'] = ($integration['enabled'] ?? 'yes') === 'yes' ? 'yes' : 'no';
+        $settings['checkout_disclosure_enabled'] = ($integration['checkout_disclosure_enabled'] ?? 'yes') === 'yes'
+            ? 'yes'
+            : 'no';
+        $settings['fluentcrm_enabled'] = ($integration['fluentcrm_enabled'] ?? 'yes') === 'yes' ? 'yes' : 'no';
 
-        update_option(Constants::OPTION_SETTINGS, $settings);
+        $optionStore->save($settings);
 
         wp_send_json([
             'message' => __('Multi-Currency settings saved.', 'fchub-multi-currency'),

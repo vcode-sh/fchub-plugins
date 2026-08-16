@@ -95,6 +95,15 @@ final class RoundingPolicyTest extends TestCase
     }
 
     #[Test]
+    public function testPrecision2NoneTruncatesToAWholeMajorUnit(): void
+    {
+        $policy = new RoundingPolicy(RoundingMode::None, 2);
+
+        $this->assertSame(1500, $policy->apply('1550'));
+        $this->assertSame(-1500, $policy->apply('-1550'));
+    }
+
+    #[Test]
     public function testZeroValueReturnsZero(): void
     {
         $this->assertSame(0, (new RoundingPolicy(RoundingMode::None))->apply('0'));

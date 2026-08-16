@@ -160,6 +160,12 @@ jobs:
           tools: composer:v2
           coverage: none
 
+      - name: Setup Node.js for Multi-Currency
+        if: matrix.php_version == '8.5' && matrix.plugin == 'fchub-multi-currency'
+        uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+
       - name: Install dependencies
         working-directory: plugins/${{ matrix.plugin }}
         run: composer install --no-interaction --prefer-dist
@@ -171,6 +177,11 @@ jobs:
       - name: Run PHPUnit
         working-directory: plugins/${{ matrix.plugin }}
         run: ./vendor/bin/phpunit
+
+      - name: Run Multi-Currency browser behavior tests
+        if: matrix.php_version == '8.5' && matrix.plugin == 'fchub-multi-currency'
+        working-directory: plugins/${{ matrix.plugin }}
+        run: node --test tests/js/*.test.mjs
 
       - name: Install pinned static analysis dependencies
         if: matrix.php_version == '8.5' && (matrix.plugin == 'fchub-fakturownia' || matrix.plugin == 'fchub-multi-currency' || matrix.plugin == 'fchub-p24' || matrix.plugin == 'fchub-wishlist')

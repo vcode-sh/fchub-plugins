@@ -2,7 +2,7 @@
 
 define('FCHUB_TESTING', true);
 define('ABSPATH', '/tmp/wordpress/');
-define('FCHUB_MC_VERSION', '1.4.4');
+define('FCHUB_MC_VERSION', '1.4.5');
 define('FCHUB_MC_PATH', dirname(__DIR__) . '/');
 define('FCHUB_MC_URL', 'http://localhost/wp-content/plugins/fchub-multi-currency/');
 define('FCHUB_MC_DB_VERSION', '1.0.0');
@@ -18,6 +18,8 @@ define('COOKIE_DOMAIN', '');
 define('WP_DEBUG', true);
 define('FLUENTCART_VERSION', '1.3.9');
 define('FLUENTCRM', true);
+
+require_once __DIR__ . '/Support/CookieFunctions.php';
 
 // Mock $wpdb global
 if (!isset($GLOBALS['wpdb'])) {
@@ -129,7 +131,10 @@ $GLOBALS['wp_mock_user_caps'] = [];
 $GLOBALS['wp_transients'] = [];
 $GLOBALS['wp_mock_is_admin'] = false;
 $GLOBALS['wp_mock_cookies'] = [];
+$GLOBALS['fchub_mc_setcookie_calls'] = [];
+$GLOBALS['fchub_mc_setcookie_result'] = true;
 $GLOBALS['wp_mock_user_meta'] = [];
+$GLOBALS['wp_mock_update_user_meta_result'] = null;
 $GLOBALS['wp_mock_post_meta'] = [];
 $GLOBALS['wp_cache_store'] = [];
 $GLOBALS['wp_registered_scripts'] = [];
@@ -137,6 +142,7 @@ $GLOBALS['wp_registered_styles'] = [];
 $GLOBALS['wp_enqueued_scripts'] = [];
 $GLOBALS['wp_enqueued_styles'] = [];
 $GLOBALS['wp_localized_scripts'] = [];
+$GLOBALS['wp_inline_scripts'] = [];
 $GLOBALS['wp_registered_blocks'] = [];
 $GLOBALS['wp_registered_block_patterns'] = [];
 $GLOBALS['wp_registered_block_pattern_categories'] = [];
@@ -282,6 +288,17 @@ if (!function_exists('did_action')) {
 if (!function_exists('apply_filters')) {
     function apply_filters($tag, $value, ...$args)
     {
+        $filters = array_values(array_filter(
+            $GLOBALS['wp_filters_registered'],
+            static fn (array $filter): bool => $filter['tag'] === $tag,
+        ));
+        usort($filters, static fn (array $left, array $right): int => $left['priority'] <=> $right['priority']);
+
+        foreach ($filters as $filter) {
+            $callbackArgs = array_slice([$value, ...$args], 0, $filter['accepted_args']);
+            $value = $filter['callback'](...$callbackArgs);
+        }
+
         return $value;
     }
 }
@@ -434,8 +451,12 @@ if (!function_exists('get_user_meta')) {
 if (!function_exists('update_user_meta')) {
     function update_user_meta($userId, $key, $value)
     {
+        if ($GLOBALS['wp_mock_update_user_meta_result'] === false) {
+            return false;
+        }
+
         $GLOBALS['wp_mock_user_meta'][$userId][$key] = $value;
-        return true;
+        return $GLOBALS['wp_mock_update_user_meta_result'] ?? true;
     }
 }
 
@@ -690,6 +711,14 @@ if (!function_exists('wp_localize_script')) {
     }
 }
 
+if (!function_exists('wp_add_inline_script')) {
+    function wp_add_inline_script($handle, $data, $position = 'after')
+    {
+        $GLOBALS['wp_inline_scripts'][$handle][$position][] = $data;
+        return true;
+    }
+}
+
 if (!function_exists('register_block_type')) {
     function register_block_type($block_type, $args = [])
     {
@@ -930,6 +959,7 @@ if (!class_exists('WP_REST_Response')) {
     {
         private $data;
         private int $status;
+        private array $headers = [];
 
         public function __construct($data = null, int $status = 200)
         {
@@ -945,6 +975,21 @@ if (!class_exists('WP_REST_Response')) {
         public function get_status(): int
         {
             return $this->status;
+        }
+
+        public function header(string $key, string $value, bool $replace = true): void
+        {
+            if (!$replace && isset($this->headers[$key])) {
+                $this->headers[$key] .= ', ' . $value;
+                return;
+            }
+
+            $this->headers[$key] = $value;
+        }
+
+        public function get_headers(): array
+        {
+            return $this->headers;
         }
     }
 }
@@ -1033,88 +1078,20 @@ spl_autoload_register(function ($class) {
 if (!function_exists('fchub_mc_format_price')) {
     function fchub_mc_format_price(float $basePrice): string
     {
-        if (!defined('FLUENTCART_VERSION')) {
-            return (string) $basePrice;
-        }
-
-        if (!FChubMultiCurrency\Support\Hooks::isEnabled()) {
-            return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
-        }
-
-        $optionStore = new FChubMultiCurrency\Storage\OptionStore();
-
-        $context = FChubMultiCurrency\Domain\Services\CurrencyContextService::getResolved();
-
-        if ($context === null) {
-            $contextService = new FChubMultiCurrency\Domain\Services\CurrencyContextService(
-                FChubMultiCurrency\Bootstrap\Modules\ContextModule::buildResolverChain($optionStore),
-                $optionStore,
-            );
-            $context = $contextService->resolve();
-        }
-
-        if ($context->isBaseDisplay) {
-            return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
-        }
-
-        $converted = function_exists('bcmul')
-            ? (float) bcmul((string) $basePrice, $context->rate->rate, 8)
-            : ((float) $basePrice * (float) $context->rate->rate);
-
-        $roundingMode = FChubMultiCurrency\Domain\Enums\RoundingMode::tryFrom(
-            $optionStore->get('rounding_mode', 'half_up'),
-        ) ?? FChubMultiCurrency\Domain\Enums\RoundingMode::HalfUp;
-        $decimals = $context->displayCurrency->decimals;
-
-        $rounded = match ($roundingMode) {
-            FChubMultiCurrency\Domain\Enums\RoundingMode::None     => (float) (($converted >= 0 ? floor($converted * (10 ** $decimals)) : ceil($converted * (10 ** $decimals))) / (10 ** $decimals)),
-            FChubMultiCurrency\Domain\Enums\RoundingMode::HalfUp   => round($converted, $decimals, PHP_ROUND_HALF_UP),
-            FChubMultiCurrency\Domain\Enums\RoundingMode::HalfDown => round($converted, $decimals, PHP_ROUND_HALF_DOWN),
-            FChubMultiCurrency\Domain\Enums\RoundingMode::Ceil     => (float) (ceil($converted * (10 ** $decimals)) / (10 ** $decimals)),
-            FChubMultiCurrency\Domain\Enums\RoundingMode::Floor    => (float) (floor($converted * (10 ** $decimals)) / (10 ** $decimals)),
-        };
-
-        return \FluentCart\Api\CurrencySettings::getPriceHtml($rounded, $context->displayCurrency->code);
+        return FChubMultiCurrency\Integration\PublicPriceApi::formatPrice($basePrice);
     }
 }
 
 if (!function_exists('fchub_mc_get_order_display_currency')) {
     function fchub_mc_get_order_display_currency(int $orderId): ?string
     {
-        if (!defined('FLUENTCART_VERSION')) {
-            return null;
-        }
-
-        $order = \FluentCart\App\Models\Order::find($orderId);
-        if (!$order) {
-            return null;
-        }
-
-        $currency = $order->getMeta('_fchub_mc_display_currency');
-        return ($currency && $currency !== '') ? (string) $currency : null;
+        return FChubMultiCurrency\Integration\PublicPriceApi::getOrderDisplayCurrency($orderId);
     }
 }
 
 if (!function_exists('fchub_mc_format_order_price')) {
     function fchub_mc_format_order_price(float $basePrice, int $orderId): string
     {
-        if (!defined('FLUENTCART_VERSION')) {
-            return (string) $basePrice;
-        }
-
-        $order = \FluentCart\App\Models\Order::find($orderId);
-        if (!$order) {
-            return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
-        }
-
-        $displayCurrency = $order->getMeta('_fchub_mc_display_currency');
-        $rate = $order->getMeta('_fchub_mc_rate');
-
-        if (!$displayCurrency || !$rate) {
-            return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
-        }
-
-        $converted = $basePrice * (float) $rate;
-        return \FluentCart\Api\CurrencySettings::getPriceHtml(round($converted, 2), $displayCurrency);
+        return FChubMultiCurrency\Integration\PublicPriceApi::formatOrderPrice($basePrice, $orderId);
     }
 }

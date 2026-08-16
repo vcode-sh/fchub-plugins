@@ -58,7 +58,7 @@ Handy for email campaigns or regional ads. The "URL Parameter Key" field lets yo
 
 ### Cookie Persistence
 
-Should the plugin remember which currency a visitor picked? When enabled, their choice is saved in a browser cookie for 90 days (configurable). They come back next week — still in EUR. No need to pick again.
+Should the plugin remember which currency a visitor picked? When enabled, their choice is saved in a browser cookie for 90 days (configurable). They come back next week — still in EUR. No need to pick again. The cookie contains only the three-letter currency code and is readable by the storefront recovery script so an edge-cached page can correct itself.
 
 When disabled, every page load starts fresh from the default display currency. Most stores want this **on**.
 
@@ -236,7 +236,9 @@ After the exchange rate math, how should converted prices be rounded?
 
 ### Current Rates
 
-The bottom of the tab shows your live rates — base currency, converted currency, the rate, which provider fetched it, when, and whether it's fresh (green **OK**) or stale. Hit **Refresh Now** to pull new rates immediately.
+The bottom of the tab shows your live rates — base currency, converted currency, the rate, which provider fetched it, when, and whether it's fresh (green **OK**) or stale.
+
+Remote providers show **Refresh Now**. A refresh succeeds only when the provider returns a valid rate for every configured display currency, so a half-updated table never gets to cosplay as current data. Manual mode instead shows one input per configured display currency and **Save Manual Rates**; all values are saved as one complete snapshot.
 
 <Separator className="my-8" />
 

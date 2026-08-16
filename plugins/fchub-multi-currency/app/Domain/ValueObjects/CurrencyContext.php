@@ -19,7 +19,7 @@ final readonly class CurrencyContext
     ) {
     }
 
-    public static function baseOnly(Currency $base): self
+    public static function baseOnly(Currency $base, ResolverSource $source = ResolverSource::Fallback): self
     {
         return new self(
             displayCurrency: $base,
@@ -31,7 +31,7 @@ final readonly class CurrencyContext
                 provider: \FChubMultiCurrency\Domain\Enums\RateProvider::Manual,
                 fetchedAt: gmdate('Y-m-d H:i:s'),
             ),
-            source: ResolverSource::Fallback,
+            source: $source,
             isBaseDisplay: true,
         );
     }

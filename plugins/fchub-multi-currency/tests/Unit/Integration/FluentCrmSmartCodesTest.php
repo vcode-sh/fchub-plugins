@@ -199,9 +199,8 @@ final class FluentCrmSmartCodesTest extends TestCase
         $order->id = 42;
         Order::setMockOrder(42, $order);
 
-        // basePrice=100.00, rate=0.85 → converted=85.00 → rounded=85.00
-        // CurrencySettings::getPriceHtml(85.00, 'EUR') → "EUR 85.00"
-        $result = fchub_mc_format_order_price(100.00, 42);
+        // 10000 cents at 0.85 becomes 8500 cents → EUR 85.00.
+        $result = fchub_mc_format_order_price(10000.0, 42);
 
         $this->assertSame('EUR 85.00', $result);
     }
@@ -214,8 +213,8 @@ final class FluentCrmSmartCodesTest extends TestCase
         Order::setMockOrder(42, $order);
 
         // No multicurrency meta → falls back to base currency formatting
-        // CurrencySettings::getPriceHtml(100.00) → "USD 100.00"
-        $result = fchub_mc_format_order_price(100.00, 42);
+        // CurrencySettings::getPriceHtml(10000) → "USD 100.00"
+        $result = fchub_mc_format_order_price(10000.0, 42);
 
         $this->assertSame('USD 100.00', $result);
     }
@@ -476,7 +475,7 @@ final class FluentCrmSmartCodesTest extends TestCase
     public function testFormatOrderPriceFallsBackForMissingOrder(): void
     {
         // No order set for ID 999 → falls back to base formatting
-        $result = fchub_mc_format_order_price(50.00, 999);
+        $result = fchub_mc_format_order_price(5000.0, 999);
 
         $this->assertSame('USD 50.00', $result);
     }

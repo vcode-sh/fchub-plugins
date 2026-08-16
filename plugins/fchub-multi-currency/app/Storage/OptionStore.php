@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Storage;
 
+use FChubMultiCurrency\Integration\FluentCartCurrency;
 use FChubMultiCurrency\Support\Constants;
 
 defined('ABSPATH') || exit;
@@ -55,6 +56,8 @@ final class OptionStore
         if (isset($merged['display_currencies']) && is_array($merged['display_currencies'])) {
             $merged['display_currencies'] = self::normalizeDisplayCurrencies($merged['display_currencies']);
         }
+
+        $merged['base_currency'] = FluentCartCurrency::code();
 
         return $merged;
     }

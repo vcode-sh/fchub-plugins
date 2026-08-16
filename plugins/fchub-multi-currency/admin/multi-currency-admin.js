@@ -91,12 +91,10 @@
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
             <span class="setting-label">Base Currency</span>\
-            <div class="form-note">ISO 4217 code. All payments are settled in this currency.</div>\
+            <div class="form-note">Managed in FluentCart Store Setup. Checkout and payment gateways use this currency.</div>\
         </div>\
         <div class="setting-fields-inner">\
-            <el-select v-model="settings.base_currency" filterable placeholder="Select currency" style="max-width:320px">\
-                <el-option v-for="c in catalogue" :key="c.code" :label="c.flag + \' \' + c.code + \' \\u2014 \' + c.name" :value="c.code" />\
-            </el-select>\
+            <el-tag type="info" effect="plain">{{ settings.base_currency }}</el-tag>\
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
@@ -529,6 +527,10 @@
 			settings: { type: Object, required: true },
 			rates: { type: Array, default: () => [] },
 			ratesLoading: { type: Boolean, default: false },
+			manualRates: { type: Object, required: true },
+			manualRatesSaving: { type: Boolean, default: false },
+			quoteCurrencies: { type: Array, default: () => [] },
+			savedRateProvider: { type: String, default: "" },
 		},
 		template:
 			'\
@@ -558,14 +560,16 @@
             </div>\
         </div>\
     </div>\
-    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
-    <div class="fchub-mc-row">\
-        <div class="setting-html-wrapper">\
-            <span class="setting-label">Refresh Interval (hours)</span>\
-            <div class="form-note">How often to fetch new exchange rates.</div>\
-        </div>\
-        <div class="setting-fields-inner">\
-            <el-input-number v-model="settings.rate_refresh_interval_hrs" :min="1" :max="168" />\
+    <div v-if="settings.rate_provider !== \'manual\'">\
+        <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+        <div class="fchub-mc-row">\
+            <div class="setting-html-wrapper">\
+                <span class="setting-label">Refresh Interval (hours)</span>\
+                <div class="form-note">How often to fetch new exchange rates.</div>\
+            </div>\
+            <div class="setting-fields-inner">\
+                <el-input-number v-model="settings.rate_refresh_interval_hrs" :min="1" :max="168" />\
+            </div>\
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
@@ -607,10 +611,23 @@
             </el-select>\
         </div>\
     </div>\
+    <div v-if="settings.rate_provider === \'manual\'" style="margin-top:24px">\
+        <h3 style="font-size:16px;font-weight:500;margin:0 0 12px">Manual Rates</h3>\
+        <div v-if="savedRateProvider !== \'manual\'" class="form-note fchub-mc-form-note--warning">Save the provider change before entering manual rates.</div>\
+        <div v-else-if="!quoteCurrencies.length" class="form-note">Add and save at least one display currency first.</div>\
+        <div v-else>\
+            <div v-for="code in quoteCurrencies" :key="code" class="fchub-mc-manual-rate-row">\
+                <span>1 {{ settings.base_currency }} =</span>\
+                <el-input v-model="manualRates[code]" inputmode="decimal" autocomplete="off" placeholder="0.00000000" />\
+                <span>{{ code }}</span>\
+            </div>\
+        </div>\
+    </div>\
     <div style="margin-top:24px">\
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">\
             <h3 style="font-size:16px;font-weight:500;margin:0">Current Rates</h3>\
-            <el-button size="small" @click="$emit(\'refresh-rates\')" :loading="ratesLoading">Refresh Now</el-button>\
+            <el-button v-if="settings.rate_provider === \'manual\'" size="small" type="primary" @click="$emit(\'save-manual-rates\')" :loading="manualRatesSaving" :disabled="savedRateProvider !== \'manual\' || !quoteCurrencies.length">Save Manual Rates</el-button>\
+            <el-button v-else size="small" @click="$emit(\'refresh-rates\')" :loading="ratesLoading">Refresh Now</el-button>\
         </div>\
         <el-table v-if="rates.length" :data="rates" stripe size="small">\
             <el-table-column prop="base_currency" label="Base" width="80" />\
@@ -625,7 +642,7 @@
             </el-table-column>\
         </el-table>\
         <div v-else-if="!ratesLoading" style="padding:40px;text-align:center;color:#909399">\
-            No exchange rates yet. Add display currencies and trigger a refresh.\
+            {{ settings.rate_provider === "manual" ? "No manual rates saved yet." : "No exchange rates yet. Add display currencies and trigger a refresh." }}\
         </div>\
     </div>\
 </div>',
@@ -867,9 +884,13 @@
 			loading: true,
 			saving: false,
 			ratesLoading: false,
+			manualRatesSaving: false,
 			diagLoading: false,
 			settings: {},
 			rates: [],
+			manualRates: {},
+			quoteCurrencies: [],
+			savedRateProvider: "",
 			diagnostics: {},
 			catalogue: catalogue,
 			catalogueMap: catalogueMap,
@@ -908,9 +929,20 @@
 			},
 			loadRates: function () {
 				this.ratesLoading = true;
-				request("GET", "admin/rates")
+				return request("GET", "admin/rates")
 					.then((data) => {
 						this.rates = data.rates || [];
+						this.quoteCurrencies = data.quote_currencies || [];
+						this.savedRateProvider = data.provider || "";
+						var currentRates = {};
+						this.rates.forEach((rate) => {
+							currentRates[rate.quote_currency] = String(rate.rate || "");
+						});
+						var manualRates = {};
+						this.quoteCurrencies.forEach((code) => {
+							manualRates[code] = currentRates[code] || "";
+						});
+						this.manualRates = manualRates;
 					})
 					.catch((err) => {
 						this.$message.error((err && err.message) || "Failed to load exchange rates.");
@@ -944,12 +976,32 @@
 						this.ratesLoading = false;
 					});
 			},
+			saveManualRates: function () {
+				this.manualRatesSaving = true;
+				return request("POST", "admin/rates/manual", { rates: this.manualRates })
+					.then((data) => {
+						this.rates = data.rates || [];
+						var savedRates = {};
+						this.rates.forEach((rate) => {
+							savedRates[rate.quote_currency] = String(rate.rate || "");
+						});
+						this.manualRates = savedRates;
+						this.$message.success("Manual rates saved.");
+					})
+					.catch((err) => {
+						this.$message.error((err && err.message) || "Manual rates could not be saved.");
+					})
+					.finally(() => {
+						this.manualRatesSaving = false;
+					});
+			},
 			saveSettings: function () {
 				this.saving = true;
 				request("POST", "admin/settings", this.settings)
 					.then((data) => {
 						this.settings = data.settings || data;
 						this.$message.success("Settings saved.");
+						return this.loadRates();
 					})
 					.catch((err) => {
 						this.$message.error((err && err.message) || "Failed to save settings.");
@@ -993,7 +1045,7 @@
             </el-tab-pane>\
             <el-tab-pane label="Exchange Rates" name="rates">\
                 <div class="form-section"><div class="fct-card"><div class="fct-card-body">\
-                    <rate-settings :settings="settings" :rates="rates" :rates-loading="ratesLoading" @refresh-rates="refreshRates" />\
+                    <rate-settings :settings="settings" :rates="rates" :rates-loading="ratesLoading" :manual-rates="manualRates" :manual-rates-saving="manualRatesSaving" :quote-currencies="quoteCurrencies" :saved-rate-provider="savedRateProvider" @refresh-rates="refreshRates" @save-manual-rates="saveManualRates" />\
                 </div></div></div>\
             </el-tab-pane>\
             <el-tab-pane label="Switcher" name="switcher">\
@@ -1166,6 +1218,7 @@
 		".fchub-mc-diag-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--el-border-color-lighter); font-size: 13px; }",
 		".fchub-mc-diag-row:last-child { border-bottom: none; }",
 		".fchub-mc-flag { font-size: 1.2em; margin-right: 6px; vertical-align: middle; }",
+		".fchub-mc-manual-rate-row { display: grid; grid-template-columns: max-content minmax(140px, 240px) max-content; gap: 10px; align-items: center; margin-bottom: 10px; }",
 		/* Currency list — drag-and-drop */
 		".fchub-mc-currency-list { border: 1px solid var(--el-border-color-lighter); border-radius: 6px; overflow: hidden; }",
 		".fchub-mc-currency-header, .fchub-mc-currency-row { display: flex; align-items: center; padding: 0 12px; font-size: 13px; }",

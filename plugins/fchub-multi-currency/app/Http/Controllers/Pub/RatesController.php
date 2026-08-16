@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Http\Controllers\Pub;
 
+use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Storage\ExchangeRateRepository;
 use FChubMultiCurrency\Storage\OptionStore;
 
@@ -19,10 +20,15 @@ final class RatesController
 
         $repository = new ExchangeRateRepository();
         $rates = $repository->findAllLatest($baseCurrency);
+        $quoteCurrencies = SelectableCurrencyCodes::fromSettings($settings)->quoteCurrencies();
 
         $formatted = [];
 
         foreach ($rates as $rate) {
+            if (!in_array($rate->quoteCurrency, $quoteCurrencies, true)) {
+                continue;
+            }
+
             $formatted[] = [
                 'base_currency'  => $rate->baseCurrency,
                 'quote_currency' => $rate->quoteCurrency,

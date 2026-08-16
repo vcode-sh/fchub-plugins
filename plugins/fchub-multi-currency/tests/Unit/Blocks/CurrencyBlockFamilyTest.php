@@ -10,6 +10,7 @@ use FChubMultiCurrency\Blocks\CurrencySelectorButtonsBlock;
 use FChubMultiCurrency\Blocks\ExchangeRateBlock;
 use FChubMultiCurrency\Bootstrap\Modules\FrontendModule;
 use FChubMultiCurrency\Tests\Support\TestCase;
+use FluentCart\Api\CurrencySettings;
 use PHPUnit\Framework\Attributes\Test;
 
 final class CurrencyBlockFamilyTest extends TestCase
@@ -18,6 +19,7 @@ final class CurrencyBlockFamilyTest extends TestCase
     {
         parent::setUp();
         $this->resetContextModuleCache();
+        CurrencySettings::setMock(['currency' => 'EUR']);
 
         $this->setOption('fchub_mc_settings', [
             'enabled' => 'yes',
@@ -49,6 +51,7 @@ final class CurrencyBlockFamilyTest extends TestCase
 
         $this->assertStringContainsString('$', $html);
         $this->assertStringContainsString('USD', $html);
+        $this->assertStringContainsString('data-fchub-mc-context-current="symbol_code"', $html);
     }
 
     #[Test]
@@ -57,6 +60,9 @@ final class CurrencyBlockFamilyTest extends TestCase
         $html = ExchangeRateBlock::render(['precision' => 4, 'format' => 'compact']);
 
         $this->assertStringContainsString('1 EUR = 1.1000 USD', $html);
+        $this->assertStringContainsString('data-fchub-mc-context-rate="compact"', $html);
+        $this->assertStringContainsString('data-fchub-mc-rate-precision="4"', $html);
+        $this->assertStringContainsString('data-fchub-mc-hide-when-base="0"', $html);
     }
 
     #[Test]
@@ -65,6 +71,8 @@ final class CurrencyBlockFamilyTest extends TestCase
         $html = CurrencyContextNoticeBlock::render(['mode' => 'compact']);
 
         $this->assertStringContainsString('Viewing prices in USD. Checkout in EUR.', $html);
+        $this->assertStringContainsString('data-fchub-mc-context-notice="compact"', $html);
+        $this->assertStringContainsString('data-fchub-mc-hide-when-base="1"', $html);
     }
 
     #[Test]
@@ -84,7 +92,6 @@ final class CurrencyBlockFamilyTest extends TestCase
     {
         $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
         $prop = $ref->getProperty('cachedChain');
-        $prop->setAccessible(true);
         $prop->setValue(null, null);
     }
 }

@@ -14,11 +14,12 @@ final class StoreSettingsExtensionTest extends TestCase
     public function testAddValuesIncludesMultiCurrencySettings(): void
     {
         $this->setOption('fchub_mc_settings', ['enabled' => 'yes', 'base_currency' => 'PLN']);
+        $this->setOption('fluent_cart_store_settings', ['currency' => 'EUR']);
 
-        $values = StoreSettingsExtension::addValues([]);
+        $values = StoreSettingsExtension::addValues(['currency' => 'USD']);
 
         $this->assertSame('yes', $values['fchub_mc_enabled']);
-        $this->assertSame('PLN', $values['fchub_mc_base_currency']);
+        $this->assertSame('EUR', $values['fchub_mc_base_currency']);
     }
 
     #[Test]

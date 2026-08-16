@@ -6,10 +6,16 @@ namespace FChubMultiCurrency\Integration;
 
 use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Actions\SaveOrderSnapshotAction;
+use FChubMultiCurrency\Domain\Enums\ResolverSource;
+use FChubMultiCurrency\Domain\Enums\StaleRateFallback;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
+use FChubMultiCurrency\Domain\Services\ExchangeRateService;
+use FChubMultiCurrency\Domain\ValueObjects\Currency;
 use FChubMultiCurrency\Domain\ValueObjects\CurrencyContext;
+use FChubMultiCurrency\Storage\ExchangeRateRepository;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Storage\PreferenceRepository;
+use FChubMultiCurrency\Storage\RatesCacheStore;
 use FChubMultiCurrency\Support\FluentCartEvent;
 use FChubMultiCurrency\Support\Hooks;
 
@@ -134,18 +140,11 @@ final class OrderSnapshotHooks
             return null; // Base currency = no snapshot needed
         }
 
-        $rateRepo = new \FChubMultiCurrency\Storage\ExchangeRateRepository();
-        $rateService = new \FChubMultiCurrency\Domain\Services\ExchangeRateService(
-            $rateRepo,
-            new \FChubMultiCurrency\Storage\RatesCacheStore(),
-        );
-
-        $rate = $rateService->getRate($baseCurrencyCode, $code);
-        $staleFallback = $settings['stale_fallback'] ?? 'base';
-
-        if ($rate === null && $staleFallback === 'last_known') {
-            $rate = $rateRepo->findLatest($baseCurrencyCode, $code);
-        }
+        $rateService = new ExchangeRateService(new ExchangeRateRepository(), new RatesCacheStore());
+        $staleFallback = StaleRateFallback::tryFrom((string) ($settings['stale_fallback'] ?? 'base'))
+            ?? StaleRateFallback::Base;
+        $maxRateAge = max(1, (int) ($settings['stale_threshold_hrs'] ?? 24)) * HOUR_IN_SECONDS;
+        $rate = $rateService->getUsableRate($baseCurrencyCode, $code, $maxRateAge, $staleFallback);
 
         if ($rate === null) {
             return null;
@@ -158,7 +157,7 @@ final class OrderSnapshotHooks
             displayCurrency: $displayCurrency,
             baseCurrency: $baseCurrency,
             rate: $rate,
-            source: \FChubMultiCurrency\Domain\Enums\ResolverSource::UserMeta,
+            source: ResolverSource::UserMeta,
             isBaseDisplay: false,
         );
     }
@@ -166,15 +165,15 @@ final class OrderSnapshotHooks
     /**
      * @param array<int|string, mixed> $enabledCurrencies
      */
-    private static function findCurrency(string $code, array $enabledCurrencies): \FChubMultiCurrency\Domain\ValueObjects\Currency
+    private static function findCurrency(string $code, array $enabledCurrencies): Currency
     {
         foreach ($enabledCurrencies as $currencyData) {
             if (is_array($currencyData) && strtoupper($currencyData['code'] ?? '') === strtoupper($code)) {
-                return \FChubMultiCurrency\Domain\ValueObjects\Currency::from($currencyData);
+                return Currency::from($currencyData);
             }
         }
 
-        return \FChubMultiCurrency\Domain\ValueObjects\Currency::from([
+        return Currency::from([
             'code'     => $code,
             'name'     => $code,
             'symbol'   => $code,

@@ -16,7 +16,6 @@ final class FormatPriceTest extends TestCase
         // Reset the cached resolver chain between tests
         $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
         $prop = $ref->getProperty('cachedChain');
-        $prop->setAccessible(true);
         $prop->setValue(null, null);
 
         // Reset the cached resolved context
@@ -90,10 +89,24 @@ final class FormatPriceTest extends TestCase
         $service = new \FChubMultiCurrency\Domain\Services\CurrencyContextService($chain, $optionStore);
         $service->resolve();
 
-        $result = \fchub_mc_format_price(100.00);
+        $result = \fchub_mc_format_price(10000.0);
 
-        // 100.00 * 0.92 = 92.00 → formatted as "EUR 92.00"
+        // FluentCart prices are cents: 10000 * 0.92 = 9200 cents → EUR 92.00.
         $this->assertStringContainsString('92.00', $result);
         $this->assertStringContainsString('EUR', $result);
+    }
+
+    #[Test]
+    public function testBaseCurrencyFallbackKeepsFluentCartsCentContract(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'enabled' => 'yes',
+            'base_currency' => 'USD',
+            'display_currencies' => [],
+        ]);
+
+        $result = \fchub_mc_format_price(12345.0);
+
+        $this->assertStringContainsString('123.45', $result);
     }
 }

@@ -19,7 +19,6 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
         // Reset cached resolver chain
         $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
         $prop = $ref->getProperty('cachedChain');
-        $prop->setAccessible(true);
         $prop->setValue(null, null);
 
         \FChubMultiCurrency\Domain\Services\CurrencyContextService::reset();
@@ -44,7 +43,12 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
         };
     }
 
-    private function configureMultiCurrency(string $displayCode = 'GBP', string $rate = '0.79000000'): void
+    private function configureMultiCurrency(
+        string $displayCode = 'GBP',
+        string $rate = '0.79000000',
+        ?string $fetchedAt = null,
+        string $staleFallback = 'base',
+    ): void
     {
         $this->setOption('fchub_mc_settings', [
             'enabled'            => 'yes',
@@ -54,6 +58,8 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
                 ['code' => 'EUR', 'name' => 'Euro', 'symbol' => '€', 'decimals' => 2, 'position' => 'left'],
             ],
             'cookie_enabled'     => 'yes',
+            'stale_threshold_hrs' => 24,
+            'stale_fallback' => $staleFallback,
         ]);
 
         $this->setWpdbMockRow([
@@ -61,7 +67,7 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
             'quote_currency' => $displayCode,
             'rate'           => $rate,
             'provider'       => 'manual',
-            'fetched_at'     => gmdate('Y-m-d H:i:s'),
+            'fetched_at'     => $fetchedAt ?? gmdate('Y-m-d H:i:s'),
         ]);
     }
 
@@ -123,7 +129,6 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
         // Reset resolver chain to simulate a different context (admin/webhook)
         $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
         $prop = $ref->getProperty('cachedChain');
-        $prop->setAccessible(true);
         $prop->setValue(null, null);
         \FChubMultiCurrency\Domain\Services\CurrencyContextService::reset();
 
@@ -172,5 +177,35 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
         $this->assertSame('GBP', $this->order->getMeta('_fchub_mc_display_currency'));
         $this->assertSame('USD', $this->order->getMeta('_fchub_mc_base_currency'));
         $this->assertNotEmpty($this->order->getMeta('_fchub_mc_rate'));
+    }
+
+    #[Test]
+    public function testCheckoutDoesNotSnapshotAStaleRateWhenFallbackIsBase(): void
+    {
+        $this->configureMultiCurrency(
+            fetchedAt: gmdate('Y-m-d H:i:s', time() - (25 * HOUR_IN_SECONDS)),
+            staleFallback: 'base',
+        );
+        $_COOKIE['fchub_mc_currency'] = 'GBP';
+
+        OrderSnapshotHooks::captureAtCheckout(['order' => $this->order]);
+
+        $this->assertSame('USD', $this->order->getMeta('_fchub_mc_display_currency'));
+        $this->assertSame('', $this->order->getMeta('_fchub_mc_rate'));
+    }
+
+    #[Test]
+    public function testCheckoutSnapshotsAStaleRateOnlyWhenLastKnownIsExplicit(): void
+    {
+        $this->configureMultiCurrency(
+            fetchedAt: gmdate('Y-m-d H:i:s', time() - (25 * HOUR_IN_SECONDS)),
+            staleFallback: 'last_known',
+        );
+        $_COOKIE['fchub_mc_currency'] = 'GBP';
+
+        OrderSnapshotHooks::captureAtCheckout(['order' => $this->order]);
+
+        $this->assertSame('GBP', $this->order->getMeta('_fchub_mc_display_currency'));
+        $this->assertSame('0.79000000', $this->order->getMeta('_fchub_mc_rate'));
     }
 }

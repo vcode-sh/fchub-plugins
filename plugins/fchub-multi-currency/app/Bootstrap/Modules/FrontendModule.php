@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Bootstrap\Modules;
 
 use FChubMultiCurrency\Bootstrap\ModuleContract;
-use FChubMultiCurrency\Domain\Services\CheckoutDisclosureService;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
+use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
+use FChubMultiCurrency\Frontend\CurrencyContextPayload;
 use FChubMultiCurrency\Frontend\CurrencySwitcherRenderer;
+use FChubMultiCurrency\Integration\FluentCartCurrency;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Support\FeatureFlags;
@@ -18,6 +20,8 @@ defined('ABSPATH') || exit;
 
 final class FrontendModule implements ModuleContract
 {
+    private static bool $contextAssetConfigured = false;
+
     public function register(): void
     {
         self::registerAssets();
@@ -27,11 +31,22 @@ final class FrontendModule implements ModuleContract
 
     public static function registerAssets(): void
     {
+        self::$contextAssetConfigured = false;
+
+        $contextPath = FCHUB_MC_PATH . 'assets/js/currency-context.js';
+        wp_register_script(
+            'fchub-mc-context',
+            FCHUB_MC_URL . 'assets/js/currency-context.js',
+            [],
+            (string) (@filemtime($contextPath) ?: FCHUB_MC_VERSION),
+            true,
+        );
+
         $projectionPath = FCHUB_MC_PATH . 'assets/js/currency-projection.js';
         wp_register_script(
             'fchub-mc-projection',
             FCHUB_MC_URL . 'assets/js/currency-projection.js',
-            [],
+            ['fchub-mc-context'],
             (string) (@filemtime($projectionPath) ?: FCHUB_MC_VERSION),
             true,
         );
@@ -40,7 +55,7 @@ final class FrontendModule implements ModuleContract
         wp_register_script(
             'fchub-mc-switcher',
             FCHUB_MC_URL . 'assets/js/currency-switcher.js',
-            [],
+            ['fchub-mc-context'],
             (string) (@filemtime($switcherJsPath) ?: FCHUB_MC_VERSION),
             true,
         );
@@ -60,15 +75,29 @@ final class FrontendModule implements ModuleContract
             return;
         }
 
-        wp_localize_script('fchub-mc-projection', 'fchubMcConfig', self::buildFrontendConfig());
+        self::ensureContextAssetEnqueued();
         wp_enqueue_script('fchub-mc-projection');
     }
 
     public static function ensureSwitcherAssetsEnqueued(): void
     {
-        wp_localize_script('fchub-mc-switcher', 'fchubMcConfig', self::buildFrontendConfig());
+        self::ensureContextAssetEnqueued();
         wp_enqueue_script('fchub-mc-switcher');
         wp_enqueue_style('fchub-mc-switcher');
+    }
+
+    public static function ensureContextAssetEnqueued(): void
+    {
+        if (!self::$contextAssetConfigured) {
+            wp_add_inline_script(
+                'fchub-mc-context',
+                'window.fchubMcConfig = ' . wp_json_encode(self::buildFrontendConfig()) . ';',
+                'before',
+            );
+            self::$contextAssetConfigured = true;
+        }
+
+        wp_enqueue_script('fchub-mc-context');
     }
 
     /**
@@ -81,94 +110,28 @@ final class FrontendModule implements ModuleContract
         $context = $contextService->resolve();
 
         $fcSettings = CurrencySettings::get();
-        $isCommaDecimal = self::shopUsesCommaDecimal($fcSettings);
+        $shopSeparators = FluentCartCurrency::separators();
 
-        $config = [
-            'rate'                  => $context->rate->rateAsFloat(),
-            'displayCurrency'       => $context->displayCurrency->code,
-            'displayCurrencyName'   => $context->displayCurrency->name,
-            'baseCurrency'          => $context->baseCurrency->code,
-            'decimals'              => $context->displayCurrency->decimals,
-            'symbol'                => html_entity_decode($context->displayCurrency->symbol, ENT_QUOTES, 'UTF-8'),
-            'position'              => $context->displayCurrency->position->value,
-            'isBaseDisplay'         => $context->isBaseDisplay,
+        return array_merge(CurrencyContextPayload::build($context, $optionStore), [
             'roundingMode'          => $optionStore->get('rounding_mode', 'half_up'),
             'restUrl'               => rest_url(Constants::REST_NAMESPACE),
             'nonce'                 => wp_create_nonce('wp_rest'),
             'currencies'            => $optionStore->get('display_currencies', []),
+            'allowedCurrencyCodes'  => SelectableCurrencyCodes::fromSettings($optionStore->all())->all(),
+            'cookieName'            => Constants::COOKIE_KEY,
+            'cookiePersistenceEnabled' => $optionStore->get('cookie_enabled', 'yes') === 'yes',
+            'accountPersistenceEnabled' => $optionStore->get('account_persistence_enabled', 'yes') === 'yes',
+            'isLoggedIn'            => get_current_user_id() > 0,
+            'urlParamEnabled'       => $optionStore->get('url_param_enabled', 'yes') === 'yes',
+            'urlParamKey'           => (string) $optionStore->get('url_param_key', 'currency'),
             'flagBaseUrl'           => FCHUB_MC_URL . 'assets/flags/4x3/',
             'baseCurrencySign'      => html_entity_decode($fcSettings['currency_sign'] ?? '$', ENT_QUOTES, 'UTF-8'),
             'baseCurrencyPosition'  => $fcSettings['currency_position'] ?? 'before',
             'baseCurrencyCode'      => $fcSettings['currency'] ?? 'USD',
-            'baseDecimalSep'        => $isCommaDecimal ? ',' : '.',
-            'baseThousandSep'       => $isCommaDecimal ? '.' : ',',
+            'baseDecimalSep'        => $shopSeparators['decimal'],
+            'baseThousandSep'       => $shopSeparators['thousand'],
             'baseDecimals'          => ($fcSettings['is_zero_decimal'] ?? false) ? 0 : 2,
-            'displayDecSep'         => self::resolveDisplaySep($context, $optionStore, 'decimal_separator', match ($context->displayCurrency->position->value) {
-                'right', 'right_space' => ',',
-                default                => '.',
-            }),
-            'displayThousandSep'    => self::resolveDisplaySep(
-                $context,
-                $optionStore,
-                'thousand_separator',
-                match ($context->displayCurrency->position->value) {
-                    'right', 'right_space' => '.',
-                    default                => ',',
-                },
-            ),
-        ];
-
-        $disclosureService = new CheckoutDisclosureService($optionStore);
-        $disclosure = $disclosureService->getDisclosure($context);
-        $config['disclosureEnabled'] = $disclosure !== null;
-        $config['disclosureText'] = $disclosure;
-
-        return $config;
-    }
-
-    /**
-     * Whether FluentCart prints store prices with a comma decimal separator.
-     *
-     * Number Format is one radio (`decimal_separator`), and the thousand
-     * separator is always its opposite — see FluentCart's own `Helper::toDecimal`.
-     * Anything other than `comma` means the dot pairing, including the character
-     * `.` that `CurrencySettings::get()` returns for an untouched store.
-     * `currency_separator` is leftover in that array and FluentCart no longer
-     * reads it.
-     *
-     * @param array<string, mixed> $fcSettings
-     */
-    private static function shopUsesCommaDecimal(array $fcSettings): bool
-    {
-        return ($fcSettings['decimal_separator'] ?? '') === 'comma';
-    }
-
-    private static function resolveDisplaySep(
-        \FChubMultiCurrency\Domain\ValueObjects\CurrencyContext $context,
-        OptionStore $optionStore,
-        string $field,
-        string $fallback,
-    ): string {
-        $currencies = $optionStore->get('display_currencies', []);
-        if (!is_array($currencies)) {
-            return $fallback;
-        }
-
-        foreach ($currencies as $currency) {
-            if (!is_array($currency)) {
-                continue;
-            }
-            if (strtoupper($currency['code'] ?? '') === $context->displayCurrency->code) {
-                $value = $currency[$field] ?? '';
-                if ($value === 'none') {
-                    return '';
-                }
-
-                return $value !== '' ? $value : $fallback;
-            }
-        }
-
-        return $fallback;
+        ]);
     }
 
     /**

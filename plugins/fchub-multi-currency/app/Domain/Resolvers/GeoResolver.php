@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Domain\Resolvers;
 
 use FChubMultiCurrency\Domain\Contracts\GeoProviderContract;
+use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 
 defined('ABSPATH') || exit;
 
 final class GeoResolver
 {
-    use AllowedCurrencyCheck;
-
     public function __construct(
         private ?GeoProviderContract $provider = null,
     ) {
@@ -31,7 +30,7 @@ final class GeoResolver
 
         $code = strtoupper($currencyCode);
 
-        if (!$this->isAllowedCurrency($code, $baseCurrencyCode, $enabledCurrencies)) {
+        if (!SelectableCurrencyCodes::from($baseCurrencyCode, $enabledCurrencies)->contains($code)) {
             return null;
         }
 

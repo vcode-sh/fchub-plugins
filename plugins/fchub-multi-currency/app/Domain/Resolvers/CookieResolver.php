@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Domain\Resolvers;
 
+use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
+
 defined('ABSPATH') || exit;
 
 final class CookieResolver
 {
-    use AllowedCurrencyCheck;
-
     public function resolve(string $baseCurrencyCode, array $enabledCurrencies): ?string
     {
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- cookie read for currency preference
@@ -21,7 +21,7 @@ final class CookieResolver
 
         $code = strtoupper($cookie);
 
-        if (!$this->isAllowedCurrency($code, $baseCurrencyCode, $enabledCurrencies)) {
+        if (!SelectableCurrencyCodes::from($baseCurrencyCode, $enabledCurrencies)->contains($code)) {
             return null;
         }
 

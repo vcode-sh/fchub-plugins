@@ -7,11 +7,10 @@ namespace FChubMultiCurrency\Frontend;
 use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Bootstrap\Modules\FrontendModule;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
-use FChubMultiCurrency\Domain\ValueObjects\ExchangeRate;
+use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Http\Controllers\Admin\CurrencyCatalogueController;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Hooks;
-use FluentCart\App\Helpers\CurrenciesHelper;
 
 defined('ABSPATH') || exit;
 
@@ -277,7 +276,10 @@ final class CurrencySwitcherRenderer
             $html .= '<span class="fchub-mc-switcher__label">' . esc_html($label) . '</span>';
         }
 
-        $html .= '<span class="' . esc_attr($widgetClassName) . '" data-fchub-mc-switcher>';
+        $html .= '<span class="' . esc_attr($widgetClassName) . '" data-fchub-mc-switcher'
+            . ' data-fchub-mc-show-rate-badge="' . ($atts['showRateBadge'] ? '1' : '0') . '"'
+            . ' data-fchub-mc-show-rate-value="' . ($atts['showRateValue'] ? '1' : '0') . '"'
+            . ' data-fchub-mc-show-context-note="' . ($atts['showContextNote'] ? '1' : '0') . '">';
         $html .= '<button type="button" class="fchub-mc-switcher__trigger" data-fchub-mc-trigger>';
 
         if ($atts['showFlag']) {
@@ -431,12 +433,12 @@ final class CurrencySwitcherRenderer
         }
 
         if (!$basePresent) {
-            $allCurrencies = CurrenciesHelper::getCurrencies();
-            $allSigns = CurrenciesHelper::getCurrencySigns();
             array_unshift($currencies, [
                 'code'   => $baseCode,
-                'name'   => $allCurrencies[$baseCode] ?? $baseCode,
-                'symbol' => $allSigns[$baseCode] ?? $baseCode,
+                'name'   => $contextState->baseCurrency->name,
+                'symbol' => $contextState->baseCurrency->symbol,
+                'decimals' => $contextState->baseCurrency->decimals,
+                'position' => $contextState->baseCurrency->position->value,
             ]);
         }
 
@@ -498,10 +500,6 @@ final class CurrencySwitcherRenderer
         return $currencyCode;
     }
 
-    /**
-     * @param mixed $defaults
-     * @return array<string, mixed>
-     */
     /**
      * @param mixed $defaults
      * @return array<string, mixed>
@@ -581,96 +579,35 @@ final class CurrencySwitcherRenderer
         \FChubMultiCurrency\Domain\ValueObjects\CurrencyContext $contextState,
         array $atts,
     ): string {
+        $hasFooter = (bool) $atts['showRateBadge']
+            || (bool) $atts['showRateValue']
+            || (bool) $atts['showContextNote'];
+        if (!$hasFooter) {
+            return '';
+        }
+
+        $presentation = CurrencyContextPresentation::switcherParts($contextState, $optionStore);
         $parts = [];
 
-        if ((bool) $atts['showRateBadge'] && !$contextState->isBaseDisplay) {
-            $parts[] = self::renderRateBadge($optionStore, $contextState->rate);
+        if ((bool) $atts['showRateBadge']) {
+            $parts[] = $presentation['rateBadge'];
         }
 
         if ((bool) $atts['showRateValue']) {
-            $parts[] = self::renderRateValue($contextState);
+            $parts[] = $presentation['rateValue'];
         }
 
         if ((bool) $atts['showContextNote']) {
-            $parts[] = self::renderContextNote($contextState);
+            $parts[] = $presentation['contextNote'];
         }
 
         $parts = array_values(array_filter($parts, static fn (string $part): bool => $part !== ''));
+        $content = implode('', $parts);
+        $hidden = $content === '' ? ' hidden' : '';
 
-        if ($parts === []) {
-            return '';
-        }
-
-        return '<span class="fchub-mc-switcher__footer">' . implode('', $parts) . '</span>';
-    }
-
-    private static function renderRateBadge(OptionStore $optionStore, ExchangeRate $rate): string
-    {
-        if ($optionStore->get('show_rate_freshness_badge', 'yes') !== 'yes') {
-            return '';
-        }
-
-        $staleThresholdHrs = (int) $optionStore->get('stale_threshold_hrs', 24);
-        $staleThresholdSeconds = $staleThresholdHrs * 3600;
-        $isStale = $rate->isStale($staleThresholdSeconds);
-
-        $fetchedTimestamp = strtotime($rate->fetchedAt . ' UTC');
-        if ($fetchedTimestamp === false) {
-            return '';
-        }
-
-        $ago = human_time_diff($fetchedTimestamp, time());
-        $class = 'fchub-mc-rate-badge' . ($isStale ? ' fchub-mc-rate-badge--stale' : '');
-        $text = esc_html(
-            sprintf(
-                /* translators: %s: human-readable time difference, e.g. "2 hours" */
-                __('Rates updated %s ago', 'fchub-multi-currency'),
-                $ago,
-            ),
-        );
-
-        return "<span class=\"{$class}\">"
-            . '<span class="fchub-mc-rate-badge__dot" aria-hidden="true"></span>'
-            . $text
+        return '<span class="fchub-mc-switcher__footer" data-fchub-mc-switcher-footer' . $hidden . '>'
+            . $content
             . '</span>';
-    }
-
-    private static function renderRateValue(
-        \FChubMultiCurrency\Domain\ValueObjects\CurrencyContext $contextState,
-    ): string {
-        if ($contextState->isBaseDisplay) {
-            return '<span class="fchub-mc-rate-context">'
-                . esc_html__('Base currency currently in use.', 'fchub-multi-currency')
-                . '</span>';
-        }
-
-        $text = sprintf(
-            /* translators: 1: base currency code, 2: exchange rate, 3: display currency code */
-            __('1 %1$s = %2$s %3$s', 'fchub-multi-currency'),
-            $contextState->baseCurrency->code,
-            $contextState->rate->rate,
-            $contextState->displayCurrency->code,
-        );
-
-        return '<span class="fchub-mc-rate-context">' . esc_html($text) . '</span>';
-    }
-
-    private static function renderContextNote(
-        \FChubMultiCurrency\Domain\ValueObjects\CurrencyContext $contextState,
-    ): string {
-        if ($contextState->isBaseDisplay) {
-            return '<span class="fchub-mc-rate-context">'
-                . esc_html__('You are viewing the store base currency.', 'fchub-multi-currency')
-                . '</span>';
-        }
-
-        $text = sprintf(
-            /* translators: %s: base currency code */
-            __('Display prices only. Checkout is charged in %s.', 'fchub-multi-currency'),
-            $contextState->baseCurrency->code,
-        );
-
-        return '<span class="fchub-mc-rate-context">' . esc_html($text) . '</span>';
     }
 
     /**
@@ -717,19 +654,7 @@ final class CurrencySwitcherRenderer
      */
     public static function allowedCurrencyCodes(OptionStore $optionStore): array
     {
-        $settings = $optionStore->all();
-        $baseCode = strtoupper((string) ($settings['base_currency'] ?? 'USD'));
-        $codes = [$baseCode];
-
-        foreach (($settings['display_currencies'] ?? []) as $currency) {
-            if (!is_array($currency) || empty($currency['code'])) {
-                continue;
-            }
-
-            $codes[] = strtoupper((string) $currency['code']);
-        }
-
-        return array_values(array_unique($codes));
+        return SelectableCurrencyCodes::fromSettings($optionStore->all())->all();
     }
 
     private static function toBool(mixed $value): bool

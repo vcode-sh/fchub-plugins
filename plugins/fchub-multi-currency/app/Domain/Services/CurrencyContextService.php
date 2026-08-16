@@ -48,7 +48,7 @@ final class CurrencyContextService
             $resolved = CurrencyContext::baseOnly($baseCurrency);
         }
 
-        self::$resolved = apply_filters('fchub_mc/context', $resolved);
+        self::$resolved = self::applyContextFilter($resolved);
 
         return self::$resolved;
     }
@@ -56,6 +56,11 @@ final class CurrencyContextService
     public static function getResolved(): ?CurrencyContext
     {
         return self::$resolved;
+    }
+
+    public static function applyContextFilter(CurrencyContext $context): CurrencyContext
+    {
+        return apply_filters('fchub_mc/context', $context);
     }
 
     public static function reset(): void

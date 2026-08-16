@@ -33,15 +33,13 @@ final class PersistContextAction
 
         if ($cookieEnabled) {
             $lifetimeDays = (int) $this->optionStore->get('cookie_lifetime_days', 90);
-            $this->repository->saveCookie($currencyCode, $lifetimeDays);
-            $cookieStored = true;
+            $cookieStored = $this->repository->saveCookie($currencyCode, $lifetimeDays);
         }
 
         $userId = get_current_user_id();
 
         if ($userId > 0 && $accountPersistenceEnabled) {
-            $this->repository->saveUserMeta($userId, $currencyCode);
-            $userMetaStored = true;
+            $userMetaStored = $this->repository->saveUserMeta($userId, $currencyCode);
         }
 
         return new PersistContextResult(

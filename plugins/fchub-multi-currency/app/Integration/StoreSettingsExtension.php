@@ -18,13 +18,18 @@ final class StoreSettingsExtension
         add_filter('fluent_cart/store_settings/rules', [self::class, 'rules']);
     }
 
+    /** Mirrors FluentCart's raw option without re-entering its StoreSettings filters. */
     public static function addValues(array $values): array
     {
         $settings = get_option(Constants::OPTION_SETTINGS, []);
         $settings = is_array($settings) ? $settings : [];
+        $storeSettings = get_option('fluent_cart_store_settings', []);
+        $storeSettings = is_array($storeSettings) ? $storeSettings : [];
 
         $values['fchub_mc_enabled'] = $settings['enabled'] ?? 'yes';
-        $values['fchub_mc_base_currency'] = $settings['base_currency'] ?? 'USD';
+        $values['fchub_mc_base_currency'] = strtoupper((string) (
+            $storeSettings['currency'] ?? $values['currency'] ?? 'USD'
+        ));
 
         return $values;
     }

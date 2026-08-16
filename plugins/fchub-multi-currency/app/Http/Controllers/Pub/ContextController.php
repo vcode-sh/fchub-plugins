@@ -7,6 +7,8 @@ namespace FChubMultiCurrency\Http\Controllers\Pub;
 use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Actions\PersistContextAction;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
+use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
+use FChubMultiCurrency\Frontend\CurrencyContextPayload;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Storage\PreferenceRepository;
 use FChubMultiCurrency\Support\EventLogger;
@@ -33,20 +35,37 @@ final class ContextController
     public function get(\WP_REST_Request $request): \WP_REST_Response
     {
         $optionStore = new OptionStore();
-        $contextService = new CurrencyContextService(
-            ContextModule::buildResolverChain($optionStore),
-            $optionStore,
-        );
+        $requestedCurrency = $request->get_param('currency');
 
-        $context = $contextService->resolve();
+        if ($requestedCurrency !== null) {
+            $currencyCode = strtoupper(sanitize_text_field((string) $requestedCurrency));
+            if (!SelectableCurrencyCodes::fromSettings($optionStore->all())->contains($currencyCode)) {
+                return self::failure(
+                    self::CODE_INVALID_CURRENCY,
+                    __('Invalid currency code.', 'fchub-multi-currency'),
+                    422,
+                );
+            }
 
-        return new \WP_REST_Response([
+            $context = CurrencyContextService::applyContextFilter(
+                ContextModule::resolveCookiePreference($optionStore, $currencyCode),
+            );
+        } else {
+            $contextService = new CurrencyContextService(
+                ContextModule::buildResolverChain($optionStore),
+                $optionStore,
+            );
+            $context = $contextService->resolve();
+        }
+
+        return self::response([
             'data' => [
                 'display_currency' => $context->displayCurrency->code,
                 'base_currency'    => $context->baseCurrency->code,
                 'rate'             => $context->rate->rate,
                 'source'           => $context->source->value,
                 'is_base_display'  => $context->isBaseDisplay,
+                'context'          => CurrencyContextPayload::buildRecovery($context, $optionStore),
             ],
         ]);
     }
@@ -96,22 +115,7 @@ final class ContextController
         $currencyCode = strtoupper($currencyCode);
 
         $optionStore = new OptionStore();
-        $baseCurrency = strtoupper((string) $optionStore->get('base_currency', 'USD'));
-        $displayCurrencies = $optionStore->get('display_currencies', []);
-        if (!is_array($displayCurrencies)) {
-            $displayCurrencies = [];
-        }
-
-        $validCodes = [$baseCurrency];
-        foreach ($displayCurrencies as $currency) {
-            if (!is_array($currency) || empty($currency['code'])) {
-                continue;
-            }
-
-            $validCodes[] = strtoupper((string) $currency['code']);
-        }
-
-        if (!in_array($currencyCode, $validCodes, true)) {
+        if (!SelectableCurrencyCodes::fromSettings($optionStore->all())->contains($currencyCode)) {
             return self::failure(
                 self::CODE_INVALID_CURRENCY,
                 __('Invalid currency code.', 'fchub-multi-currency'),
@@ -167,7 +171,7 @@ final class ContextController
             'source' => 'rest',
         ]);
 
-        return new \WP_REST_Response([
+        return self::response([
             'data' => [
                 'code'      => self::CODE_SAVED,
                 'message'   => __('Currency preference saved.', 'fchub-multi-currency'),
@@ -182,7 +186,7 @@ final class ContextController
      */
     private static function failure(string $code, string $message, int $status, array $extra = []): \WP_REST_Response
     {
-        return new \WP_REST_Response([
+        return self::response([
             'data' => array_merge(
                 [
                     'code'    => $code,
@@ -191,5 +195,18 @@ final class ContextController
                 $extra,
             ),
         ], $status);
+    }
+
+    /**
+     * Context responses must never be reused across visitors or preferences.
+     *
+     * @param array<string, mixed> $data
+     */
+    private static function response(array $data, int $status = 200): \WP_REST_Response
+    {
+        $response = new \WP_REST_Response($data, $status);
+        $response->header('Cache-Control', 'no-store');
+
+        return $response;
     }
 }

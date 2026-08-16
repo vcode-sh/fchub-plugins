@@ -20,22 +20,34 @@ final class PersistContextCookieTest extends TestCase
             'cookie_lifetime_days' => 30,
         ]);
 
-        // Track whether saveCookie path is reached via a subclass-like approach:
-        // Since PreferenceRepository is final, we verify through the OptionStore check.
         $optionStore = new OptionStore();
-        $this->assertSame('yes', $optionStore->get('cookie_enabled', 'yes'));
+        $result = (new PersistContextAction(new PreferenceRepository(), $optionStore))->execute('EUR');
 
-        // With cookie enabled, execute should attempt to set the cookie.
-        // setcookie() returns false in CLI but doesn't throw.
-        $repo = new PreferenceRepository();
-        $action = new PersistContextAction($repo, $optionStore);
-        $result = @$action->execute('EUR'); // Suppress setcookie "headers already sent" warning
-
-        // No logged-in user → no user meta saved, but the cookie channel carried the preference
+        $this->assertCount(1, $GLOBALS['fchub_mc_setcookie_calls']);
         $this->assertEmpty($GLOBALS['wp_mock_user_meta']);
         $this->assertTrue($result->cookieStored);
         $this->assertFalse($result->userMetaStored);
         $this->assertTrue($result->persisted());
+    }
+
+    #[Test]
+    public function testCurrencyCookieIsReadableByTheStorefrontRecoveryScript(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'cookie_enabled' => 'yes',
+            'cookie_lifetime_days' => 30,
+        ]);
+
+        (new PersistContextAction(new PreferenceRepository(), new OptionStore()))->execute('eur');
+
+        $this->assertCount(1, $GLOBALS['fchub_mc_setcookie_calls']);
+        $call = $GLOBALS['fchub_mc_setcookie_calls'][0];
+
+        $this->assertSame('fchub_mc_currency', $call['name']);
+        $this->assertSame('EUR', $call['value']);
+        $this->assertSame('/', $call['options']['path']);
+        $this->assertSame('Lax', $call['options']['samesite']);
+        $this->assertFalse($call['options']['httponly']);
     }
 
     #[Test]
@@ -45,14 +57,10 @@ final class PersistContextCookieTest extends TestCase
             'cookie_enabled' => 'no',
         ]);
 
-        $optionStore = new OptionStore();
-        $this->assertSame('no', $optionStore->get('cookie_enabled', 'yes'));
-
-        // The cookie_enabled guard should skip saveCookie entirely. Since we can't intercept
-        // setcookie on a final class, the returned result is the observable proof.
-        $result = (new PersistContextAction(new PreferenceRepository(), $optionStore))->execute('EUR');
+        $result = (new PersistContextAction(new PreferenceRepository(), new OptionStore()))->execute('EUR');
 
         $this->assertFalse($result->cookieStored, 'Cookie should be disabled');
+        $this->assertCount(0, $GLOBALS['fchub_mc_setcookie_calls']);
     }
 
     #[Test]
@@ -73,9 +81,47 @@ final class PersistContextCookieTest extends TestCase
     }
 
     #[Test]
-    public function testGuestWithCookiesDisabledIsTheOnlyUnpersistableCase(): void
+    public function testFailedCookieHeaderIsNotReportedAsPersisted(): void
     {
-        // Same settings, but logged in: user meta keeps the preference alive.
+        $this->setOption('fchub_mc_settings', ['cookie_enabled' => 'yes']);
+        $GLOBALS['fchub_mc_setcookie_result'] = false;
+
+        $result = (new PersistContextAction(new PreferenceRepository(), new OptionStore()))->execute('EUR');
+
+        $this->assertFalse($result->cookieStored);
+        $this->assertFalse($result->persisted());
+    }
+
+    #[Test]
+    public function testFailedUserMetaWriteIsNotReportedAsPersisted(): void
+    {
+        $this->setCurrentUserId(7);
+        $this->setOption('fchub_mc_settings', ['cookie_enabled' => 'no']);
+        $GLOBALS['wp_mock_update_user_meta_result'] = false;
+
+        $result = (new PersistContextAction(new PreferenceRepository(), new OptionStore()))->execute('EUR');
+
+        $this->assertFalse($result->userMetaStored);
+        $this->assertFalse($result->persisted());
+    }
+
+    #[Test]
+    public function testAlreadyMatchingUserMetaCountsAsPersistedWhenWordPressReturnsFalse(): void
+    {
+        $this->setCurrentUserId(7);
+        $this->setOption('fchub_mc_settings', ['cookie_enabled' => 'no']);
+        $GLOBALS['wp_mock_user_meta'][7]['_fchub_mc_currency'] = 'EUR';
+        $GLOBALS['wp_mock_update_user_meta_result'] = false;
+
+        $result = (new PersistContextAction(new PreferenceRepository(), new OptionStore()))->execute('EUR');
+
+        $this->assertTrue($result->userMetaStored);
+        $this->assertTrue($result->persisted());
+    }
+
+    #[Test]
+    public function testLoggedInVisitorPersistsThroughUserMetaWhenCookiesAreDisabled(): void
+    {
         $this->setCurrentUserId(7);
         $this->setOption('fchub_mc_settings', [
             'cookie_enabled' => 'no',
@@ -103,11 +149,9 @@ final class PersistContextCookieTest extends TestCase
     }
 
     #[Test]
-    public function testUserMetaAlwaysSaved(): void
+    public function testUserMetaSavedWhenCookiesAreDisabled(): void
     {
         $this->setCurrentUserId(42);
-
-        // Even with cookies disabled, user meta should be saved
         $this->setOption('fchub_mc_settings', [
             'cookie_enabled' => 'no',
         ]);
@@ -116,7 +160,6 @@ final class PersistContextCookieTest extends TestCase
         $action = new PersistContextAction($repo, new OptionStore());
         $action->execute('EUR');
 
-        // User meta should be saved regardless of cookie_enabled
         $this->assertSame('EUR', $GLOBALS['wp_mock_user_meta'][42]['_fchub_mc_currency'] ?? '');
     }
 
@@ -132,9 +175,8 @@ final class PersistContextCookieTest extends TestCase
 
         $repo = new PreferenceRepository();
         $action = new PersistContextAction($repo, new OptionStore());
-        @$action->execute('GBP'); // Suppress setcookie warning
+        $action->execute('GBP');
 
-        // User meta should be saved
         $this->assertSame('GBP', $GLOBALS['wp_mock_user_meta'][42]['_fchub_mc_currency'] ?? '');
     }
 
@@ -150,7 +192,7 @@ final class PersistContextCookieTest extends TestCase
 
         $repo = new PreferenceRepository();
         $action = new PersistContextAction($repo, new OptionStore());
-        @$action->execute('EUR');
+        $action->execute('EUR');
 
         $this->assertSame('', $GLOBALS['wp_mock_user_meta'][42]['_fchub_mc_currency'] ?? '');
     }

@@ -13,6 +13,79 @@ use PHPUnit\Framework\Attributes\Test;
 final class ContextModuleTest extends TestCase
 {
     #[Test]
+    public function testCookieRecoveryKeepsItsSourceWhenTheSelectedRateIsUnavailable(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency' => 'USD',
+            'display_currencies' => [[
+                'code' => 'EUR',
+                'name' => 'Euro',
+                'symbol' => '€',
+                'decimals' => 2,
+                'position' => 'right_space',
+            ]],
+        ]);
+        $this->setWpdbMockRow(null);
+
+        $context = ContextModule::resolveCookiePreference(new OptionStore(), 'EUR');
+
+        $this->assertTrue($context->isBaseDisplay);
+        $this->assertSame('USD', $context->displayCurrency->code);
+        $this->assertSame(ResolverSource::Cookie, $context->source);
+    }
+
+    #[Test]
+    public function testBaseFallbackUsesFluentCartCurrencyMetadata(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency' => 'USD',
+            'display_currencies' => [],
+        ]);
+
+        $context = ContextModule::resolveCookiePreference(new OptionStore(), 'USD');
+
+        $this->assertSame('US Dollar', $context->displayCurrency->name);
+        $this->assertSame('$', $context->displayCurrency->symbol);
+        $this->assertSame('left', $context->displayCurrency->position->value);
+    }
+
+    #[Test]
+    public function testRemovedDefaultCurrencyCannotSurviveThroughHistoricalRateData(): void
+    {
+        $_GET = [];
+        $_COOKIE = [];
+
+        $settings = [
+            'base_currency' => 'USD',
+            'default_display_currency' => 'GBP',
+            'display_currencies' => [[
+                'code' => 'EUR',
+                'name' => 'Euro',
+                'symbol' => '€',
+                'decimals' => 2,
+                'position' => 'right_space',
+            ]],
+        ];
+        $this->setOption('fchub_mc_settings', $settings);
+        $this->setWpdbMockRow([
+            'base_currency' => 'USD',
+            'quote_currency' => 'GBP',
+            'rate' => '0.79000000',
+            'provider' => 'manual',
+            'fetched_at' => current_time('mysql'),
+        ]);
+
+        $context = ContextModule::buildResolverChain(new OptionStore())
+            ->resolve($settings['base_currency'], $settings['display_currencies']);
+
+        $this->assertNotNull($context);
+        $this->assertTrue($context->isBaseDisplay);
+        $this->assertSame('USD', $context->displayCurrency->code);
+        $this->assertSame(ResolverSource::Fallback, $context->source);
+        $this->assertSame([], $GLOBALS['wpdb']->queries, 'Removed currencies must not trigger a rate lookup.');
+    }
+
+    #[Test]
     public function testFallbackKeepsStoreBaseWhenDefaultDisplayCurrencyHasNoRate(): void
     {
         $_GET = [];

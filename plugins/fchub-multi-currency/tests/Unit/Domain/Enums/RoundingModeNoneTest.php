@@ -16,7 +16,6 @@ final class RoundingModeNoneTest extends TestCase
         // Reset cached resolver chain
         $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
         $prop = $ref->getProperty('cachedChain');
-        $prop->setAccessible(true);
         $prop->setValue(null, null);
 
         \FChubMultiCurrency\Domain\Services\CurrencyContextService::reset();
@@ -53,9 +52,8 @@ final class RoundingModeNoneTest extends TestCase
         $service = new \FChubMultiCurrency\Domain\Services\CurrencyContextService($chain, $optionStore);
         $service->resolve();
 
-        // 100 * 4.3217 = 432.17 — with None rounding and 2 decimals,
-        // round($converted, 2) should produce 432.17
-        $result = \fchub_mc_format_price(100.00);
+        // 10000 cents * 4.3217 = 43217 cents → PLN 432.17.
+        $result = \fchub_mc_format_price(10000.0);
 
         $this->assertStringContainsString('432.17', $result);
         $this->assertStringContainsString('PLN', $result);
@@ -73,7 +71,7 @@ final class RoundingModeNoneTest extends TestCase
             ],
         ]);
 
-        // Rate that produces many decimal places: 100 * 0.33333333 = 33.33333300
+        // Rate that produces fractional cents: 10000 * 0.33333333 = 3333.33330000.
         $this->setWpdbMockRow([
             'base_currency'  => 'USD',
             'quote_currency' => 'EUR',
@@ -89,9 +87,7 @@ final class RoundingModeNoneTest extends TestCase
         $service = new \FChubMultiCurrency\Domain\Services\CurrencyContextService($chain, $optionStore);
         $service->resolve();
 
-        // 100 * 0.33333333 = 33.333333
-        // round(33.333333, 2) = 33.33 (rounds to 2 decimal places)
-        $result = \fchub_mc_format_price(100.00);
+        $result = \fchub_mc_format_price(10000.0);
 
         $this->assertStringContainsString('33.33', $result);
     }
@@ -124,9 +120,8 @@ final class RoundingModeNoneTest extends TestCase
         $service = new \FChubMultiCurrency\Domain\Services\CurrencyContextService($chain, $optionStore);
         $service->resolve();
 
-        // 10 * 149.85 = 1498.5
-        // Truncation with 0 decimals: floor(1498.5) = 1498
-        $result = \fchub_mc_format_price(10.00);
+        // 1000 cents * 149.85 = 149850 cents → JPY 1498.50 in FluentCart's storage scale.
+        $result = \fchub_mc_format_price(1000.0);
 
         // Should contain the integer value, no decimal places
         $this->assertStringContainsString('JPY', $result);
@@ -136,8 +131,7 @@ final class RoundingModeNoneTest extends TestCase
     #[Test]
     public function testNoneRoundingTruncatesNotRounds(): void
     {
-        // Setup with rate that produces a value where truncation != rounding
-        // 100 * 0.33337 = 33.337 — truncation gives 33.33, rounding gives 33.34
+        // Setup with a fractional-cent value where truncation differs from rounding.
         $this->setOption('fchub_mc_settings', [
             'enabled'            => 'yes',
             'base_currency'      => 'USD',
@@ -162,8 +156,8 @@ final class RoundingModeNoneTest extends TestCase
         $service = new \FChubMultiCurrency\Domain\Services\CurrencyContextService($chain, $optionStore);
         $service->resolve();
 
-        // 100 * 0.33337 = 33.337 → truncated to 33.33, NOT rounded to 33.34
-        $result = \fchub_mc_format_price(100.00);
+        // 10000 cents * 0.33337 = 3333.7 cents → 33.33, not 33.34.
+        $result = \fchub_mc_format_price(10000.0);
 
         $this->assertStringContainsString('33.33', $result);
         $this->assertStringNotContainsString('33.34', $result);

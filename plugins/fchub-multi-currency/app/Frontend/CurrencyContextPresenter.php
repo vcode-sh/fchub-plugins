@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Frontend;
 
 use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
-use FChubMultiCurrency\Domain\Services\CheckoutDisclosureService;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Http\Controllers\Admin\CurrencyCatalogueController;
 use FChubMultiCurrency\Storage\OptionStore;
@@ -43,22 +42,7 @@ final class CurrencyContextPresenter
 
     public static function renderCurrentCurrency(string $displayMode = 'flag_code'): string
     {
-        $parts = self::currentCurrencyParts();
-
-        return match ($displayMode) {
-            'code' => '<span class="fchub-mc-inline-current">' . esc_html($parts['code']) . '</span>',
-            'symbol' => '<span class="fchub-mc-inline-current">' . esc_html($parts['symbol']) . '</span>',
-            'name' => '<span class="fchub-mc-inline-current">' . esc_html($parts['name']) . '</span>',
-            'flag_name' => '<span class="fchub-mc-inline-current">'
-                . $parts['flag']
-                . '<span class="fchub-mc-inline-current__text">' . esc_html($parts['name']) . '</span></span>',
-            'symbol_code' => '<span class="fchub-mc-inline-current">'
-                . '<span class="fchub-mc-inline-current__text">' . esc_html($parts['symbol']) . '</span>'
-                . '<span class="fchub-mc-inline-current__text">' . esc_html($parts['code']) . '</span></span>',
-            default => '<span class="fchub-mc-inline-current">'
-                . $parts['flag']
-                . '<span class="fchub-mc-inline-current__text">' . esc_html($parts['code']) . '</span></span>',
-        };
+        return CurrencyContextPresentation::renderCurrent(self::resolveContext(), $displayMode);
     }
 
     public static function renderRateValue(int $precision = 4, string $format = 'compact', bool $hideWhenBase = false): string
@@ -69,27 +53,7 @@ final class CurrencyContextPresenter
             return '';
         }
 
-        $precision = max(0, min(8, $precision));
-        $rate = number_format((float) $context->rate->rate, $precision, '.', '');
-
-        $text = match ($format) {
-            'sentence' => sprintf(
-                /* translators: 1: base currency code, 2: rate, 3: display currency code */
-                __('Current rate: 1 %1$s = %2$s %3$s', 'fchub-multi-currency'),
-                $context->baseCurrency->code,
-                $rate,
-                $context->displayCurrency->code,
-            ),
-            default => sprintf(
-                /* translators: 1: base currency code, 2: rate, 3: display currency code */
-                __('1 %1$s = %2$s %3$s', 'fchub-multi-currency'),
-                $context->baseCurrency->code,
-                $rate,
-                $context->displayCurrency->code,
-            ),
-        };
-
-        return '<span class="fchub-mc-inline-rate">' . esc_html($text) . '</span>';
+        return CurrencyContextPresentation::renderRate($context, $precision, $format);
     }
 
     public static function renderNotice(string $mode = 'compact', bool $hideWhenBase = true): string
@@ -99,28 +63,6 @@ final class CurrencyContextPresenter
             return '';
         }
 
-        if ($mode === 'checkout') {
-            $disclosure = (new CheckoutDisclosureService(new OptionStore()))->getDisclosure($context);
-            return $disclosure === null
-                ? ''
-                : '<span class="fchub-mc-inline-notice">' . $disclosure . '</span>';
-        }
-
-        $text = match ($mode) {
-            'full' => sprintf(
-                /* translators: 1: display currency code, 2: base currency code */
-                __('Prices shown in %1$s are approximate. Checkout is charged in %2$s.', 'fchub-multi-currency'),
-                $context->displayCurrency->code,
-                $context->baseCurrency->code,
-            ),
-            default => sprintf(
-                /* translators: 1: display currency code, 2: base currency code */
-                __('Viewing prices in %1$s. Checkout in %2$s.', 'fchub-multi-currency'),
-                $context->displayCurrency->code,
-                $context->baseCurrency->code,
-            ),
-        };
-
-        return '<span class="fchub-mc-inline-notice">' . esc_html($text) . '</span>';
+        return CurrencyContextPresentation::renderNotice($context, new OptionStore(), $mode);
     }
 }

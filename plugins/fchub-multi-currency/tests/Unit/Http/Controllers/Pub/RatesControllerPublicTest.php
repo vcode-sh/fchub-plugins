@@ -15,6 +15,7 @@ final class RatesControllerPublicTest extends TestCase
     {
         $this->setOption('fchub_mc_settings', [
             'base_currency' => 'USD',
+            'display_currencies' => [['code' => 'EUR']],
         ]);
 
         // Mock a rate result from the database (ARRAY_A format)
@@ -52,6 +53,7 @@ final class RatesControllerPublicTest extends TestCase
     {
         $this->setOption('fchub_mc_settings', [
             'base_currency' => 'USD',
+            'display_currencies' => [['code' => 'GBP']],
         ]);
 
         $this->setWpdbMockResults([
@@ -78,5 +80,35 @@ final class RatesControllerPublicTest extends TestCase
         $this->assertArrayHasKey('quote_currency', $rate);
         $this->assertArrayHasKey('rate', $rate);
         $this->assertArrayHasKey('fetched_at', $rate);
+    }
+
+    #[Test]
+    public function testPublicResponseOmitsHistoricalRatesForRemovedCurrencies(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency' => 'USD',
+            'display_currencies' => [['code' => 'EUR']],
+        ]);
+        $this->setWpdbMockResults([
+            [
+                'base_currency' => 'USD',
+                'quote_currency' => 'EUR',
+                'rate' => '0.92000000',
+                'provider' => 'ecb',
+                'fetched_at' => '2026-08-16 10:00:00',
+            ],
+            [
+                'base_currency' => 'USD',
+                'quote_currency' => 'JPY',
+                'rate' => '147.00000000',
+                'provider' => 'ecb',
+                'fetched_at' => '2026-08-16 10:00:00',
+            ],
+        ]);
+
+        $response = (new RatesController())->index(new \WP_REST_Request('GET', '/'));
+        $rates = $response->get_data()['data']['rates'];
+
+        $this->assertSame(['EUR'], array_column($rates, 'quote_currency'));
     }
 }

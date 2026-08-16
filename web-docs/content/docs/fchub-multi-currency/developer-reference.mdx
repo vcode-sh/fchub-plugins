@@ -19,36 +19,49 @@ All endpoints use the `fchub-mc/v1` namespace. Admin endpoints require `manage_o
 <Tabs items={['GET /context', 'POST /context', 'GET /rates']}>
 <Tab value="GET /context">
 
-Returns the current resolved currency context.
+Returns the current resolved currency context. An optional `currency=EUR`
+query resolves that allowed browser-cookie preference for cached-page recovery,
+independently of the public URL-parameter setting. Every response uses
+`Cache-Control: no-store` because visitor context makes an excellent cache key
+and a dreadful shared response.
 
 **Response:**
 
 ```json
 {
-  "display_currency": {
-    "code": "EUR",
-    "name": "Euro",
-    "symbol": "€",
-    "decimals": 2,
-    "position": "right_space"
-  },
-  "base_currency": {
-    "code": "USD",
-    "name": "US Dollar",
-    "symbol": "$",
-    "decimals": 2,
-    "position": "left"
-  },
-  "rate": "0.92140000",
-  "source": "cookie",
-  "is_base_display": false
+  "data": {
+    "display_currency": "EUR",
+    "base_currency": "USD",
+    "rate": "0.92140000",
+    "source": "cookie",
+    "is_base_display": false,
+    "context": {
+      "rate": 0.9214,
+      "displayCurrency": "EUR",
+      "displayCurrencyName": "Euro",
+      "baseCurrency": "USD",
+      "decimals": 2,
+      "symbol": "€",
+      "position": "right_space",
+      "isBaseDisplay": false,
+      "resolverSource": "cookie",
+      "displayDecSep": ",",
+      "displayThousandSep": ".",
+      "disclosureEnabled": true,
+      "disclosureText": "Prices shown in EUR are approximate. Your payment will be processed in USD.",
+      "presentation": {}
+    }
+  }
 }
 ```
 
 </Tab>
 <Tab value="POST /context">
 
-Sets the visitor's currency preference. Saves to cookie and user meta (if logged in). Fires `fchub_mc/context_switched`.
+Sets the visitor's currency preference. Saves to the cookie and, for an
+authenticated request, user meta. Guest calls omit `X-WP-Nonce`; signed-in calls
+include the current REST nonce so WordPress may authenticate the account. A
+confirmed write fires `fchub_mc/context_switched`.
 
 **Request body:**
 
@@ -58,9 +71,23 @@ Sets the visitor's currency preference. Saves to cookie and user meta (if logged
 }
 ```
 
-**Response:** Same as `GET /context` with the newly set currency.
+**Successful response:**
 
-The currency code is validated against the display currencies whitelist. Invalid codes return 400.
+```json
+{
+  "data": {
+    "code": "preference_saved",
+    "message": "Currency preference saved.",
+    "currency": "EUR",
+    "persisted": true
+  }
+}
+```
+
+The code is validated against the base and configured display currencies.
+Failures use stable outcome codes and `persisted: false`: malformed JSON returns
+400, a disabled module 403, unavailable persistence 409, an invalid currency
+422, and rate limiting 429. These responses also use `Cache-Control: no-store`.
 
 </Tab>
 <Tab value="GET /rates">
@@ -71,11 +98,16 @@ Returns the latest exchange rates for all configured display currencies.
 
 ```json
 {
-  "base": "USD",
-  "rates": {
-    "EUR": "0.92140000",
-    "GBP": "0.79230000",
-    "PLN": "4.02150000"
+  "data": {
+    "base_currency": "USD",
+    "rates": [
+      {
+        "base_currency": "USD",
+        "quote_currency": "EUR",
+        "rate": "0.92140000",
+        "fetched_at": "2026-08-16 12:00:00"
+      }
+    ]
   }
 }
 ```
@@ -87,7 +119,7 @@ Returns the latest exchange rates for all configured display currencies.
 
 All require `manage_options` and nonce verification.
 
-<Tabs items={['GET /admin/settings', 'POST /admin/settings', 'POST /admin/rates/refresh', 'GET /admin/currencies/catalogue', 'GET /admin/diagnostics']}>
+<Tabs items={['GET /admin/settings', 'POST /admin/settings', 'GET /admin/rates', 'POST /admin/rates/refresh', 'POST /admin/rates/manual', 'GET /admin/currencies/catalogue', 'GET /admin/diagnostics']}>
 <Tab value="GET /admin/settings">
 
 Returns all plugin settings with defaults merged.
@@ -100,11 +132,23 @@ Saves and sanitises settings. Reschedules the cron job if the refresh interval c
 **Request body:** Full or partial settings object. Missing keys retain their current values.
 
 </Tab>
+<Tab value="GET /admin/rates">
+
+Returns the effective FluentCart base currency, saved provider, configured quote codes, and the latest persisted rate rows used by the admin table.
+
+</Tab>
 <Tab value="POST /admin/rates/refresh">
 
-Triggers an immediate rate refresh from the configured provider. Returns success/failure with the number of rates refreshed.
+Triggers an immediate refresh from the saved remote provider. Every configured quote must be present and valid. The complete snapshot is stored with one timestamp and published to cache only after the database write succeeds.
 
-Returns HTTP 500 if the refresh fails (provider error, lock contention, empty rates).
+Returns HTTP 409 when the saved provider is Manual rates. Returns HTTP 500 for provider errors, lock contention, no configured quotes, incomplete or invalid snapshots, and persistence failures. Existing rate history and cache entries remain untouched on failure.
+
+</Tab>
+<Tab value="POST /admin/rates/manual">
+
+Saves one complete manual-rate snapshot. The request body is a `rates` object containing one positive decimal string for every configured quote currency and no extra currencies.
+
+Returns HTTP 400 for a malformed body, 422 for an incomplete or invalid snapshot, and 500 when persistence fails. The endpoint is available only while Manual rates is the saved provider.
 
 </Tab>
 <Tab value="GET /admin/currencies/catalogue">

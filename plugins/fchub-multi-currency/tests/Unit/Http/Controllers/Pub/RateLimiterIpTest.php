@@ -21,7 +21,6 @@ final class RateLimiterIpTest extends TestCase
         // Reset cached resolver chain
         $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
         $prop = $ref->getProperty('cachedChain');
-        $prop->setAccessible(true);
         $prop->setValue(null, null);
 
         $_GET = [];

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Domain\Resolvers;
 
+use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
+
 defined('ABSPATH') || exit;
 
 final class UrlParamResolver
 {
-    use AllowedCurrencyCheck;
-
     public function __construct(
         private string $paramKey = 'currency',
     ) {
@@ -26,7 +26,7 @@ final class UrlParamResolver
 
         $code = strtoupper($param);
 
-        if (!$this->isAllowedCurrency($code, $baseCurrencyCode, $enabledCurrencies)) {
+        if (!SelectableCurrencyCodes::from($baseCurrencyCode, $enabledCurrencies)->contains($code)) {
             return null;
         }
 

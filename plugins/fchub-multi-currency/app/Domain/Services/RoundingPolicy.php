@@ -40,7 +40,9 @@ final class RoundingPolicy
         $floatValue = (float) $value;
 
         return match ($this->mode) {
-            RoundingMode::None     => (int) $floatValue,
+            RoundingMode::None     => (int) (($floatValue >= 0
+                ? floor($floatValue / $step)
+                : ceil($floatValue / $step)) * $step),
             RoundingMode::HalfUp   => (int) (round($floatValue / $step, 0, PHP_ROUND_HALF_UP) * $step),
             RoundingMode::HalfDown => (int) (round($floatValue / $step, 0, PHP_ROUND_HALF_DOWN) * $step),
             RoundingMode::Ceil     => (int) (ceil($floatValue / $step) * $step),

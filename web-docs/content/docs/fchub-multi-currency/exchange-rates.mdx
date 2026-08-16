@@ -58,7 +58,7 @@ The ECB only covers about 30 major currencies (plus EUR). If you need exotic cur
 
 **Slug:** `manual`
 
-No external HTTP calls. The provider reads the most recent rate from the database for each currency pair. Useful if you want to set rates yourself (via the admin) or let a previous provider's rates persist after switching.
+No external HTTP calls and no scheduled refresh. Enter one rate for every configured display currency in the admin and save them together. If validation or persistence fails, the previous manual snapshot remains current.
 
 </Tab>
 </Tabs>
@@ -67,7 +67,7 @@ No external HTTP calls. The provider reads the most recent rate from the databas
 
 ## Refresh Cycle
 
-The rate refresh runs on a WordPress cron schedule:
+Remote-provider refreshes run on a WordPress cron schedule. Manual rates use their explicit save action instead.
 
 <Steps>
   <Step>
@@ -88,12 +88,12 @@ The rate refresh runs on a WordPress cron schedule:
   <Step>
     **Validation**
 
-    Each rate is validated against the display currencies whitelist. Rates for currencies not in your display list are ignored. Zero or negative rates are skipped and logged as errors — because a rate of `0` would zero out every price on your storefront.
+    The configured display-currency set is the contract. Extra provider rates are ignored, but every configured quote must be present, numeric, and greater than zero. One missing or invalid quote rejects the whole snapshot — because a mixed-age rate table is not a successful refresh wearing a convincing hat.
   </Step>
   <Step>
     **Storage**
 
-    Valid rates are inserted into the `fchub_mc_rate_history` table and written to the WordPress object cache (group `fchub_mc_rates`, 1-hour TTL). Existing cache entries for the refreshed pairs are deleted first to prevent stale reads.
+    The complete snapshot is inserted into `fchub_mc_rate_history` with one multi-row write and one timestamp. Only after that write succeeds are all corresponding entries replaced in the WordPress object cache (group `fchub_mc_rates`, 1-hour TTL). A failed write leaves the previous cache untouched.
   </Step>
   <Step>
     **Pruning**
@@ -107,7 +107,7 @@ The rate refresh runs on a WordPress cron schedule:
   </Step>
 </Steps>
 
-You can also trigger a manual refresh from the admin: **FluentCart > Settings > Multi-Currency > Exchange Rates > Refresh Now**. This calls the same action as the cron job.
+You can also trigger an immediate remote refresh from the admin: **FluentCart > Settings > Multi-Currency > Exchange Rates > Refresh Now**. This calls the same action as the cron job. Manual mode uses **Save Manual Rates** instead; the generic refresh endpoint rejects it rather than laundering an old rate through a shiny new timestamp.
 
 <Separator className="my-8" />
 

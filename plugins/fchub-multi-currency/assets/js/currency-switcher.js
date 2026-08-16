@@ -133,6 +133,20 @@
 	}
 
 	/**
+	 * An explicit URL preference wins on arrival. Once the visitor actively
+	 * chooses another currency, remove only that configured key so it cannot
+	 * override the newly saved preference on the reload.
+	 */
+	function clearUrlPreference() {
+		if (config.urlParamEnabled !== true || !config.urlParamKey) return;
+
+		const url = new URL(window.location.href);
+		if (!url.searchParams.has(config.urlParamKey)) return;
+		url.searchParams.delete(config.urlParamKey);
+		window.history.replaceState(window.history.state, "", url.toString());
+	}
+
+	/**
 	 * Posts the preference and only reloads once the server confirms it stored something.
 	 * A 403 (plugin disabled), 409 (nothing to persist for this visitor), 422 (bad currency)
 	 * or 429 (rate limited) leaves the page alone and surfaces the server's message.
@@ -140,13 +154,16 @@
 	function switchCurrency(currencyCode, options) {
 		const settings = options || {};
 		clearError(settings.root || null);
+		const headers = { "Content-Type": "application/json" };
+		if (config.isLoggedIn === true && nonce) {
+			headers["X-WP-Nonce"] = nonce;
+		}
 
 		return fetch(`${restUrl}/context`, {
 			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"X-WP-Nonce": nonce,
-			},
+			credentials: "same-origin",
+			cache: "no-store",
+			headers,
 			body: JSON.stringify({ currency: currencyCode }),
 		})
 			.then((response) =>
@@ -157,7 +174,7 @@
 			)
 			.then(({ response, payload }) => {
 				const data = payload && typeof payload === "object" ? payload.data : null;
-				const persisted = data?.persisted !== false;
+				const persisted = data?.persisted === true;
 
 				if (!response.ok || !persisted) {
 					failSwitch(
@@ -170,6 +187,7 @@
 					return;
 				}
 
+				clearUrlPreference();
 				window.dispatchEvent(
 					new CustomEvent("fchub_mc:context_changed", {
 						detail: { currency: currencyCode, response: payload },

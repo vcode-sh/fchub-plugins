@@ -17,18 +17,44 @@
  *
  * Fires: fchub_mc:prices_projected (after each projection pass)
  */
-(() => {
+(async () => {
+	let projectionShieldTimeout = null;
+	function releaseProjectionShield() {
+		document.documentElement.classList.remove("fchub-mc-projecting");
+		if (projectionShieldTimeout !== null) {
+			clearTimeout(projectionShieldTimeout);
+			projectionShieldTimeout = null;
+		}
+	}
+
+	document.documentElement.classList.add("fchub-mc-projecting");
+	projectionShieldTimeout = setTimeout(releaseProjectionShield, 2000);
+
+	const contextReady = window.fchubMcContextReady;
+	if (contextReady && typeof contextReady.then === "function") {
+		await contextReady;
+	}
+
 	const cfg = window.fchubMcConfig || {};
 	const rate = parseFloat(cfg.rate || "1");
 
 	// Bail out if no conversion needed
-	if (!cfg.displayCurrency || !cfg.baseCurrency) return;
-	if (cfg.isBaseDisplay) return;
-	if (cfg.displayCurrency === cfg.baseCurrency) return;
-	if (!rate || !Number.isFinite(rate) || rate === 1) return;
+	if (
+		!cfg.displayCurrency
+		|| !cfg.baseCurrency
+		|| cfg.isBaseDisplay
+		|| cfg.displayCurrency === cfg.baseCurrency
+		|| !rate
+		|| !Number.isFinite(rate)
+		|| rate === 1
+	) {
+		releaseProjectionShield();
+		return;
+	}
 
 	// Display currency config
-	const decimals = Math.max(0, Math.min(20, parseInt(cfg.decimals, 10) || 2));
+	const parsedDecimals = parseInt(cfg.decimals, 10);
+	const decimals = Math.max(0, Math.min(20, Number.isNaN(parsedDecimals) ? 2 : parsedDecimals));
 	const symbol = cfg.symbol || cfg.displayCurrency;
 	const position = cfg.position || "left";
 	const roundingMode = cfg.roundingMode || "half_up";
@@ -42,7 +68,9 @@
 
 	// Display currency formatting config (for output)
 	const displayDecSep = cfg.displayDecSep || ".";
-	const displayThousandSep = cfg.displayThousandSep || ",";
+	const displayThousandSep = typeof cfg.displayThousandSep === "string"
+		? cfg.displayThousandSep
+		: ",";
 
 	// Flag to suppress MutationObserver during our own DOM changes
 	let projecting = false;
@@ -193,6 +221,8 @@
 	function applyRounding(amount) {
 		const factor = 10 ** decimals;
 		const scaled = amount * factor;
+		const sign = scaled < 0 ? -1 : 1;
+		const magnitude = Math.abs(scaled);
 
 		switch (roundingMode) {
 			case "ceil":
@@ -200,15 +230,16 @@
 			case "floor":
 				return Math.floor(scaled) / factor;
 			case "half_down": {
-				const floored = Math.floor(scaled);
-				return ((scaled - floored) > 0.5 ? Math.ceil(scaled) : floored) / factor;
+				const lower = Math.floor(magnitude);
+				const rounded = (magnitude - lower) > 0.5 ? lower + 1 : lower;
+				return sign * rounded / factor;
 			}
 			case "none": {
 				const truncated = Math.trunc(scaled);
 				return truncated / factor;
 			}
 			default:
-				return Math.round(scaled) / factor;
+				return sign * Math.floor(magnitude + 0.5) / factor;
 		}
 	}
 
@@ -236,19 +267,20 @@
 	 * Format a converted amount with the display currency symbol.
 	 */
 	function formatPrice(amount) {
-		const num = formatNumber(amount);
+		const sign = amount < 0 ? "-" : "";
+		const num = formatNumber(Math.abs(amount));
 
 		switch (position) {
 			case "left":
-				return symbol + num;
+				return sign + symbol + num;
 			case "right":
-				return num + symbol;
+				return sign + num + symbol;
 			case "left_space":
-				return `${symbol} ${num}`;
+				return `${sign}${symbol} ${num}`;
 			case "right_space":
-				return `${num} ${symbol}`;
+				return `${sign}${num} ${symbol}`;
 			default:
-				return symbol + num;
+				return sign + symbol + num;
 		}
 	}
 
@@ -312,14 +344,14 @@
 	 * like "per month, until cancel". Returns the modified string, or null
 	 * if no price was found.
 	 */
-	function replaceInlinePrice(text) {
+	function replaceInlinePrice(text, formatter = formatPrice) {
 		const match = text.match(basePriceRegex);
 		if (!match) return null;
 
 		const baseAmount = parseBasePrice(match[0]);
 		if (Number.isNaN(baseAmount)) return null;
 
-		const converted = formatPrice(applyRounding(baseAmount * rate));
+		const converted = formatter(applyRounding(baseAmount * rate));
 
 		// Preserve whitespace that the regex captured around the price
 		const leading = match[0].match(/^\s*/)[0];
@@ -507,7 +539,7 @@
 			if (!el.getAttribute(ATTR_ORIGINAL)) {
 				el.setAttribute(ATTR_ORIGINAL, el.innerHTML);
 			}
-			const converted = replaceInlinePrice(node.textContent);
+			const converted = replaceInlinePrice(node.textContent, formatNumber);
 			if (converted === null) return 0;
 
 			// Replace <sup> currency sign with display currency sign
@@ -613,7 +645,7 @@
 	}
 
 	/**
-	 * Project variant button data-item-price / data-compare-price attributes.
+	 * Project variant button labels from FluentCart's base-price attributes.
 	 */
 	function projectVariantButtons(root) {
 		const buttons = root.querySelectorAll("[data-fluent-cart-product-variant][data-item-price]");
@@ -621,33 +653,21 @@
 			if (btn.getAttribute(ATTR_PROJECTED)) continue;
 
 			const itemPrice = parseBasePrice(btn.getAttribute("data-item-price"));
-			if (!Number.isNaN(itemPrice)) {
-				btn.setAttribute("data-item-price", formatPrice(applyRounding(itemPrice * rate)));
-			}
-
 			const comparePrice = btn.getAttribute("data-compare-price");
+			let compareAmount = NaN;
 			if (comparePrice) {
-				const cp = parseBasePrice(comparePrice);
-				if (!Number.isNaN(cp)) {
-					btn.setAttribute("data-compare-price", formatPrice(applyRounding(cp * rate)));
-				}
+				compareAmount = parseBasePrice(comparePrice);
 			}
 
-			// Convert visible price text in variant button spans
+			// Keep FluentCart's data attributes as the immutable base-price source.
 			const priceSpan = btn.querySelector(".fct-product-variant-item-price span");
-			if (priceSpan && looksLikePrice(priceSpan.textContent)) {
-				const amount = parseBasePrice(priceSpan.textContent);
-				if (!Number.isNaN(amount)) {
-					priceSpan.textContent = formatPrice(applyRounding(amount * rate));
-				}
+			if (priceSpan && !Number.isNaN(itemPrice)) {
+				priceSpan.textContent = formatPrice(applyRounding(itemPrice * rate));
 			}
 
 			const compareSpan = btn.querySelector(".fct-product-variant-compare-price span");
-			if (compareSpan && looksLikePrice(compareSpan.textContent)) {
-				const amount = parseBasePrice(compareSpan.textContent);
-				if (!Number.isNaN(amount)) {
-					compareSpan.textContent = formatPrice(applyRounding(amount * rate));
-				}
+			if (compareSpan && !Number.isNaN(compareAmount)) {
+				compareSpan.textContent = formatPrice(applyRounding(compareAmount * rate));
 			}
 
 			btn.setAttribute(ATTR_PROJECTED, "1");
@@ -735,7 +755,7 @@
 		}
 
 		injectDisclosures();
-		document.documentElement.classList.remove("fchub-mc-projecting");
+		releaseProjectionShield();
 
 		setTimeout(() => {
 			projecting = false;
@@ -842,9 +862,6 @@
 
 		window.addEventListener("fchub_mc:context_changed", () => reproject(100));
 	}
-
-	// Add FOUC prevention class immediately
-	document.documentElement.classList.add("fchub-mc-projecting");
 
 	// Initial projection
 	function init() {
