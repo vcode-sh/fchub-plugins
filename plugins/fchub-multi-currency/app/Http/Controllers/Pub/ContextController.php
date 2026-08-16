@@ -13,7 +13,6 @@ use FChubMultiCurrency\Storage\PreferenceRepository;
 use FChubMultiCurrency\Support\EventLogger;
 use FChubMultiCurrency\Support\Hooks;
 use FChubMultiCurrency\Support\IpResolver;
-use FChubMultiCurrency\Support\Profiler;
 
 defined('ABSPATH') || exit;
 
@@ -47,55 +46,35 @@ final class ContextController
      * The response varies per visitor (cookie, account, query string), so it must
      * never be cached — by the browser, by an edge/CDN layer, or by anything in
      * between. See self::noStore().
-     *
-     * Temporary instrumentation for issue #72's non-base-currency latency
-     * investigation — see Support\Profiler, Support\CacheDiagnostics, and the
-     * marks in ExchangeRateService/RatesCacheStore/ExchangeRateRepository.
-     * Pass ?_debug_timing=1 to get `_profile` (timeline) and `_notes`
-     * (hit/miss + cache-group diagnostics) in the response. Not meant to ship
-     * long-term — remove once the real bottleneck is found and fixed.
      */
     public function get(\WP_REST_Request $request): \WP_REST_Response
     {
-        Profiler::reset();
-        Profiler::mark('get_start');
-
         $optionStore = new OptionStore();
         $contextService = new CurrencyContextService(
             ContextModule::buildResolverChain($optionStore),
             $optionStore,
         );
-        Profiler::mark('chain_built');
 
         $context = $contextService->resolve();
-        Profiler::mark('context_resolved');
-
         $pricing = FrontendModule::buildPricingConfig($context, $optionStore);
-        Profiler::mark('pricing_built');
 
-        $data = [
-            'display_currency'           => $context->displayCurrency->code,
-            'display_currency_name'      => $pricing['displayCurrencyName'],
-            'base_currency'              => $context->baseCurrency->code,
-            'rate'                       => $context->rate->rate,
-            'source'                     => $context->source->value,
-            'is_base_display'            => $context->isBaseDisplay,
-            'symbol'                     => $pricing['symbol'],
-            'decimals'                   => $pricing['decimals'],
-            'position'                   => $pricing['position'],
-            'display_decimal_separator'  => $pricing['displayDecSep'],
-            'display_thousand_separator' => $pricing['displayThousandSep'],
-            'disclosure_enabled'         => $pricing['disclosureEnabled'],
-            'disclosure_text'            => $pricing['disclosureText'],
-        ];
-
-        if (Profiler::isRequested()) {
-            $data['_profile'] = Profiler::report();
-            $data['_notes'] = Profiler::noteReport();
-            $data['_is_logged_in'] = is_user_logged_in();
-        }
-
-        return self::noStore(new \WP_REST_Response(['data' => $data]));
+        return self::noStore(new \WP_REST_Response([
+            'data' => [
+                'display_currency'           => $context->displayCurrency->code,
+                'display_currency_name'      => $pricing['displayCurrencyName'],
+                'base_currency'              => $context->baseCurrency->code,
+                'rate'                       => $context->rate->rate,
+                'source'                     => $context->source->value,
+                'is_base_display'            => $context->isBaseDisplay,
+                'symbol'                     => $pricing['symbol'],
+                'decimals'                   => $pricing['decimals'],
+                'position'                   => $pricing['position'],
+                'display_decimal_separator'  => $pricing['displayDecSep'],
+                'display_thousand_separator' => $pricing['displayThousandSep'],
+                'disclosure_enabled'         => $pricing['disclosureEnabled'],
+                'disclosure_text'            => $pricing['disclosureText'],
+            ],
+        ]));
     }
 
     public function set(\WP_REST_Request $request): \WP_REST_Response

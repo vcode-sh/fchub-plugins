@@ -614,7 +614,7 @@ describe("Source invariant: prices are untouched (no hide, no dim) during reconc
 	});
 
 	it("does not call projectPrices() (or any other price-touching class) in the reconciliation branch before reconcile() settles", () => {
-		const match = projectionSource.match(/debugLog\("init_reconciliation_branch"\);([\s\S]{0,900}?)reconcile\(\)\.finally/);
+		const match = projectionSource.match(/(\/\/ Deliberately do nothing to prices here[\s\S]{0,900}?)reconcile\(\)\.finally/);
 		assert.ok(match, "could not find the reconciliation branch of init() in currency-projection.js, or something now runs between it and reconcile().finally");
 
 		// Strip // comment lines first — the region's own explanatory comment
@@ -878,11 +878,12 @@ describe("Source invariant: stripUrlParamFromAddressBar() only touches the addre
 	});
 
 	it("is called from init()'s non-reconciliation branch — the only branch a url_param resolution can ever reach", () => {
-		// Anchored on this exact debugLog call, unique to init()'s non-
-		// reconciliation branch — the bare `if (!reconciliationCandidate)`
-		// text also opens the unrelated top-level FOUC-class block earlier in
-		// the file, which does not call stripUrlParamFromAddressBar() at all.
-		const match = projectionSource.match(/debugLog\("init_no_reconciliation_branch"\);([\s\S]{0,200}?)\n\t\t\}/);
+		// Anchored on "function init() {" immediately before the if, unique to
+		// init()'s non-reconciliation branch — the bare
+		// `if (!reconciliationCandidate)` text also opens the unrelated
+		// top-level FOUC-class block earlier in the file, which does not call
+		// stripUrlParamFromAddressBar() at all.
+		const match = projectionSource.match(/function init\(\) \{\s*if \(!reconciliationCandidate\) \{([\s\S]{0,200}?)\n\t\t\}/);
 		assert.ok(match, "could not find init()'s non-reconciliation branch in currency-projection.js");
 		assert.match(
 			match[1],

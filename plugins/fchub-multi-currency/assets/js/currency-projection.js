@@ -30,27 +30,6 @@
 (() => {
 	const cfg = window.fchubMcConfig || {};
 
-	// TEMPORARY diagnostic logging for issue #72's environment-discrepancy
-	// investigation (production shows a 3-phase sequence — correct, then wrong,
-	// then correct again — staging shows only 2 phases with the same deployed
-	// code). Writes to sessionStorage, which — unlike an in-memory variable —
-	// survives the location.reload() this same flow triggers, so the real
-	// switch → reload → reconcile sequence can be read back afterward with
-	// accurate timestamps, instead of depending on polling fast enough to
-	// catch it live. Not meant to ship long-term — remove this and the
-	// matching block in currency-switcher.js once the discrepancy is understood.
-	const DEBUG_LOG_KEY = "fchub_mc_debug_trace";
-	function debugLog(event, extra) {
-		try {
-			const raw = window.sessionStorage.getItem(DEBUG_LOG_KEY);
-			const trace = raw ? JSON.parse(raw) : [];
-			trace.push(Object.assign({ event, t: Date.now() }, extra || {}));
-			window.sessionStorage.setItem(DEBUG_LOG_KEY, JSON.stringify(trace));
-		} catch {
-			// ignore — diagnostic only
-		}
-	}
-
 	// Mirrors the cookie name (Constants::COOKIE_KEY) — see currency-switcher.js,
 	// which writes this after a successful guest switch.
 	const STORAGE_KEY = "fchub_mc_currency";
@@ -154,32 +133,10 @@
 		storedCurrencyAtLoad !== cfg.displayCurrency &&
 		RECONCILABLE_SOURCES.indexOf(cfg.source || "") !== -1;
 
-	debugLog("script_start", {
-		cfgDisplayCurrency: cfg.displayCurrency,
-		cfgSource: cfg.source,
-		cfgIsBaseDisplay: cfg.isBaseDisplay,
-		cfgGuestLocalStorageEnabled: cfg.guestLocalStorageEnabled,
-		rawLocalStorageValue: (() => {
-			try {
-				return window.localStorage.getItem(STORAGE_KEY);
-			} catch {
-				return null;
-			}
-		})(),
-		storedCurrencyAtLoad,
-		reconciliationCandidate,
-		triggerCodeAtScriptStart: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
-		// The fchub_mc_currency cookie is httpOnly (PreferenceRepository::saveCookie),
-		// so its value is never visible here — this only shows what else (if
-		// anything) document.cookie exposes.
-		visibleCookies: document.cookie,
-	});
-
 	// Bail out entirely if there's nothing to do — no conversion needed on the
 	// page as served, and no reason to suspect that's wrong. Preserves the
 	// original zero-cost fast path for genuinely single-currency stores.
 	if (!needsProjection() && !reconciliationCandidate) {
-		debugLog("bailed_out_no_projection_no_reconciliation");
 		return;
 	}
 
@@ -1032,13 +989,11 @@
 			signal: controller ? controller.signal : undefined,
 		})
 			.then((response) => {
-				debugLog("reconcile_response_received", { status: response.status, ok: response.ok });
 				return response.ok ? response.json() : null;
 			})
 			.then((payload) => {
 				const data = payload && typeof payload === "object" ? payload.data : null;
 				if (!data || !data.display_currency) {
-					debugLog("reconcile_no_usable_data");
 					return false;
 				}
 
@@ -1047,11 +1002,6 @@
 				// the rest of the chain lands on — only apply it as a price-projection
 				// change if it's actually different from what's already on the page.
 				if (data.display_currency === displayCode && !!data.is_base_display === isBaseDisplay) {
-					debugLog("reconcile_server_agrees_no_change", {
-						serverDisplayCurrency: data.display_currency,
-						serverSource: data.source,
-					});
-
 					// The server just confirmed the page's original (stale-looking)
 					// value was actually correct — rare, but means the trigger's
 					// optimistic sync to the visitor's localStorage guess (see
@@ -1065,13 +1015,6 @@
 
 					return false;
 				}
-
-				debugLog("reconcile_applying_change", {
-					fromDisplayCode: displayCode,
-					toDisplayCode: data.display_currency,
-					serverSource: data.source,
-					triggerCodeBeforeApply: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
-				});
 
 				rate = parseFloat(data.rate || "1");
 				decimals = Math.max(0, Math.min(20, parseInt(data.decimals, 10) || 2));
@@ -1089,10 +1032,6 @@
 				if (typeof window.fchubMcSyncSwitcherDisplay === "function") {
 					window.fchubMcSyncSwitcherDisplay(data.display_currency);
 				}
-				debugLog("switcher_sync_returned", {
-					appliedCurrency: data.display_currency,
-					triggerCodeAfterApply: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
-				});
 
 				window.dispatchEvent(
 					new CustomEvent("fchub_mc:context_reconciled", {
@@ -1102,13 +1041,11 @@
 
 				return true;
 			})
-			.catch((err) => {
-				debugLog("reconcile_error", { message: err?.message ?? String(err) });
+			.catch(() => {
 				return false;
 			})
 			.finally(() => {
 				if (timeoutId) clearTimeout(timeoutId);
-				debugLog("reconcile_settled");
 			});
 	}
 
@@ -1225,22 +1162,16 @@
 		// wait (issue #72 UX requirement). This is the ONLY visible loading
 		// treatment during reconciliation; prices get none at all (see above).
 		syncTriggerToCode(storedCurrencyAtLoad);
-		debugLog("switcher_loading_applied", {
-			triggerCodeAtThisPoint: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
-		});
 	}
 
 	function init() {
 		if (!reconciliationCandidate) {
-			debugLog("init_no_reconciliation_branch");
 			stripUrlParamFromAddressBar();
 			projectPrices();
 			observeDynamicUpdates();
 			listenForFluentCartEvents();
 			return;
 		}
-
-		debugLog("init_reconciliation_branch");
 
 		// Deliberately do nothing to prices here — no projectPrices() call, no
 		// hide/dim class, nothing. They stay exactly as the server rendered
@@ -1259,16 +1190,10 @@
 			// lifting the loading state here reveals that corrected label, not
 			// the stale one. On failure/timeout it reveals the original
 			// server-rendered value, same as it always has.
-			debugLog("switcher_loading_about_to_clear", {
-				triggerCodeAtThisPoint: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
-			});
 			setSwitcherLoading(false);
 			projectPrices();
 			observeDynamicUpdates();
 			listenForFluentCartEvents();
-			debugLog("init_reconciliation_branch_complete", {
-				triggerCodeFinal: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
-			});
 		});
 	}
 

@@ -11,22 +11,6 @@
 	const nonce = config.nonce || "";
 	const flagBaseUrl = config.flagBaseUrl || "";
 
-	// TEMPORARY diagnostic logging for issue #72 — see the matching block and
-	// comment in currency-projection.js, which this shares a sessionStorage key
-	// with so the whole switch → reload → reconcile sequence reads back as one
-	// timeline. Not meant to ship long-term.
-	const DEBUG_LOG_KEY = "fchub_mc_debug_trace";
-	function debugLog(event, extra) {
-		try {
-			const raw = window.sessionStorage.getItem(DEBUG_LOG_KEY);
-			const trace = raw ? JSON.parse(raw) : [];
-			trace.push(Object.assign({ event, t: Date.now() }, extra || {}));
-			window.sessionStorage.setItem(DEBUG_LOG_KEY, JSON.stringify(trace));
-		} catch {
-			// ignore — diagnostic only
-		}
-	}
-
 	// Mirrors the cookie name (Constants::COOKIE_KEY) — same preference, a second
 	// transport. See STORAGE_KEY in currency-projection.js, which reads this back
 	// and validates it before trusting it.
@@ -271,7 +255,6 @@
 				// reload URL is simply the current URL, unmodified — never
 				// carrying ?currency=, never touching UrlParamResolver.
 				const reloadUrl = config.isLoggedIn ? window.location.href : buildReloadUrl(currencyCode);
-				debugLog("switch_success_navigating", { currencyCode, reloadUrl, isLoggedIn: !!config.isLoggedIn });
 				if (reloadUrl) {
 					// history.replaceState() + reload(), not
 					// window.location.href = reloadUrl. Assigning href performs a
@@ -529,11 +512,6 @@
 				triggerName.textContent = optionName.textContent;
 			}
 
-			debugLog("optimistic_trigger_update", {
-				selectedValue: value,
-				triggerCodeAfterOptimisticUpdate: trigger.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
-			});
-
 			close();
 			root.classList.add("fchub-mc-switcher--loading");
 			switchCurrency(value, {
@@ -715,7 +693,6 @@
 	 */
 	function applyResolvedCurrency(currencyCode) {
 		const code = (currencyCode || "").toUpperCase();
-		debugLog("applyResolvedCurrency_called", { requestedCode: code });
 		if (!code) return;
 
 		document.querySelectorAll("[data-fchub-mc-switcher]").forEach((root) => {
@@ -728,7 +705,6 @@
 				(option) => (option.dataset.value || "").toUpperCase() === code,
 			);
 			if (!target) {
-				debugLog("applyResolvedCurrency_no_matching_option", { requestedCode: code });
 				return;
 			}
 

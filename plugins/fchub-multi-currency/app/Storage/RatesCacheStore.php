@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Storage;
 
 use FChubMultiCurrency\Domain\ValueObjects\ExchangeRate;
-use FChubMultiCurrency\Support\CacheDiagnostics;
-use FChubMultiCurrency\Support\Profiler;
 
 defined('ABSPATH') || exit;
 
@@ -18,32 +16,7 @@ final class RatesCacheStore
     public function get(string $baseCurrency, string $quoteCurrency): ?ExchangeRate
     {
         $key = self::cacheKey($baseCurrency, $quoteCurrency);
-
-        // Temporary instrumentation for issue #72 — see Support\Profiler and
-        // Support\CacheDiagnostics. $found (wp_cache_get()'s own by-reference
-        // hit/miss flag) is the authoritative signal, not just `$cached ===
-        // false` — a driver could plausibly cache a falsy-looking value.
-        // Cheap (a handful of hrtime()/array-append calls) and unconditional
-        // so the timeline is always available; only read via ?_debug_timing=1.
-        $debug = Profiler::isRequested();
-        if ($debug) {
-            Profiler::mark('cache_get_start');
-        }
-
-        $found = null;
-        $cached = wp_cache_get($key, self::CACHE_GROUP, false, $found);
-
-        if ($debug) {
-            Profiler::mark($found ? 'cache_get_hit' : 'cache_get_miss');
-            Profiler::note('cache_get_result', [
-                'key'      => $key,
-                'group'    => self::CACHE_GROUP,
-                'found'    => $found,
-                'cached_is_false' => $cached === false,
-                'cached_is_array' => is_array($cached),
-            ]);
-            Profiler::note('cache_group_diagnostics', CacheDiagnostics::inspectGroup(self::CACHE_GROUP));
-        }
+        $cached = wp_cache_get($key, self::CACHE_GROUP);
 
         if ($cached === false || !is_array($cached)) {
             return null;
