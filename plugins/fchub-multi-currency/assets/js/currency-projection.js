@@ -73,11 +73,11 @@
 	// it was aborted. 12s clears that observed worst case with real headroom for
 	// queuing to compound further under heavier load, while staying short enough
 	// that a visitor isn't waiting a long time for a client-side correction to a
-	// cached page. Note this bounds the network wait only — the switcher
-	// trigger shows the visitor's own choice throughout this whole duration
-	// (see syncTriggerToCode() below), but prices are left completely
-	// untouched until reconcile() actually settles; see the reconciliation
-	// branch of init() below.
+	// cached page. Note this bounds the network wait only — this file leaves
+	// the switcher trigger and prices alike completely untouched throughout
+	// this whole duration, exactly as a logged-in visitor's page load already
+	// does, until reconcile() actually settles; see the reconciliation branch
+	// of init() below.
 	const RECONCILE_TIMEOUT_MS = 12000;
 
 	// Mutable projection parameters — reassigned in place by reconcile() below if
@@ -1052,17 +1052,12 @@
 						serverSource: data.source,
 					});
 
-					// The server just confirmed the page's original (stale-looking)
-					// value was actually correct — rare, but means the trigger's
-					// optimistic sync to the visitor's localStorage guess (see
-					// syncTriggerToCode() above) was wrong. The visitor's guess never
-					// gets to silently win over what the server actually says: correct
-					// the trigger back. No price-projection state changes here since
-					// displayCode/rate/etc. were already right.
-					if (data.display_currency !== storedCurrencyAtLoad && typeof window.fchubMcSyncSwitcherDisplay === "function") {
-						window.fchubMcSyncSwitcherDisplay(data.display_currency);
-					}
-
+					// The server just confirmed the page's original server-rendered
+					// value was already correct. The trigger was never touched by
+					// anything on this pass — it's showing that same value already —
+					// so there's nothing to correct. No price-projection state
+					// changes here either, since displayCode/rate/etc. were already
+					// right.
 					return false;
 				}
 
@@ -1112,67 +1107,6 @@
 			});
 	}
 
-	/**
-	 * Keeps the switcher's own trigger label out of the picture while a
-	 * reconciliation is in flight, reusing the exact dimmed/non-interactive
-	 * state currency-switcher.js already applies the moment a visitor picks a
-	 * new currency (.fchub-mc-switcher--loading).
-	 */
-	function setSwitcherLoading(isLoading) {
-		document.querySelectorAll("[data-fchub-mc-switcher]").forEach((el) => {
-			el.classList.toggle("fchub-mc-switcher--loading", isLoading);
-		});
-	}
-
-	/**
-	 * Updates the trigger's visible flag/code/symbol/name to a given currency
-	 * code, copying from that currency's own already-rendered dropdown option
-	 * (server-escaped, correctly formatted) — the same technique
-	 * currency-switcher.js's applyResolvedCurrency() uses for its fallback
-	 * flag path. Duplicated here rather than calling
-	 * window.fchubMcSyncSwitcherDisplay because currency-switcher.js has not
-	 * necessarily executed yet at the point this needs to run: on this site,
-	 * script tag order prints currency-projection.js before
-	 * currency-switcher.js, both synchronous, so that global isn't reliably
-	 * defined this early — confirmed live, not assumed. The trigger is
-	 * non-interactive (pointer-events: none) for the whole window this runs
-	 * in, so the dropdown's own active-option/checkmark state — which
-	 * applyResolvedCurrency() also updates — is never visible during this
-	 * window and doesn't need duplicating here.
-	 *
-	 * Required so the switcher always shows the visitor's own choice, never
-	 * the page's possibly-stale server-rendered value, for the entire
-	 * reconciliation wait — not just once reconcile() eventually resolves
-	 * (issue #72).
-	 */
-	function syncTriggerToCode(code) {
-		document.querySelectorAll("[data-fchub-mc-switcher]").forEach((root) => {
-			const trigger = root.querySelector("[data-fchub-mc-trigger]");
-			const dropdown = root.querySelector("[data-fchub-mc-dropdown]");
-			const listbox = dropdown ? dropdown.querySelector("[role='listbox']") : null;
-			if (!trigger || !listbox) return;
-
-			const target = [...listbox.querySelectorAll("[role='option']")].find(
-				(option) => (option.dataset.value || "").toUpperCase() === code,
-			);
-			if (!target) return;
-
-			const triggerFlag = trigger.querySelector(".fchub-mc-switcher__flag");
-			const triggerCode = trigger.querySelector(".fchub-mc-switcher__code");
-			const triggerSymbol = trigger.querySelector(".fchub-mc-switcher__symbol");
-			const triggerName = trigger.querySelector(".fchub-mc-switcher__name");
-			const optionFlag = target.querySelector(".fchub-mc-switcher__flag");
-			const optionCode = target.querySelector(".fchub-mc-switcher__option-code");
-			const optionSymbol = target.querySelector(".fchub-mc-switcher__option-symbol");
-			const optionName = target.querySelector(".fchub-mc-switcher__option-name");
-
-			if (triggerFlag && optionFlag) triggerFlag.innerHTML = optionFlag.innerHTML;
-			if (triggerCode && optionCode) triggerCode.textContent = optionCode.textContent;
-			if (triggerSymbol && optionSymbol) triggerSymbol.textContent = optionSymbol.textContent;
-			if (triggerName && optionName) triggerName.textContent = optionName.textContent;
-		});
-	}
-
 	// Add FOUC prevention class immediately — but only for the plain
 	// (non-reconciliation) path. Prices must not be touched at all while a
 	// reconciliation is pending: no hide, no dim, nothing — confirmed against
@@ -1181,18 +1115,30 @@
 	// They stay exactly as the server rendered them until reconcile() settles
 	// and projects them once, directly to the final values, in a single
 	// atomic pass — see the reconciliation branch of init() below.
+	//
+	// Deliberately no else branch here, and no switcher-trigger UI state of
+	// any kind added anywhere else in this file (issue #72 follow-up). A
+	// currency switch is a two-phase action: selectOption() in
+	// currency-switcher.js optimistically updates the trigger and applies
+	// .fchub-mc-switcher--loading itself before POSTing, then reloads the
+	// page on success — a hard navigation, which this script only ever sees
+	// the far side of. The browser drops all DOM focus on that navigation,
+	// so whatever focus/hover-driven styling a theme applies to the trigger
+	// (confirmed live: this site's theme styles a plain CSS `button:focus`
+	// rule, unrelated to this plugin) is already gone by the time the fresh
+	// page paints, logged in or out — that part isn't this file's to
+	// replicate or restore. A logged-in reload has nothing left to wait for,
+	// so it settles into that same fresh, unfocused, undimmed look
+	// instantly. Re-applying .fchub-mc-switcher--loading here and holding it
+	// for the length of the reconcile() fetch used to be exactly what made a
+	// logged-out reload look different: it kept the trigger visibly dimmed
+	// for several more seconds with nothing left to dim it *toward* (no
+	// focus, no theme highlight), reading as a stuck/flashing control
+	// instead of a settled one. Leaving the trigger alone here reproduces
+	// the logged-in look exactly, because it's the same DOM in the same
+	// unfocused post-navigation state either way.
 	if (!reconciliationCandidate) {
 		document.documentElement.classList.add("fchub-mc-projecting");
-	} else {
-		setSwitcherLoading(true);
-		// Show the visitor's own choice immediately — not the page's possibly-
-		// stale server-rendered value — and keep showing it for the entire
-		// wait (issue #72 UX requirement). This is the ONLY visible loading
-		// treatment during reconciliation; prices get none at all (see above).
-		syncTriggerToCode(storedCurrencyAtLoad);
-		debugLog("switcher_loading_applied", {
-			triggerCodeAtThisPoint: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
-		});
 	}
 
 	function init() {
@@ -1219,14 +1165,12 @@
 		reconcile().finally(() => {
 			// fchubMcSyncSwitcherDisplay() (called from within reconcile()'s own
 			// success path, before this finally() runs) has already updated the
-			// trigger's content by this point if reconciliation found a change —
-			// lifting the loading state here reveals that corrected label, not
-			// the stale one. On failure/timeout it reveals the original
-			// server-rendered value, same as it always has.
-			debugLog("switcher_loading_about_to_clear", {
+			// trigger's content by this point if reconciliation found a change.
+			// Nothing here needs to reveal or restore it — the trigger was never
+			// hidden, dimmed, or otherwise held back by this file to begin with.
+			debugLog("reconcile_finally_projecting", {
 				triggerCodeAtThisPoint: document.querySelector(".fchub-mc-switcher__code")?.textContent ?? null,
 			});
-			setSwitcherLoading(false);
 			projectPrices();
 			observeDynamicUpdates();
 			listenForFluentCartEvents();

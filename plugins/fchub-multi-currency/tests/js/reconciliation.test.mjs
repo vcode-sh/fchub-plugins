@@ -354,96 +354,79 @@ describe("Source invariant: applyResolvedCurrency() moves the option-check glyph
 // actual mismatch to investigate (reconciliationCandidate), not on every
 // page load that merely needs price conversion.
 
-describe("Source invariant: the switcher trigger is suppressed during reconciliation, not just prices", () => {
-	it("applies the loading state only when reconciliationCandidate is true, in the else branch of the FOUC-class decision", () => {
-		const match = projectionSource.match(
-			/if\s*\(!reconciliationCandidate\)\s*\{[\s\S]{0,300}?\}\s*else\s*\{([\s\S]{0,900}?)\n\t\}/,
-		);
-
-		assert.ok(match, "could not find the `if (!reconciliationCandidate) { ... } else { ... }` FOUC-class/loading-state block in currency-projection.js");
-		assert.match(
-			match[1],
-			/setSwitcherLoading\(true\)/,
-			"the switcher trigger must be marked loading in the else branch (reconciliationCandidate true) of the same decision that decides whether to hide prices — not unconditionally, since a page that only needs price conversion never has the wrong currency in the trigger",
-		);
-	});
-
-	it("clears the loading state once reconcile() settles, targeting the trigger via [data-fchub-mc-switcher]", () => {
-		const setterMatch = projectionSource.match(
-			/function setSwitcherLoading\(isLoading\) \{([\s\S]*?)\n\t\}/,
-		);
-		assert.ok(setterMatch, "could not find setSwitcherLoading(...) in currency-projection.js");
-		assert.match(
-			setterMatch[1],
-			/data-fchub-mc-switcher\]["']\)[\s\S]*?fchub-mc-switcher--loading/,
-			"setSwitcherLoading() must toggle .fchub-mc-switcher--loading on [data-fchub-mc-switcher] elements",
-		);
-
-		const finallyMatch = projectionSource.match(/reconcile\(\)\.finally\(\(\) => \{([\s\S]{0,1000})/);
-		assert.ok(finallyMatch, "could not find reconcile().finally(...) in currency-projection.js");
-		assert.match(
-			finallyMatch[1],
-			/setSwitcherLoading\(false\)/,
-			"reconcile()'s finally() must clear the switcher loading state once it settles (success, no-op, or failure) — otherwise the trigger stays dimmed forever",
-		);
-	});
-});
-
-// ─── Source invariant: the trigger shows the visitor's own choice — ───
-// ─── never a stale value — for the entire reconciliation wait ─────────
+// ─── Source invariant: the guest reconciliation path adds NO UI state of ───
+// ─── its own — a guest's post-reload wait must look exactly like a ─────────
+// ─── logged-in visitor's, full stop ─────────────────────────────────────────
 //
-// Confirmed live via the sessionStorage trace on production (issue #72):
-// setSwitcherLoading(true) correctly dimmed the trigger immediately, but its
-// TEXT stayed the page's stale server-rendered value (e.g. "AUD") for the
-// whole ~5.6s wait, only flipping to the correct value ("CHF") the instant
-// reconcile() finally resolved. A dimmed-but-wrong value is still a wrong
-// value on screen. Per the site owner's explicit, non-negotiable spec: the
-// trigger must show the visitor's own localStorage choice immediately and
-// throughout, never the stale cfg value and never blank — only prices (which
-// are genuinely invalid until reconciled) may be hidden during this window.
+// Confirmed live via direct DOM/CSS inspection on production (issue #72
+// follow-up), not assumed: this site's theme styles a plain, unrelated
+// `button:focus` rule with an orange background. currency-switcher.js's
+// close() (called from selectOption() right before the loading class and the
+// POST) focuses the trigger for accessibility, which is what actually turns
+// it orange pre-reload — this plugin's own CSS never defines that color.
+// window.location.reload() then performs a real hard navigation, which always
+// drops DOM focus regardless of login state, so the freshly loaded page's
+// trigger is never focused and the theme's orange rule never re-applies —
+// again, identically for logged-in and logged-out visitors. A logged-in
+// reload has nothing left to wait for, so it settles into that same fresh,
+// unfocused, undimmed look instantly and the visitor never perceives a
+// separate step. setSwitcherLoading()/syncTriggerToCode() — this file
+// re-applying and holding .fchub-mc-switcher--loading for the length of the
+// reconcile() fetch — were what made a logged-out reload look different: with
+// nothing focused to dim *toward*, several more seconds of visibly dimmed
+// wrong-colored trigger read as a stuck/flashing control. Removing that UI
+// layer entirely reproduces the logged-in look exactly, because it's the same
+// DOM in the same unfocused post-navigation state either way.
 
-describe("Source invariant: the trigger syncs to the visitor's choice immediately, not just prices", () => {
-	it("syncs the trigger to storedCurrencyAtLoad in the same synchronous pass that applies the loading state", () => {
-		const match = projectionSource.match(
-			/if\s*\(!reconciliationCandidate\)\s*\{[\s\S]{0,300}?\}\s*else\s*\{([\s\S]{0,900}?)\n\t\}/,
-		);
-		assert.ok(match, "could not find the `if (!reconciliationCandidate) { ... } else { ... }` block in currency-projection.js");
-		assert.match(
-			match[1],
-			/setSwitcherLoading\(true\)[\s\S]*?syncTriggerToCode\(storedCurrencyAtLoad\)/,
-			"the trigger must be synced to storedCurrencyAtLoad (the visitor's own choice) immediately when the loading state is applied — not left showing the stale cfg-baked value until reconcile() resolves",
-		);
-	});
-
-	it("syncTriggerToCode() does not depend on currency-switcher.js having executed yet", () => {
-		// Confirmed live: script tag order on this site prints
-		// currency-projection.js before currency-switcher.js, both
-		// synchronous — window.fchubMcSyncSwitcherDisplay is not reliably
-		// defined at the point syncTriggerToCode() must run. It has to be
-		// self-contained.
-		const match = projectionSource.match(/function syncTriggerToCode\(code\) \{([\s\S]*?)\n\t\}/);
-		assert.ok(match, "could not find syncTriggerToCode(...) in currency-projection.js");
+describe("Source invariant: the guest reconciliation path adds no switcher-trigger UI state of its own", () => {
+	it("does not define setSwitcherLoading() or syncTriggerToCode() anywhere in this file", () => {
 		assert.doesNotMatch(
-			match[1],
-			/fchubMcSyncSwitcherDisplay/,
-			"syncTriggerToCode() must not depend on window.fchubMcSyncSwitcherDisplay — that global isn't reliably defined this early given this site's actual script order",
+			projectionSource,
+			/function\s+setSwitcherLoading\(/,
+			"setSwitcherLoading() must not exist — no code in this file may toggle the trigger's loading/dimmed state; that belongs solely to currency-switcher.js's pre-reload optimistic-update phase",
 		);
-		assert.match(
-			match[1],
-			/data-fchub-mc-switcher\]["']\)/,
-			"syncTriggerToCode() must locate the trigger itself via [data-fchub-mc-switcher], not rely on another script having already found it",
+		assert.doesNotMatch(
+			projectionSource,
+			/function\s+syncTriggerToCode\(/,
+			"syncTriggerToCode() must not exist — the trigger is left showing exactly what the server rendered throughout the reconciliation wait, never overwritten with an optimistic localStorage guess",
 		);
 	});
 
-	it("reverts the optimistic sync if the server confirms the original page value was correct after all", () => {
-		const match = projectionSource.match(
-			/data\.display_currency === displayCode[\s\S]{0,1200}?return false;/,
+	it("does not reference .fchub-mc-switcher--loading in actual code (comments may still explain why it was removed)", () => {
+		const codeOnly = projectionSource
+			.split("\n")
+			.filter((line) => !line.trim().startsWith("//"))
+			.join("\n");
+		assert.doesNotMatch(
+			codeOnly,
+			/fchub-mc-switcher--loading/,
+			"currency-projection.js must never toggle .fchub-mc-switcher--loading — that class belongs solely to currency-switcher.js's selectOption(), applied before the POST and cleared implicitly by the page reload it triggers on success",
 		);
-		assert.ok(match, "could not find the 'server agrees, no change' branch in currency-projection.js");
+	});
+
+	it("the reconciliationCandidate FOUC-class decision has no else branch", () => {
+		const match = projectionSource.match(/if\s*\(!reconciliationCandidate\)\s*\{([\s\S]{0,400}?)\n\t\}/);
+		assert.ok(match, "could not find the `if (!reconciliationCandidate) { ... }` FOUC-class block in currency-projection.js");
 		assert.match(
+			match[1],
+			/classList\.add\(["']fchub-mc-projecting["']\)/,
+			".fchub-mc-projecting must still be added for the plain (non-reconciliation) path",
+		);
+
+		const afterBlock = projectionSource.slice(match.index + match[0].length, match.index + match[0].length + 80).trimStart();
+		assert.ok(
+			!afterBlock.startsWith("else"),
+			"reconciliationCandidate being true must not trigger any code of its own here — no else branch, no UI state change, nothing — a page that needs reconciliation gets no different treatment than one that doesn't until reconcile() actually settles",
+		);
+	});
+
+	it("does not revert any 'optimistic sync' when the server agrees the page was already correct — there is nothing to revert", () => {
+		const match = projectionSource.match(/data\.display_currency === displayCode[\s\S]{0,600}?return false;/);
+		assert.ok(match, "could not find the 'server agrees, no change' branch in currency-projection.js");
+		assert.doesNotMatch(
 			match[0],
-			/data\.display_currency\s*!==\s*storedCurrencyAtLoad[\s\S]*?fchubMcSyncSwitcherDisplay/,
-			"when the server confirms the page's original value was right all along, and that differs from the optimistic localStorage guess already shown, the trigger must be corrected back — the visitor's guess must never silently win over what the server actually says",
+			/fchubMcSyncSwitcherDisplay/,
+			"the 'server agrees, no change' branch must not call fchubMcSyncSwitcherDisplay — with no optimistic trigger sync happening earlier in this file, the trigger is already showing the server-rendered (and now server-confirmed) value, so there is nothing left to correct back",
 		);
 	});
 });
@@ -464,14 +447,18 @@ describe("Source invariant: the trigger syncs to the visitor's choice immediatel
 
 describe("Source invariant: prices are untouched (no hide, no dim) during reconciliation", () => {
 	it("does not add .fchub-mc-projecting when reconciliationCandidate is true — only for the plain path", () => {
-		const match = projectionSource.match(
-			/if\s*\(!reconciliationCandidate\)\s*\{([\s\S]{0,200}?)\}\s*else\s*\{/,
-		);
-		assert.ok(match, "could not find the `if (!reconciliationCandidate) { ... } else { ... }` FOUC-class block in currency-projection.js");
+		const match = projectionSource.match(/if\s*\(!reconciliationCandidate\)\s*\{([\s\S]{0,400}?)\n\t\}/);
+		assert.ok(match, "could not find the `if (!reconciliationCandidate) { ... }` FOUC-class block in currency-projection.js");
 		assert.match(
 			match[1],
 			/classList\.add\(["']fchub-mc-projecting["']\)/,
 			".fchub-mc-projecting must only be added for the plain (non-reconciliation) path — adding it unconditionally would hide prices for the whole reconciliation wait again",
+		);
+
+		const afterBlock = projectionSource.slice(match.index + match[0].length, match.index + match[0].length + 80).trimStart();
+		assert.ok(
+			!afterBlock.startsWith("else"),
+			"the reconciliationCandidate-true case must add no class of its own — there is deliberately no else branch here",
 		);
 	});
 

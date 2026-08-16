@@ -326,19 +326,33 @@ cookie round-tripping through that layer:
    a shared, anonymous-visitor snapshot of the page — the visitor's cookie
    never gets stripped in that case, it's simply irrelevant to what HTML the
    cache returns, since the request never reaches WordPress/PHP at all.
-3. If they disagree, the switcher's trigger is immediately synced to the
-   localStorage value — the visitor's own choice, not the page's stale
-   baked-in one — and dimmed/non-interactive (`fchub-mc-switcher--loading`)
-   for the duration. Prices, by contrast, are left completely untouched — no
-   hiding, no dimming, no projection pass at all — until reconciliation
-   actually completes, at which point they go directly from whatever the
-   page originally rendered to the corrected, converted values in one step.
-   Only the trigger shows a loading state during the wait; prices get none.
-   The fetch itself is `GET {restUrl}/context?currency=<code>` — which
-   resolves via the URL query string, not the cookie — and on response,
-   reassigns the mutable projection state in place, clears and runs price
-   projection for the first time, and calls
-   `window.fchubMcSyncSwitcherDisplay()` again to reflect whatever the server
+3. If they disagree, `currency-projection.js` adds no visual state of its own
+   at all — neither to the trigger nor to prices — while the reconciliation
+   fetch is in flight. Both stay exactly as the server originally rendered
+   them until the fetch settles, at which point (if it found a real change)
+   they go directly to the corrected values in one step: prices via a single
+   `projectPrices()` pass, and the trigger via
+   `window.fchubMcSyncSwitcherDisplay()`. This is deliberate: a currency
+   switch reloads the page (see `currency-switcher.js`'s `switchCurrency()`),
+   and a guest's post-reload wait must look exactly like a signed-in
+   visitor's, whose page never runs this branch at all. Earlier revisions of
+   this fallback re-applied and held `.fchub-mc-switcher--loading` on the
+   trigger for the length of the fetch to signal the wait — confirmed live to
+   backfire: this plugin's own CSS gives the trigger no color of its own
+   (`--fchub-mc-bg` is plain white), and any highlighted look it has right
+   after a pick comes from the host theme's own `:focus` styling, applied
+   because `currency-switcher.js`'s `close()` focuses the trigger for
+   accessibility before the reload. `window.location.reload()` always drops
+   DOM focus on the fresh page regardless of login state, so that highlight
+   is already gone the instant the page repaints either way — a signed-in
+   visitor's reload has nothing left to wait for and never shows otherwise.
+   Re-applying the loading class for several more seconds on the guest path
+   only made that ordinary, otherwise-instant focus loss visible as a
+   stuck/flashing trigger. The fetch itself is
+   `GET {restUrl}/context?currency=<code>` — which resolves via the URL query
+   string, not the cookie — and on response, reassigns the mutable projection
+   state in place, clears and runs price projection for the first time, and
+   calls `window.fchubMcSyncSwitcherDisplay()` to reflect whatever the server
    actually confirmed (normally the same value already shown; if the server
    disagrees with the visitor's saved choice — rare — this corrects the
    trigger to match the server instead). `fchub_mc:context_reconciled` fires
