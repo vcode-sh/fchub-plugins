@@ -10,6 +10,14 @@ const repositoryRoot = path.resolve(
   "../..",
 );
 
+function runBuild(root, slug) {
+  return execFileSync("bash", ["build.sh", slug], {
+    cwd: root,
+    encoding: "utf8",
+    env: { ...process.env, SOURCE_DATE_EPOCH: "1700000000" },
+  });
+}
+
 function createFixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "fchub-build-contract-"));
   fs.mkdirSync(path.join(root, "lib"), { recursive: true });
@@ -102,10 +110,7 @@ test("while submission is paused, every plugin receives the shared updater", () 
     setSubmissionPaused(root, true);
 
     for (const slug of ["fchub-wishlist", "fchub-portal-extender"]) {
-      const output = execFileSync("bash", ["build.sh", slug], {
-        cwd: root,
-        encoding: "utf8",
-      });
+      const output = runBuild(root, slug);
 
       assert.match(output, /GitHubUpdater synced into 1 plugin/);
       assert.equal(
@@ -131,10 +136,7 @@ test("once submission resumes, WordPress.org targets are excluded again", () => 
   try {
     setSubmissionPaused(root, false);
 
-    const wordpressOrgOutput = execFileSync("bash", ["build.sh", "fchub-wishlist"], {
-      cwd: root,
-      encoding: "utf8",
-    });
+    const wordpressOrgOutput = runBuild(root, "fchub-wishlist");
     assert.doesNotMatch(wordpressOrgOutput, /GitHubUpdater synced/);
     assert.equal(
       fs.existsSync(
@@ -144,10 +146,7 @@ test("once submission resumes, WordPress.org targets are excluded again", () => 
       "WordPress.org target must not receive the shared updater",
     );
 
-    const maintainedOutput = execFileSync("bash", ["build.sh", "fchub-portal-extender"], {
-      cwd: root,
-      encoding: "utf8",
-    });
+    const maintainedOutput = runBuild(root, "fchub-portal-extender");
     assert.match(maintainedOutput, /GitHubUpdater synced into 1 plugin/);
     assert.equal(
       fs.existsSync(
