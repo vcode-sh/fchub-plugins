@@ -149,6 +149,21 @@
 		RECONCILABLE_SOURCES.indexOf(cfg.source || "") !== -1 &&
 		!!cfg.urlParamEnabled;
 
+	// Called unconditionally here — a hoisted function declaration, defined
+	// further down this file — rather than from inside init()'s
+	// non-reconciliation branch. init() is never even reached for a
+	// no-projection case (base currency, or any display currency whose rate
+	// is exactly 1): the bail-out immediately below returns before init() is
+	// defined or called at all. A guest switching back to the base currency
+	// via the URL-param reload is exactly that case — cfg.source is
+	// "url_param" (correct, no reconciliation needed) but needsProjection()
+	// is false (no conversion needed, also correct) — so calling this only
+	// from inside init() left the parameter stuck in the address bar
+	// permanently for that entirely normal action. Calling it here instead
+	// covers every case where cfg.source is "url_param", needs-projection or
+	// not.
+	stripUrlParamFromAddressBar();
+
 	// Bail out entirely if there's nothing to do — no conversion needed on the
 	// page as served, and no reason to suspect that's wrong. Preserves the
 	// original zero-cost fast path for genuinely single-currency stores.
@@ -1190,7 +1205,6 @@
 
 	function init() {
 		if (!reconciliationCandidate) {
-			stripUrlParamFromAddressBar();
 			projectPrices();
 			observeDynamicUpdates();
 			listenForFluentCartEvents();

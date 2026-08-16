@@ -964,18 +964,38 @@ describe("Source invariant: stripUrlParamFromAddressBar() only touches the addre
 		);
 	});
 
-	it("is called from init()'s non-reconciliation branch — the only branch a url_param resolution can ever reach", () => {
-		// Anchored on "function init() {" immediately before the if, unique to
-		// init()'s non-reconciliation branch — the bare
-		// `if (!reconciliationCandidate)` text also opens the unrelated
-		// top-level FOUC-class block earlier in the file, which does not call
-		// stripUrlParamFromAddressBar() at all.
-		const match = projectionSource.match(/function init\(\) \{\s*if \(!reconciliationCandidate\) \{([\s\S]{0,200}?)\n\t\t\}/);
-		assert.ok(match, "could not find init()'s non-reconciliation branch in currency-projection.js");
+	// Caught by Codex's automated review on PR #149, confirmed by reading the
+	// code: init() is only ever reached if needsProjection() or
+	// reconciliationCandidate is true — the bail-out right above it returns
+	// before init() is defined or called at all otherwise. A guest switching
+	// back to the BASE currency via the URL-param reload lands with
+	// cfg.source === "url_param" (correct — no reconciliation needed) AND
+	// needsProjection() false (no conversion needed — also correct, base
+	// currency needs no projecting), so that early return fires and init()
+	// never runs. Calling stripUrlParamFromAddressBar() only from inside
+	// init() therefore left the currency parameter stuck in the address bar
+	// permanently for that entirely normal action (switching back to
+	// default) — and for any other no-projection case, such as a display
+	// currency whose rate happens to be exactly 1.
+	it("is called unconditionally before the needsProjection()/reconciliationCandidate bail-out — not only from inside init()", () => {
+		const match = projectionSource.match(/const reconciliationCandidate =([\s\S]{0,1500}?)if \(!needsProjection\(\) && !reconciliationCandidate\) \{/);
+		assert.ok(match, "could not find the region between reconciliationCandidate's assignment and the needsProjection() bail-out in currency-projection.js");
 		assert.match(
 			match[1],
 			/stripUrlParamFromAddressBar\(\);/,
-			"init()'s non-reconciliation branch must call stripUrlParamFromAddressBar() — a url_param resolution is never a reconciliation candidate (see RECONCILABLE_SOURCES above), so this is the only branch it ever reaches",
+			"stripUrlParamFromAddressBar() must be called before the needsProjection()/reconciliationCandidate bail-out — that bail-out returns (and init() is never reached) for any no-projection case, including a guest switching back to the base currency via the URL-param reload, which must still have the parameter stripped",
+		);
+	});
+
+	it("is not also called from inside init() — exactly one call site, not a double call", () => {
+		const codeOnly = projectionSource
+			.split("\n")
+			.filter((line) => !line.trim().startsWith("//"))
+			.join("\n");
+		assert.equal(
+			(codeOnly.match(/stripUrlParamFromAddressBar\(\);/g) || []).length,
+			1,
+			"stripUrlParamFromAddressBar() must be called exactly once — now that it runs unconditionally before the bail-out, the old call site inside init()'s non-reconciliation branch is redundant and must be removed, not left calling it a second time",
 		);
 	});
 });
