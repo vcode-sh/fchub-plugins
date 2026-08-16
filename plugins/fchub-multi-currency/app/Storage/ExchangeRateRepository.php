@@ -7,6 +7,7 @@ namespace FChubMultiCurrency\Storage;
 use FChubMultiCurrency\Domain\ValueObjects\ExchangeRate;
 use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Support\Logger;
+use FChubMultiCurrency\Support\Profiler;
 
 defined('ABSPATH') || exit;
 
@@ -16,6 +17,16 @@ final class ExchangeRateRepository
     {
         global $wpdb;
         $table = $wpdb->prefix . Constants::TABLE_RATE_HISTORY;
+
+        // Temporary instrumentation for issue #72 — see Support\Profiler.
+        // Isolates the actual query execution ($wpdb->get_row() only) from
+        // whatever ExchangeRateService/RatesCacheStore did before this was
+        // ever called, so a slow query can be told apart from slow
+        // surrounding code.
+        $debug = Profiler::isRequested();
+        if ($debug) {
+            Profiler::mark('db_query_start');
+        }
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- This authoritative fallback must see the latest persisted rate; service-level projection caching occurs above the repository.
         $row = $wpdb->get_row(
@@ -27,6 +38,14 @@ final class ExchangeRateRepository
             ),
             ARRAY_A,
         );
+
+        if ($debug) {
+            Profiler::mark('db_query_done');
+            Profiler::note('db_query_result', [
+                'found'      => $row !== null,
+                'last_error' => $wpdb->last_error,
+            ]);
+        }
 
         if ($row === null) {
             return null;

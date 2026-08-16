@@ -7,6 +7,7 @@ namespace FChubMultiCurrency\Domain\Services;
 use FChubMultiCurrency\Domain\ValueObjects\ExchangeRate;
 use FChubMultiCurrency\Storage\ExchangeRateRepository;
 use FChubMultiCurrency\Storage\RatesCacheStore;
+use FChubMultiCurrency\Support\Profiler;
 
 defined('ABSPATH') || exit;
 
@@ -30,7 +31,21 @@ final class ExchangeRateService
             );
         }
 
+        // Temporary instrumentation for issue #72 — see Support\Profiler.
+        // RatesCacheStore::get() marks its own internal hit/miss; the marks
+        // here bound the cache lookup and the DB fallback as seen from this
+        // call site, so the two can be compared against each other and
+        // against the request total.
+        $debug = Profiler::isRequested();
+        if ($debug) {
+            Profiler::mark('rate_lookup_start');
+        }
+
         $cached = $this->cache->get($baseCurrency, $quoteCurrency);
+
+        if ($debug) {
+            Profiler::mark($cached !== null ? 'rate_cache_hit' : 'rate_cache_miss');
+        }
 
         if ($cached !== null) {
             return $cached;
@@ -38,8 +53,16 @@ final class ExchangeRateService
 
         $rate = $this->repository->findLatest($baseCurrency, $quoteCurrency);
 
+        if ($debug) {
+            Profiler::mark('rate_db_fallback_done');
+        }
+
         if ($rate !== null) {
             $this->cache->set($rate);
+
+            if ($debug) {
+                Profiler::mark('rate_cache_set_done');
+            }
         }
 
         return $rate;

@@ -420,4 +420,76 @@ final class ContextControllerTest extends TestCase
         $this->assertSame($expectedStatus, $response->get_status());
         $this->assertSame('no-store', $response->get_headers()['Cache-Control'] ?? null);
     }
+
+    /**
+     * Temporary diagnostic instrumentation for issue #72's non-base-currency
+     * latency investigation (see Support\Profiler, Support\CacheDiagnostics).
+     * Gated on $_GET['_debug_timing'] — checked directly, not via
+     * WP_REST_Request::get_param(), because the same gate also has to work on
+     * a plain front-end page load (ContextModule::outputDebugTimingComment()),
+     * which has no request object. Confirmed here that ordinary traffic —
+     * every other test in this file, none of which touch $_GET — never sees
+     * a `_profile` key.
+     */
+    #[Test]
+    public function testGetOmitsProfileByDefault(): void
+    {
+        $this->setOption('fchub_mc_settings', ['base_currency' => 'USD']);
+        $this->setWpdbMockRow(null);
+
+        $response = (new ContextController())->get(new \WP_REST_Request('GET', '/'));
+        $data = $response->get_data()['data'];
+
+        $this->assertArrayNotHasKey('_profile', $data);
+        $this->assertArrayNotHasKey('_notes', $data);
+        $this->assertArrayNotHasKey('_is_logged_in', $data);
+    }
+
+    #[Test]
+    public function testGetIncludesTimingAndCacheDiagnosticsWhenDebugTimingRequested(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency'      => 'USD',
+            'display_currencies' => [['code' => 'EUR', 'name' => 'Euro', 'symbol' => '€']],
+        ]);
+        $this->setWpdbMockRow([
+            'base_currency'  => 'USD',
+            'quote_currency' => 'EUR',
+            'rate'           => '0.92000000',
+            'provider'       => 'manual',
+            'fetched_at'     => current_time('mysql'),
+        ]);
+        $_COOKIE['fchub_mc_currency'] = 'EUR';
+        $_GET['_debug_timing'] = '1';
+
+        $response = (new ContextController())->get(new \WP_REST_Request('GET', '/'));
+        $data = $response->get_data()['data'];
+
+        $this->assertArrayHasKey('_profile', $data);
+        $labels = array_column($data['_profile'], 'label');
+
+        // Controller-level stages always appear...
+        $this->assertContains('get_start', $labels);
+        $this->assertContains('chain_built', $labels);
+        $this->assertContains('context_resolved', $labels);
+        $this->assertContains('pricing_built', $labels);
+        // ...and since EUR != base here, the rate lookup actually runs, so its
+        // marks — and the DB-query-only marks one level below it — must
+        // appear too. This is the specific breakdown issue #72 needs (cache
+        // hit/miss vs. DB fallback vs. pure query time), not just round-trip.
+        $this->assertContains('rate_lookup_start', $labels);
+        $this->assertContains('rate_cache_miss', $labels, 'first lookup in this test has nothing cached yet');
+        $this->assertContains('rate_db_fallback_done', $labels);
+        $this->assertContains('db_query_start', $labels);
+        $this->assertContains('db_query_done', $labels);
+
+        $noteLabels = array_column($data['_notes'], 'label');
+        $this->assertContains('cache_get_result', $noteLabels);
+        $this->assertContains('cache_group_diagnostics', $noteLabels);
+        $this->assertContains('db_query_result', $noteLabels);
+
+        $this->assertArrayHasKey('_is_logged_in', $data);
+
+        unset($_COOKIE['fchub_mc_currency'], $_GET['_debug_timing']);
+    }
 }

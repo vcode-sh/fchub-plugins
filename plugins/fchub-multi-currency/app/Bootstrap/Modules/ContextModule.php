@@ -25,6 +25,7 @@ use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Support\EventLogger;
 use FChubMultiCurrency\Support\FeatureFlags;
 use FChubMultiCurrency\Support\Hooks;
+use FChubMultiCurrency\Support\Profiler;
 
 defined('ABSPATH') || exit;
 
@@ -37,6 +38,19 @@ final class ContextModule implements ModuleContract
         add_action('wp', [self::class, 'persistPostedCurrencyPreference'], 0);
         add_action('wp', [self::class, 'resolveContext'], 1);
         add_action('wp_login', [self::class, 'mergeGuestPreference'], 10, 2);
+
+        // Temporary instrumentation for issue #72's non-base-currency latency
+        // investigation — see Support\Profiler. resolveContext() below is
+        // what actually runs the resolver chain (and, for a non-base
+        // currency, ExchangeRateService::getRate()) on a real front-end page
+        // load — the exact path the reported ~6.5s reload goes through,
+        // as opposed to a direct REST fetch of GET /context, which shares
+        // the same underlying code but not necessarily the same object-cache
+        // bootstrapping on every host. Emits an HTML comment near the end of
+        // the page, gated on the same ?_debug_timing=1 flag as the REST
+        // endpoint, since a normal page load has no JSON response to attach
+        // this to. Not meant to ship long-term.
+        add_action('wp_footer', [self::class, 'outputDebugTimingComment'], 999);
     }
 
     public static function persistPostedCurrencyPreference(): void
@@ -112,10 +126,57 @@ final class ContextModule implements ModuleContract
             return;
         }
 
+        $debug = Profiler::isRequested();
+        if ($debug) {
+            Profiler::reset();
+            Profiler::mark('wp_hook_resolve_start');
+        }
+
         $optionStore = new OptionStore();
         $chain = self::buildResolverChain($optionStore);
+        if ($debug) {
+            Profiler::mark('chain_built');
+        }
+
         $service = new CurrencyContextService($chain, $optionStore);
-        $service->resolve();
+        $context = $service->resolve();
+
+        if ($debug) {
+            Profiler::mark('context_resolved');
+            Profiler::note('resolved_context', [
+                'display_currency' => $context->displayCurrency->code,
+                'base_currency'    => $context->baseCurrency->code,
+                'source'           => $context->source->value,
+                'is_base_display'  => $context->isBaseDisplay,
+            ]);
+        }
+    }
+
+    /**
+     * Temporary instrumentation for issue #72 — see Support\Profiler and the
+     * comment on register()'s wp_footer hook above. Prints as an HTML
+     * comment so it's visible in "View Source" / fetched markup without
+     * altering the rendered page. Not meant to ship long-term.
+     */
+    public static function outputDebugTimingComment(): void
+    {
+        if (!Hooks::isEnabled() || !Profiler::isRequested()) {
+            return;
+        }
+
+        $payload = [
+            'is_logged_in' => is_user_logged_in(),
+            'profile'      => Profiler::report(),
+            'notes'        => Profiler::noteReport(),
+        ];
+
+        $json = wp_json_encode($payload, JSON_PRETTY_PRINT);
+        if ($json === false) {
+            return;
+        }
+
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- fixed diagnostic JSON built entirely from internal timing/reflection data, not request input; comment delimiters are hardcoded and cannot be broken out of by any value here
+        echo "\n<!-- fchub-mc-debug-timing\n" . $json . "\n-->\n";
     }
 
     public static function mergeGuestPreference(string $userLogin, $user): void

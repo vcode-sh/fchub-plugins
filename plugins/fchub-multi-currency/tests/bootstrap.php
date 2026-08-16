@@ -27,6 +27,7 @@ if (!isset($GLOBALS['wpdb'])) {
         public string $options = 'wp_options';
         public string $usermeta = 'wp_usermeta';
         public int $insert_id = 0;
+        public string $last_error = '';
         /** @var array<int, string> */
         public array $queries = [];
 
@@ -243,9 +244,9 @@ if (!function_exists('human_time_diff')) {
 }
 
 if (!function_exists('wp_json_encode')) {
-    function wp_json_encode($data)
+    function wp_json_encode($data, $options = 0, $depth = 512)
     {
-        return json_encode($data);
+        return json_encode($data, $options, $depth);
     }
 }
 
@@ -555,8 +556,10 @@ if (!function_exists('plugin_dir_url')) {
 }
 
 if (!function_exists('wp_cache_get')) {
-    function wp_cache_get($key, $group = '')
+    function wp_cache_get($key, $group = '', $force = false, &$found = null)
     {
+        $found = isset($GLOBALS['wp_cache_store'][$group][$key]);
+
         return $GLOBALS['wp_cache_store'][$group][$key] ?? false;
     }
 }
