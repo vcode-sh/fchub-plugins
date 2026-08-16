@@ -252,6 +252,144 @@ describe("Issue #72: cookie stripped by host edge/WAF layer for a guest", () => 
 	});
 });
 
+// ─── Extracted from currency-switcher.js: buildReloadUrl() ────────────────
+// ─── and currency-projection.js: stripUrlParamFromAddressBar() ────────────
+//
+// Issue #72 follow-up: switching currency used to always window.location.reload(),
+// which for a guest whose cookie doesn't reliably reach the server on that reload
+// meant a second, separate client-side reconciliation fetch was the only way the
+// freshly loaded page ever saw the right currency — two sequential slow round-trips
+// where a signed-in visitor only ever pays one. UrlParamResolver is Priority 1 in
+// the resolver chain (above the cookie, above a signed-in visitor's saved
+// preference), and reads $_GET directly on any request — including a reload — so
+// appending the switched-to currency as that URL param lets the reload's own
+// server-render resolve it correctly in one round-trip, matching the logged-in
+// timing exactly. RECONCILABLE_SOURCES excluding "url_param" (already covered
+// above) is what keeps the restored Part 1 loading UI from firing for this path.
+
+function buildReloadUrl(currentHref, currencyCode, urlParamEnabled, urlParamKey) {
+	if (!urlParamEnabled) return null;
+	const paramKey = urlParamKey || "currency";
+	try {
+		const url = new URL(currentHref);
+		url.searchParams.set(paramKey, currencyCode);
+		return url.toString();
+	} catch {
+		return null;
+	}
+}
+
+function computeStrippedUrl(currentHref, source, urlParamKey) {
+	if (source !== "url_param" || !urlParamKey) return null;
+	try {
+		const url = new URL(currentHref);
+		if (!url.searchParams.has(urlParamKey)) return null;
+		url.searchParams.delete(urlParamKey);
+		return url.toString();
+	} catch {
+		return null;
+	}
+}
+
+describe("buildReloadUrl", () => {
+	it("returns null when urlParamEnabled is false — callers must fall back to a plain reload()", () => {
+		assert.equal(buildReloadUrl("https://example.com/shop/", "EUR", false, "currency"), null);
+	});
+
+	it("appends the currency param when the URL has no existing query string", () => {
+		const url = buildReloadUrl("https://example.com/shop/", "EUR", true, "currency");
+		assert.equal(url, "https://example.com/shop/?currency=EUR");
+	});
+
+	it("overwrites, not duplicates, a currency param already present from a previous switch", () => {
+		const url = buildReloadUrl("https://example.com/shop/?currency=USD", "EUR", true, "currency");
+		assert.equal(url, "https://example.com/shop/?currency=EUR");
+		assert.equal((url.match(/currency=/g) || []).length, 1, "must set the param in place, never append a second copy");
+	});
+
+	it("overwrites a currency param from an incoming ?currency= link the same way", () => {
+		const url = buildReloadUrl("https://example.com/shop/?currency=GBP&ref=newsletter", "EUR", true, "currency");
+		const parsed = new URL(url);
+		assert.equal(parsed.searchParams.get("currency"), "EUR");
+		assert.equal(parsed.searchParams.get("ref"), "newsletter");
+	});
+
+	it("preserves unrelated existing query params and the hash", () => {
+		const url = buildReloadUrl("https://example.com/shop/?sort=price#reviews", "EUR", true, "currency");
+		const parsed = new URL(url);
+		assert.equal(parsed.searchParams.get("sort"), "price");
+		assert.equal(parsed.searchParams.get("currency"), "EUR");
+		assert.equal(parsed.hash, "#reviews");
+	});
+
+	it("uses the configured urlParamKey instead of hardcoding \"currency\"", () => {
+		const url = buildReloadUrl("https://example.com/shop/", "EUR", true, "curr");
+		const parsed = new URL(url);
+		assert.equal(parsed.searchParams.get("curr"), "EUR");
+		assert.equal(parsed.searchParams.has("currency"), false);
+	});
+
+	it("defaults to \"currency\" when urlParamKey is falsy but enabled is true", () => {
+		const url = buildReloadUrl("https://example.com/shop/", "EUR", true, "");
+		const parsed = new URL(url);
+		assert.equal(parsed.searchParams.get("currency"), "EUR");
+	});
+});
+
+describe("computeStrippedUrl (stripUrlParamFromAddressBar's pure logic)", () => {
+	it("does nothing when the resolved source isn't url_param — must never touch a cookie/geo/default-resolved page's URL", () => {
+		assert.equal(computeStrippedUrl("https://example.com/shop/?currency=EUR", "cookie", "currency"), null);
+	});
+
+	it("does nothing when the param isn't actually present in the URL", () => {
+		assert.equal(computeStrippedUrl("https://example.com/shop/", "url_param", "currency"), null);
+	});
+
+	it("strips the param when source is url_param and the param is present", () => {
+		const url = computeStrippedUrl("https://example.com/shop/?currency=EUR", "url_param", "currency");
+		assert.equal(url, "https://example.com/shop/");
+	});
+
+	it("preserves other query params and the path when stripping", () => {
+		const url = computeStrippedUrl("https://example.com/shop/?sort=price&currency=EUR#reviews", "url_param", "currency");
+		const parsed = new URL(url);
+		assert.equal(parsed.searchParams.has("currency"), false);
+		assert.equal(parsed.searchParams.get("sort"), "price");
+		assert.equal(parsed.hash, "#reviews");
+	});
+});
+
+// ─── End-to-end: the two scenarios this file must never let bleed into ────
+// ─── each other — a currency switch vs. arriving at a stale cached page ───
+
+describe("Issue #72 follow-up: switching currency vs. arriving at a stale cached page are handled differently, on purpose", () => {
+	it("a currency switch's reload lands with source url_param — not a reconciliation candidate, no restored loading UI, no second fetch", () => {
+		const reloadUrl = buildReloadUrl("https://example.com/shop/", "EUR", true, "currency");
+		assert.equal(reloadUrl, "https://example.com/shop/?currency=EUR");
+
+		// The server-render this reload triggers resolves via UrlParamResolver
+		// (Priority 1), so the freshly loaded page's own cfg.source is "url_param".
+		const cfg = { displayCurrency: "EUR", source: "url_param" };
+		assert.equal(
+			isReconciliationCandidate(cfg, "EUR"),
+			false,
+			"a switch's own reload must never be treated as a reconciliation candidate — it already resolved correctly server-side in one round-trip",
+		);
+	});
+
+	it("arriving at a stale cached page still lands with a reconcilable source — the restored Part 1 loading UI still applies", () => {
+		// A guest arrives at a full-page cache HIT (or a WAF-stripped-cookie
+		// request): the server never saw the visitor's real preference, source
+		// falls through to cookie/geo/default, and localStorage disagrees.
+		const cfg = { displayCurrency: "USD", source: "default" };
+		assert.equal(
+			isReconciliationCandidate(cfg, "EUR"),
+			true,
+			"this scenario is exactly what Part 1's restored setSwitcherLoading()/syncTriggerToCode() and the reconciliation fetch exist for — switching currency being fixed to a single round-trip must not regress this path",
+		);
+	});
+});
+
 // ─── Source invariants: reconcile()'s fetch must never be cache-servable ───
 //
 // Confirmed live on issue #72 (Rocket.net staging): every layer resolved the
@@ -354,79 +492,96 @@ describe("Source invariant: applyResolvedCurrency() moves the option-check glyph
 // actual mismatch to investigate (reconciliationCandidate), not on every
 // page load that merely needs price conversion.
 
-// ─── Source invariant: the guest reconciliation path adds NO UI state of ───
-// ─── its own — a guest's post-reload wait must look exactly like a ─────────
-// ─── logged-in visitor's, full stop ─────────────────────────────────────────
-//
-// Confirmed live via direct DOM/CSS inspection on production (issue #72
-// follow-up), not assumed: this site's theme styles a plain, unrelated
-// `button:focus` rule with an orange background. currency-switcher.js's
-// close() (called from selectOption() right before the loading class and the
-// POST) focuses the trigger for accessibility, which is what actually turns
-// it orange pre-reload — this plugin's own CSS never defines that color.
-// window.location.reload() then performs a real hard navigation, which always
-// drops DOM focus regardless of login state, so the freshly loaded page's
-// trigger is never focused and the theme's orange rule never re-applies —
-// again, identically for logged-in and logged-out visitors. A logged-in
-// reload has nothing left to wait for, so it settles into that same fresh,
-// unfocused, undimmed look instantly and the visitor never perceives a
-// separate step. setSwitcherLoading()/syncTriggerToCode() — this file
-// re-applying and holding .fchub-mc-switcher--loading for the length of the
-// reconcile() fetch — were what made a logged-out reload look different: with
-// nothing focused to dim *toward*, several more seconds of visibly dimmed
-// wrong-colored trigger read as a stuck/flashing control. Removing that UI
-// layer entirely reproduces the logged-in look exactly, because it's the same
-// DOM in the same unfocused post-navigation state either way.
-
-describe("Source invariant: the guest reconciliation path adds no switcher-trigger UI state of its own", () => {
-	it("does not define setSwitcherLoading() or syncTriggerToCode() anywhere in this file", () => {
-		assert.doesNotMatch(
-			projectionSource,
-			/function\s+setSwitcherLoading\(/,
-			"setSwitcherLoading() must not exist — no code in this file may toggle the trigger's loading/dimmed state; that belongs solely to currency-switcher.js's pre-reload optimistic-update phase",
+describe("Source invariant: the switcher trigger is suppressed during reconciliation, not just prices", () => {
+	it("applies the loading state only when reconciliationCandidate is true, in the else branch of the FOUC-class decision", () => {
+		const match = projectionSource.match(
+			/if\s*\(!reconciliationCandidate\)\s*\{[\s\S]{0,300}?\}\s*else\s*\{([\s\S]{0,900}?)\n\t\}/,
 		);
-		assert.doesNotMatch(
-			projectionSource,
-			/function\s+syncTriggerToCode\(/,
-			"syncTriggerToCode() must not exist — the trigger is left showing exactly what the server rendered throughout the reconciliation wait, never overwritten with an optimistic localStorage guess",
-		);
-	});
 
-	it("does not reference .fchub-mc-switcher--loading in actual code (comments may still explain why it was removed)", () => {
-		const codeOnly = projectionSource
-			.split("\n")
-			.filter((line) => !line.trim().startsWith("//"))
-			.join("\n");
-		assert.doesNotMatch(
-			codeOnly,
-			/fchub-mc-switcher--loading/,
-			"currency-projection.js must never toggle .fchub-mc-switcher--loading — that class belongs solely to currency-switcher.js's selectOption(), applied before the POST and cleared implicitly by the page reload it triggers on success",
-		);
-	});
-
-	it("the reconciliationCandidate FOUC-class decision has no else branch", () => {
-		const match = projectionSource.match(/if\s*\(!reconciliationCandidate\)\s*\{([\s\S]{0,400}?)\n\t\}/);
-		assert.ok(match, "could not find the `if (!reconciliationCandidate) { ... }` FOUC-class block in currency-projection.js");
+		assert.ok(match, "could not find the `if (!reconciliationCandidate) { ... } else { ... }` FOUC-class/loading-state block in currency-projection.js");
 		assert.match(
 			match[1],
-			/classList\.add\(["']fchub-mc-projecting["']\)/,
-			".fchub-mc-projecting must still be added for the plain (non-reconciliation) path",
-		);
-
-		const afterBlock = projectionSource.slice(match.index + match[0].length, match.index + match[0].length + 80).trimStart();
-		assert.ok(
-			!afterBlock.startsWith("else"),
-			"reconciliationCandidate being true must not trigger any code of its own here — no else branch, no UI state change, nothing — a page that needs reconciliation gets no different treatment than one that doesn't until reconcile() actually settles",
+			/setSwitcherLoading\(true\)/,
+			"the switcher trigger must be marked loading in the else branch (reconciliationCandidate true) of the same decision that decides whether to hide prices — not unconditionally, since a page that only needs price conversion never has the wrong currency in the trigger",
 		);
 	});
 
-	it("does not revert any 'optimistic sync' when the server agrees the page was already correct — there is nothing to revert", () => {
-		const match = projectionSource.match(/data\.display_currency === displayCode[\s\S]{0,600}?return false;/);
-		assert.ok(match, "could not find the 'server agrees, no change' branch in currency-projection.js");
+	it("clears the loading state once reconcile() settles, targeting the trigger via [data-fchub-mc-switcher]", () => {
+		const setterMatch = projectionSource.match(
+			/function setSwitcherLoading\(isLoading\) \{([\s\S]*?)\n\t\}/,
+		);
+		assert.ok(setterMatch, "could not find setSwitcherLoading(...) in currency-projection.js");
+		assert.match(
+			setterMatch[1],
+			/data-fchub-mc-switcher\]["']\)[\s\S]*?fchub-mc-switcher--loading/,
+			"setSwitcherLoading() must toggle .fchub-mc-switcher--loading on [data-fchub-mc-switcher] elements",
+		);
+
+		const finallyMatch = projectionSource.match(/reconcile\(\)\.finally\(\(\) => \{([\s\S]{0,1000})/);
+		assert.ok(finallyMatch, "could not find reconcile().finally(...) in currency-projection.js");
+		assert.match(
+			finallyMatch[1],
+			/setSwitcherLoading\(false\)/,
+			"reconcile()'s finally() must clear the switcher loading state once it settles (success, no-op, or failure) — otherwise the trigger stays dimmed forever",
+		);
+	});
+});
+
+// ─── Source invariant: the trigger shows the visitor's own choice — ───
+// ─── never a stale value — for the entire reconciliation wait ─────────
+//
+// Confirmed live via the sessionStorage trace on production (issue #72):
+// setSwitcherLoading(true) correctly dimmed the trigger immediately, but its
+// TEXT stayed the page's stale server-rendered value (e.g. "AUD") for the
+// whole ~5.6s wait, only flipping to the correct value ("CHF") the instant
+// reconcile() finally resolved. A dimmed-but-wrong value is still a wrong
+// value on screen. Per the site owner's explicit, non-negotiable spec: the
+// trigger must show the visitor's own localStorage choice immediately and
+// throughout, never the stale cfg value and never blank — only prices (which
+// are genuinely invalid until reconciled) may be hidden during this window.
+
+describe("Source invariant: the trigger syncs to the visitor's choice immediately, not just prices", () => {
+	it("syncs the trigger to storedCurrencyAtLoad in the same synchronous pass that applies the loading state", () => {
+		const match = projectionSource.match(
+			/if\s*\(!reconciliationCandidate\)\s*\{[\s\S]{0,300}?\}\s*else\s*\{([\s\S]{0,900}?)\n\t\}/,
+		);
+		assert.ok(match, "could not find the `if (!reconciliationCandidate) { ... } else { ... }` block in currency-projection.js");
+		assert.match(
+			match[1],
+			/setSwitcherLoading\(true\)[\s\S]*?syncTriggerToCode\(storedCurrencyAtLoad\)/,
+			"the trigger must be synced to storedCurrencyAtLoad (the visitor's own choice) immediately when the loading state is applied — not left showing the stale cfg-baked value until reconcile() resolves",
+		);
+	});
+
+	it("syncTriggerToCode() does not depend on currency-switcher.js having executed yet", () => {
+		// Confirmed live: script tag order on this site prints
+		// currency-projection.js before currency-switcher.js, both
+		// synchronous — window.fchubMcSyncSwitcherDisplay is not reliably
+		// defined at the point syncTriggerToCode() must run. It has to be
+		// self-contained.
+		const match = projectionSource.match(/function syncTriggerToCode\(code\) \{([\s\S]*?)\n\t\}/);
+		assert.ok(match, "could not find syncTriggerToCode(...) in currency-projection.js");
 		assert.doesNotMatch(
-			match[0],
+			match[1],
 			/fchubMcSyncSwitcherDisplay/,
-			"the 'server agrees, no change' branch must not call fchubMcSyncSwitcherDisplay — with no optimistic trigger sync happening earlier in this file, the trigger is already showing the server-rendered (and now server-confirmed) value, so there is nothing left to correct back",
+			"syncTriggerToCode() must not depend on window.fchubMcSyncSwitcherDisplay — that global isn't reliably defined this early given this site's actual script order",
+		);
+		assert.match(
+			match[1],
+			/data-fchub-mc-switcher\]["']\)/,
+			"syncTriggerToCode() must locate the trigger itself via [data-fchub-mc-switcher], not rely on another script having already found it",
+		);
+	});
+
+	it("reverts the optimistic sync if the server confirms the original page value was correct after all", () => {
+		const match = projectionSource.match(
+			/data\.display_currency === displayCode[\s\S]{0,1200}?return false;/,
+		);
+		assert.ok(match, "could not find the 'server agrees, no change' branch in currency-projection.js");
+		assert.match(
+			match[0],
+			/data\.display_currency\s*!==\s*storedCurrencyAtLoad[\s\S]*?fchubMcSyncSwitcherDisplay/,
+			"when the server confirms the page's original value was right all along, and that differs from the optimistic localStorage guess already shown, the trigger must be corrected back — the visitor's guess must never silently win over what the server actually says",
 		);
 	});
 });
@@ -447,18 +602,14 @@ describe("Source invariant: the guest reconciliation path adds no switcher-trigg
 
 describe("Source invariant: prices are untouched (no hide, no dim) during reconciliation", () => {
 	it("does not add .fchub-mc-projecting when reconciliationCandidate is true — only for the plain path", () => {
-		const match = projectionSource.match(/if\s*\(!reconciliationCandidate\)\s*\{([\s\S]{0,400}?)\n\t\}/);
-		assert.ok(match, "could not find the `if (!reconciliationCandidate) { ... }` FOUC-class block in currency-projection.js");
+		const match = projectionSource.match(
+			/if\s*\(!reconciliationCandidate\)\s*\{([\s\S]{0,200}?)\}\s*else\s*\{/,
+		);
+		assert.ok(match, "could not find the `if (!reconciliationCandidate) { ... } else { ... }` FOUC-class block in currency-projection.js");
 		assert.match(
 			match[1],
 			/classList\.add\(["']fchub-mc-projecting["']\)/,
 			".fchub-mc-projecting must only be added for the plain (non-reconciliation) path — adding it unconditionally would hide prices for the whole reconciliation wait again",
-		);
-
-		const afterBlock = projectionSource.slice(match.index + match[0].length, match.index + match[0].length + 80).trimStart();
-		assert.ok(
-			!afterBlock.startsWith("else"),
-			"the reconciliationCandidate-true case must add no class of its own — there is deliberately no else branch here",
 		);
 	});
 
@@ -559,6 +710,117 @@ describe("Source invariant: the CSS FOUC fallback never races an in-flight recon
 		assert.ok(
 			cssDelayMs - jsTimeoutMs >= 2000,
 			`CSS FOUC fallback (${cssDelayMs}ms) should clear RECONCILE_TIMEOUT_MS (${jsTimeoutMs}ms) with at least 2s of margin, not just technically come after it — the JS still has to run its .finally() callback and a full projectPrices() pass after the fetch settles`,
+		);
+	});
+});
+
+// ─── Source invariant: RECONCILABLE_SOURCES excludes url_param ────────────
+//
+// This is what keeps a currency switch's own reload (Part 2, issue #72
+// follow-up) from ever being treated as a reconciliation candidate: once it
+// lands with source url_param, the restored Part 1 loading UI and the
+// second reconciliation fetch must both stay off. Reads the real array
+// literal rather than trusting the hand-mirrored copy at the top of this
+// file, which would only prove the copy still agrees with itself.
+
+describe("Source invariant: RECONCILABLE_SOURCES excludes url_param and user_meta", () => {
+	it("currency-projection.js's real RECONCILABLE_SOURCES array is exactly [\"cookie\", \"geo\", \"default\"]", () => {
+		const match = projectionSource.match(/const RECONCILABLE_SOURCES = (\[[^\]]*\]);/);
+		assert.ok(match, "could not find the RECONCILABLE_SOURCES array literal in currency-projection.js");
+
+		const sources = JSON.parse(match[1].replace(/'/g, '"'));
+		assert.deepEqual(
+			sources,
+			["cookie", "geo", "default"],
+			"RECONCILABLE_SOURCES must stay exactly these three — url_param (an explicit link or this file's own switch-triggered reload) and user_meta (a signed-in visitor's saved preference) must never be second-guessed by a stale localStorage value",
+		);
+	});
+});
+
+// ─── Source invariant: switching currency navigates via a URL-param ───────
+// ─── reload, not window.location.reload(), when the resolver is enabled ───
+//
+// Confirmed by reading ContextModule::buildResolverChain() (Priority 1) and
+// switchCurrency() together — a currency switch used to always
+// window.location.reload(), forcing the freshly loaded page to fall back on
+// whatever the guest cookie resolved to (or a second reconciliation fetch if
+// it didn't reach the server), where a signed-in visitor only ever paid one
+// round-trip. Appending the switched-to currency as the URL param
+// UrlParamResolver reads makes the reload itself resolve correctly,
+// server-side, in the same single request.
+
+describe("Source invariant: switchCurrency() reloads via a URL-param URL, not a bare reload()", () => {
+	it("defines buildReloadUrl() using the URL API, not string concatenation", () => {
+		const match = switcherSource.match(/function buildReloadUrl\(currencyCode\) \{([\s\S]*?)\n\t\}/);
+		assert.ok(match, "could not find buildReloadUrl(...) in currency-switcher.js");
+		assert.match(
+			match[1],
+			/new URL\(/,
+			"buildReloadUrl() must use the URL API to parse the current location — string concatenation can't correctly handle both an absent query string and an already-present param from a previous switch or an incoming link",
+		);
+		assert.match(
+			match[1],
+			/searchParams\.set\(/,
+			"buildReloadUrl() must use URLSearchParams.set() — set() overwrites a same-named param in place, where append() would duplicate it on a second switch",
+		);
+		assert.match(
+			match[1],
+			/if\s*\(!config\.urlParamEnabled\)\s*return null;/,
+			"buildReloadUrl() must return null when urlParamEnabled is false, so callers fall back to a plain reload() instead of relying on a resolver that isn't in the chain",
+		);
+	});
+
+	it("switchCurrency()'s success branch calls buildReloadUrl() and falls back to reload() only when it returns null", () => {
+		const match = switcherSource.match(/persistToLocalStorage\(currencyCode\);([\s\S]{0,700}?)\n\t\t\t\}\)/);
+		assert.ok(match, "could not find switchCurrency()'s success branch in currency-switcher.js");
+		assert.match(
+			match[1],
+			/const reloadUrl = buildReloadUrl\(currencyCode\);/,
+			"switchCurrency() must build the reload URL from the currency that was just confirmed persisted",
+		);
+		assert.match(
+			match[1],
+			/if\s*\(reloadUrl\)\s*\{\s*window\.location\.href\s*=\s*reloadUrl;\s*\}\s*else\s*\{\s*window\.location\.reload\(\);\s*\}/,
+			"switchCurrency() must navigate to the URL-param reload URL when buildReloadUrl() returns one, and fall back to window.location.reload() only when it returns null (urlParamEnabled is false)",
+		);
+	});
+});
+
+// ─── Source invariant: the currency param is stripped back out of the ─────
+// ─── address bar once a url_param-resolved page has settled ───────────────
+
+describe("Source invariant: stripUrlParamFromAddressBar() only touches the address bar for a url_param resolution, via replaceState", () => {
+	it("is gated on cfg.source === \"url_param\" and never navigates", () => {
+		const match = projectionSource.match(/function stripUrlParamFromAddressBar\(\) \{([\s\S]*?)\n\t\}/);
+		assert.ok(match, "could not find stripUrlParamFromAddressBar(...) in currency-projection.js");
+		assert.match(
+			match[1],
+			/cfg\.source\s*!==\s*["']url_param["']/,
+			'stripUrlParamFromAddressBar() must be gated on cfg.source === "url_param" — it must never rewrite the URL of a page that resolved via cookie, geo, default, or a signed-in visitor\'s saved preference',
+		);
+		assert.match(
+			match[1],
+			/window\.history\.replaceState\(/,
+			"stripUrlParamFromAddressBar() must use history.replaceState() — the one API that changes the visible URL with no navigation and no flicker",
+		);
+		assert.doesNotMatch(
+			match[1],
+			/location\.href\s*=[^=]|location\.assign\(|location\.replace\(/,
+			"stripUrlParamFromAddressBar() must never navigate (assigning location.href, or location.assign/replace) — that would defeat the entire point of a single-round-trip switch. Reading window.location.href (e.g. to build the URL) is fine; only navigating away is forbidden",
+		);
+	});
+
+	it("is called from init()'s non-reconciliation branch — the only branch a url_param resolution can ever reach", () => {
+		// Anchored on this exact debugLog call, unique to init()'s non-
+		// reconciliation branch — the bare `if (!reconciliationCandidate)`
+		// text also opens the unrelated top-level FOUC-class block earlier in
+		// the file, which does not call stripUrlParamFromAddressBar() at all.
+		const match = projectionSource.match(/debugLog\("init_no_reconciliation_branch"\);([\s\S]{0,200}?)\n\t\t\}/);
+		assert.ok(match, "could not find init()'s non-reconciliation branch in currency-projection.js");
+		assert.match(
+			match[1],
+			/stripUrlParamFromAddressBar\(\);/,
+			"init()'s non-reconciliation branch must call stripUrlParamFromAddressBar() — a url_param resolution is never a reconciliation candidate (see RECONCILABLE_SOURCES above), so this is the only branch it ever reaches",
 		);
 	});
 });

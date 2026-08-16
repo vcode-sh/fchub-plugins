@@ -175,6 +175,39 @@
 	}
 
 	/**
+	 * Builds the URL to reload to after a successful switch: the current page
+	 * URL with the switched-to currency appended as the query parameter
+	 * UrlParamResolver reads server-side (ContextModule::buildResolverChain(),
+	 * Priority 1 — above the cookie and above a signed-in visitor's saved
+	 * account preference). That means the reload's own server-render resolves
+	 * the correct currency in this one request, without depending on the
+	 * guest cookie reaching the server on it (issue #72's root cause) and
+	 * without a second, separate reconciliation fetch on the freshly loaded
+	 * page — RECONCILABLE_SOURCES in currency-projection.js already excludes
+	 * url_param, so that branch correctly never runs once this lands.
+	 *
+	 * Uses the URL API rather than string concatenation specifically so an
+	 * existing query string — including a `?currency=` from an earlier
+	 * switch, or an incoming link — is preserved and merely has this one
+	 * param set, not duplicated or clobbered.
+	 *
+	 * Returns null when urlParamEnabled is false (the site owner turned
+	 * URL-param resolution off in settings): the resolver this relies on
+	 * isn't in the chain, so callers must fall back to a plain reload().
+	 */
+	function buildReloadUrl(currencyCode) {
+		if (!config.urlParamEnabled) return null;
+		const paramKey = config.urlParamKey || "currency";
+		try {
+			const url = new URL(window.location.href);
+			url.searchParams.set(paramKey, currencyCode);
+			return url.toString();
+		} catch {
+			return null;
+		}
+	}
+
+	/**
 	 * Posts the preference and only reloads once the server confirms it stored something.
 	 * A 403 (plugin disabled), 409 (nothing to persist for this visitor), 422 (bad currency)
 	 * or 429 (rate limited) leaves the page alone and surfaces the server's message.
@@ -220,7 +253,14 @@
 						detail: { currency: currencyCode, response: payload },
 					}),
 				);
-				window.location.reload();
+
+				const reloadUrl = buildReloadUrl(currencyCode);
+				debugLog("switch_success_navigating", { currencyCode, reloadUrl });
+				if (reloadUrl) {
+					window.location.href = reloadUrl;
+				} else {
+					window.location.reload();
+				}
 			})
 			.catch((err) => {
 				failSwitch(currencyCode, err?.message || FALLBACK_ERROR, settings, 0, "network_error");

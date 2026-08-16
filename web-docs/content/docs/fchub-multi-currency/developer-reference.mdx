@@ -295,6 +295,58 @@ The `fchubMcConfig` object is injected via `wp_localize_script` and available gl
 | `disclosureEnabled` | bool | Whether checkout disclosure is active |
 | `disclosureText` | string\|null | Rendered disclosure text with tokens replaced |
 | `guestLocalStorageEnabled` | bool | Whether the guest localStorage fallback is active — mirrors `cookie_enabled`. See [Guest Currency Reconciliation](#guest-currency-reconciliation). |
+| `urlParamEnabled` | bool | Whether `UrlParamResolver` is in the resolver chain — mirrors `url_param_enabled`. See [Single Round-Trip Currency Switching](#single-round-trip-currency-switching). |
+| `urlParamKey` | string | The query parameter `UrlParamResolver` reads — mirrors `url_param_key` (default `currency`). |
+
+<Separator className="my-8" />
+
+## Single Round-Trip Currency Switching
+
+A currency switch already costs one round-trip before any of this: `POST
+/context` to persist the choice, then a reload. Historically that reload was
+a bare `window.location.reload()`, which left the freshly loaded page to
+resolve its own currency however the resolver chain normally would — fine for
+a signed-in visitor (`UserMetaResolver` resolves ahead of the cookie), but on
+a host where a guest's cookie doesn't reliably reach the server on that same
+reload (see [Guest Currency Reconciliation](#guest-currency-reconciliation)
+below), the page would land on the wrong currency and need a second, separate
+reconciliation fetch to correct itself — two slow round-trips stacked
+sequentially where a signed-in visitor only ever pays one.
+
+`currency-switcher.js`'s `switchCurrency()` already knows the exact currency
+it just persisted, so instead of a bare reload it builds the reload URL with
+that currency appended as the query parameter `UrlParamResolver` reads —
+`UrlParamResolver` is Priority 1 in the resolver chain
+(`ContextModule::buildResolverChain()`), ahead of the cookie and ahead of a
+signed-in visitor's saved account preference, and reads `$_GET` directly on
+any request, including this reload. That means the reload's own server-render
+resolves the correct currency in this one request, for every visitor, without
+depending on the cookie at all:
+
+```javascript
+// Simplified — see buildReloadUrl() in currency-switcher.js
+const url = new URL(window.location.href);
+url.searchParams.set(cfg.urlParamKey, currencyCode); // "currency" by default
+window.location.href = url.toString();
+```
+
+Because `RECONCILABLE_SOURCES` excludes `url_param` (see below), a page that
+loads this way is never treated as a reconciliation candidate — the
+`currency-projection.js` fallback correctly stays out of it entirely, with no
+loading state and no second fetch.
+
+If `urlParamEnabled` is `false` (the site owner disabled URL-parameter
+resolution in settings), `buildReloadUrl()` returns `null` and
+`switchCurrency()` falls back to a plain `window.location.reload()`, exactly
+as before — it never assumes a resolver that isn't in the chain.
+
+Once the reloaded page has settled, `currency-projection.js` removes the
+currency parameter from the visible URL again via `history.replaceState()` —
+no navigation, no visible change — so the address bar doesn't accumulate
+`?currency=EUR` after every switch, and a CDN in front of the page doesn't
+get a reason to cache each currency as a separate URL. This only ever touches
+the URL when `source` is `url_param` on the current page; it never rewrites
+the address bar for a cookie/geo/default/user_meta resolution.
 
 <Separator className="my-8" />
 
@@ -308,6 +360,15 @@ WordPress on an ordinary page load, so the resolver chain falls through past
 still has the cookie and the visitor never changed their mind. Signed-in
 visitors are unaffected: their preference lives in user meta, a second,
 independent channel `UserMetaResolver` resolves ahead of the cookie.
+
+This is a different scenario from [Single Round-Trip Currency
+Switching](#single-round-trip-currency-switching) above: that section covers
+the reload immediately after a switch, which now resolves correctly in one
+request via the URL parameter and never reaches this fallback at all
+(`source` is `url_param` there, and `RECONCILABLE_SOURCES` excludes it). This
+section covers a guest arriving at *any other* page load — a fresh visit, a
+bookmark, a full-page cache hit — where the cookie set by an earlier switch
+doesn't reach the server.
 
 The plugin adds a client-side fallback that doesn't depend on the
 cookie round-tripping through that layer:
@@ -326,33 +387,19 @@ cookie round-tripping through that layer:
    a shared, anonymous-visitor snapshot of the page — the visitor's cookie
    never gets stripped in that case, it's simply irrelevant to what HTML the
    cache returns, since the request never reaches WordPress/PHP at all.
-3. If they disagree, `currency-projection.js` adds no visual state of its own
-   at all — neither to the trigger nor to prices — while the reconciliation
-   fetch is in flight. Both stay exactly as the server originally rendered
-   them until the fetch settles, at which point (if it found a real change)
-   they go directly to the corrected values in one step: prices via a single
-   `projectPrices()` pass, and the trigger via
-   `window.fchubMcSyncSwitcherDisplay()`. This is deliberate: a currency
-   switch reloads the page (see `currency-switcher.js`'s `switchCurrency()`),
-   and a guest's post-reload wait must look exactly like a signed-in
-   visitor's, whose page never runs this branch at all. Earlier revisions of
-   this fallback re-applied and held `.fchub-mc-switcher--loading` on the
-   trigger for the length of the fetch to signal the wait — confirmed live to
-   backfire: this plugin's own CSS gives the trigger no color of its own
-   (`--fchub-mc-bg` is plain white), and any highlighted look it has right
-   after a pick comes from the host theme's own `:focus` styling, applied
-   because `currency-switcher.js`'s `close()` focuses the trigger for
-   accessibility before the reload. `window.location.reload()` always drops
-   DOM focus on the fresh page regardless of login state, so that highlight
-   is already gone the instant the page repaints either way — a signed-in
-   visitor's reload has nothing left to wait for and never shows otherwise.
-   Re-applying the loading class for several more seconds on the guest path
-   only made that ordinary, otherwise-instant focus loss visible as a
-   stuck/flashing trigger. The fetch itself is
-   `GET {restUrl}/context?currency=<code>` — which resolves via the URL query
-   string, not the cookie — and on response, reassigns the mutable projection
-   state in place, clears and runs price projection for the first time, and
-   calls `window.fchubMcSyncSwitcherDisplay()` to reflect whatever the server
+3. If they disagree, the switcher's trigger is immediately synced to the
+   localStorage value — the visitor's own choice, not the page's stale
+   baked-in one — and dimmed/non-interactive (`fchub-mc-switcher--loading`)
+   for the duration. Prices, by contrast, are left completely untouched — no
+   hiding, no dimming, no projection pass at all — until reconciliation
+   actually completes, at which point they go directly from whatever the
+   page originally rendered to the corrected, converted values in one step.
+   Only the trigger shows a loading state during the wait; prices get none.
+   The fetch itself is `GET {restUrl}/context?currency=<code>` — which
+   resolves via the URL query string, not the cookie — and on response,
+   reassigns the mutable projection state in place, clears and runs price
+   projection for the first time, and calls
+   `window.fchubMcSyncSwitcherDisplay()` again to reflect whatever the server
    actually confirmed (normally the same value already shown; if the server
    disagrees with the visitor's saved choice — rare — this corrects the
    trigger to match the server instead). `fchub_mc:context_reconciled` fires

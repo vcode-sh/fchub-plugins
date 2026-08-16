@@ -102,6 +102,18 @@ final class FrontendModule implements ModuleContract
             // localStorage must not become a silent back door around that choice.
             // See PublicRoutes GET /context and currency-projection.js reconcile().
             'guestLocalStorageEnabled' => $optionStore->get('cookie_enabled', 'yes') === 'yes',
+            // Whether the resolver chain's top-priority UrlParamResolver is active,
+            // and which query parameter it reads (see
+            // ContextModule::buildResolverChain(), Priority 1). currency-switcher.js
+            // uses this to append the switched-to currency to the post-switch reload
+            // URL, so the page's own server-render resolves it correctly in that
+            // same request — no second client-side reconciliation fetch needed, and
+            // no dependency on the guest cookie reaching the server on the reload
+            // (issue #72). Mirrors url_param_enabled/url_param_key exactly; if the
+            // site owner has turned URL-param resolution off, this must be false so
+            // the switcher doesn't rely on a resolver that isn't in the chain.
+            'urlParamEnabled'          => $optionStore->get('url_param_enabled', 'yes') === 'yes',
+            'urlParamKey'              => $optionStore->get('url_param_key', 'currency'),
         ]);
     }
 

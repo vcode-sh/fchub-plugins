@@ -165,6 +165,53 @@ final class FrontendModuleTest extends TestCase
         $this->assertSame('default', $config['source']);
     }
 
+    /**
+     * currency-switcher.js's post-switch reload needs to know whether
+     * UrlParamResolver is actually in the resolver chain, and which query
+     * parameter it reads, before it can append the switched-to currency to
+     * the reload URL (issue #72 follow-up: this is what lets the reload
+     * resolve correctly in one server round-trip instead of needing a
+     * second client-side reconciliation fetch). Defaults mirror
+     * Constants::DEFAULTS exactly.
+     */
+    #[Test]
+    public function testFrontendConfigExposesUrlParamEnabledAndKeyFollowingSettings(): void
+    {
+        $this->setOption('fchub_mc_settings', $this->switcherSettings());
+        $this->setWpdbMockRow(null);
+
+        $config = FrontendModule::buildFrontendConfig();
+
+        $this->assertTrue($config['urlParamEnabled']);
+        $this->assertSame('currency', $config['urlParamKey']);
+    }
+
+    #[Test]
+    public function testFrontendConfigDisablesUrlParamWhenResolverIsDisabledInSettings(): void
+    {
+        $settings = $this->switcherSettings();
+        $settings['url_param_enabled'] = 'no';
+        $this->setOption('fchub_mc_settings', $settings);
+        $this->setWpdbMockRow(null);
+
+        $config = FrontendModule::buildFrontendConfig();
+
+        $this->assertFalse($config['urlParamEnabled']);
+    }
+
+    #[Test]
+    public function testFrontendConfigExposesACustomUrlParamKey(): void
+    {
+        $settings = $this->switcherSettings();
+        $settings['url_param_key'] = 'curr';
+        $this->setOption('fchub_mc_settings', $settings);
+        $this->setWpdbMockRow(null);
+
+        $config = FrontendModule::buildFrontendConfig();
+
+        $this->assertSame('curr', $config['urlParamKey']);
+    }
+
     #[Test]
     public function testBuildPricingConfigCarriesPerCurrencyFormattingFields(): void
     {
