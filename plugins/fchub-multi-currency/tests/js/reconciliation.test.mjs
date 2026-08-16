@@ -770,23 +770,51 @@ describe("Source invariant: switchCurrency() reloads via a URL-param URL, not a 
 		);
 	});
 
-	it("switchCurrency()'s success branch calls buildReloadUrl() and falls back to reload() only when it returns null", () => {
-		const match = switcherSource.match(/persistToLocalStorage\(currencyCode\);([\s\S]{0,1500}?)\n\t\t\t\}\)/);
+	it("switchCurrency()'s success branch builds the guest reload URL and falls back to reload() only when it returns null", () => {
+		const match = switcherSource.match(/persistToLocalStorage\(currencyCode\);([\s\S]{0,2700}?)\n\t\t\t\}\)/);
 		assert.ok(match, "could not find switchCurrency()'s success branch in currency-switcher.js");
+
+		const codeOnly = match[1]
+			.split("\n")
+			.filter((line) => !line.trim().startsWith("//"))
+			.join("\n");
+
 		assert.match(
-			match[1],
-			/const reloadUrl = buildReloadUrl\(currencyCode\);/,
-			"switchCurrency() must build the reload URL from the currency that was just confirmed persisted",
-		);
-		assert.match(
-			match[1],
+			codeOnly,
 			/if\s*\(reloadUrl\)\s*\{/,
-			"switchCurrency() must branch on whether buildReloadUrl() returned a URL",
+			"switchCurrency() must branch on whether a reload URL was determined",
 		);
 		assert.match(
-			match[1],
+			codeOnly,
 			/\}\s*else\s*\{\s*window\.location\.reload\(\);\s*\}/,
-			"switchCurrency() must fall back to window.location.reload() only when buildReloadUrl() returns null (urlParamEnabled is false)",
+			"switchCurrency() must fall back to window.location.reload() only when the reload URL is null (guest path, urlParamEnabled is false)",
+		);
+	});
+
+	// The URL-param reload exists purely to route a *guest's* reload through
+	// UrlParamResolver, working around their cookie not reliably reaching the
+	// server (issue #72) — a signed-in visitor's preference already resolves
+	// correctly and quickly via UserMetaResolver (Priority 2), and never had
+	// that problem. Routing them through this too regressed their own,
+	// already-fast switch time to match a guest's slower one, for no benefit.
+	it("only calls buildReloadUrl() for a logged-out visitor — a signed-in visitor's reload URL is the current URL, unmodified", () => {
+		const match = switcherSource.match(/persistToLocalStorage\(currencyCode\);([\s\S]{0,2700}?)\n\t\t\t\}\)/);
+		assert.ok(match, "could not find switchCurrency()'s success branch in currency-switcher.js");
+
+		assert.match(
+			match[1],
+			/const reloadUrl = config\.isLoggedIn \? window\.location\.href : buildReloadUrl\(currencyCode\);/,
+			'switchCurrency() must only call buildReloadUrl() when config.isLoggedIn is false; a signed-in visitor\'s reload URL must be exactly "window.location.href" unmodified — never carrying the currency param, never touching UrlParamResolver',
+		);
+
+		const codeOnly = match[1]
+			.split("\n")
+			.filter((line) => !line.trim().startsWith("//"))
+			.join("\n");
+		assert.equal(
+			(codeOnly.match(/buildReloadUrl\(/g) || []).length,
+			1,
+			"buildReloadUrl() must appear exactly once in switchCurrency()'s success branch — as the alternative in the isLoggedIn ternary, never called unconditionally or a second time for the logged-in case",
 		);
 	});
 
@@ -799,7 +827,7 @@ describe("Source invariant: switchCurrency() reloads via a URL-param URL, not a 
 	// currency param) never had this problem, because reload() re-requests the
 	// *current* history entry rather than navigating to a new one.
 	it("reaches the reload URL via history.replaceState() + reload() — never a direct window.location.href assignment — to preserve scroll position", () => {
-		const match = switcherSource.match(/if\s*\(reloadUrl\)\s*\{([\s\S]{0,1100}?)\n\t\t\t\t\}\s*else/);
+		const match = switcherSource.match(/if\s*\(reloadUrl\)\s*\{([\s\S]{0,1300}?)\n\t\t\t\t\}\s*else/);
 		assert.ok(match, "could not find the `if (reloadUrl) { ... } else { ... }` branch in currency-switcher.js");
 
 		const codeOnly = match[1]

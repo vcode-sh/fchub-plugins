@@ -194,6 +194,13 @@
 	 * Returns null when urlParamEnabled is false (the site owner turned
 	 * URL-param resolution off in settings): the resolver this relies on
 	 * isn't in the chain, so callers must fall back to a plain reload().
+	 *
+	 * Only ever called for a logged-out visitor (see switchCurrency()) — this
+	 * exists purely to work around a guest's cookie not reliably reaching the
+	 * server on the reload (issue #72). A signed-in visitor's preference
+	 * already resolves correctly and quickly via UserMetaResolver (Priority
+	 * 2), so routing them through this too gained them nothing and cost them
+	 * the same slower reload guests needed it for.
 	 */
 	function buildReloadUrl(currencyCode) {
 		if (!config.urlParamEnabled) return null;
@@ -254,8 +261,17 @@
 					}),
 				);
 
-				const reloadUrl = buildReloadUrl(currencyCode);
-				debugLog("switch_success_navigating", { currencyCode, reloadUrl });
+				// buildReloadUrl() is never even called for a signed-in visitor.
+				// It exists purely to route a guest's reload through
+				// UrlParamResolver so it resolves correctly without depending on
+				// their cookie reaching the server (issue #72) — a signed-in
+				// visitor's preference already resolves correctly and quickly via
+				// UserMetaResolver, so this would only have cost them the same
+				// slower reload a guest needed it for, for no benefit. Their
+				// reload URL is simply the current URL, unmodified — never
+				// carrying ?currency=, never touching UrlParamResolver.
+				const reloadUrl = config.isLoggedIn ? window.location.href : buildReloadUrl(currencyCode);
+				debugLog("switch_success_navigating", { currencyCode, reloadUrl, isLoggedIn: !!config.isLoggedIn });
 				if (reloadUrl) {
 					// history.replaceState() + reload(), not
 					// window.location.href = reloadUrl. Assigning href performs a
@@ -268,11 +284,20 @@
 					// new one — preserving scroll position exactly the way the
 					// plugin's original plain reload() always did before this
 					// currency param existed. Server-side resolution is
-					// unaffected either way: UrlParamResolver reads the same
-					// query string regardless of which browser API put it there.
+					// unaffected either way: UrlParamResolver (guest) or
+					// UserMetaResolver (signed-in) reads/resolves the same way
+					// regardless of which browser API put the URL there. Applies
+					// to both the guest and signed-in reload alike — only the URL
+					// each ends up reloading differs.
 					window.history.replaceState(window.history.state, "", reloadUrl);
 					window.location.reload();
 				} else {
+					// Guest path only: urlParamEnabled is false, so
+					// buildReloadUrl() returned null — the resolver this would
+					// rely on isn't in the chain. Falls back to reload()'s own
+					// default scroll-preserving behavior (reloading the current
+					// entry, URL unchanged) rather than assuming a resolver that
+					// isn't there.
 					window.location.reload();
 				}
 			})

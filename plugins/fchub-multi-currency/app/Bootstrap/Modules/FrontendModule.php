@@ -114,6 +114,16 @@ final class FrontendModule implements ModuleContract
             // the switcher doesn't rely on a resolver that isn't in the chain.
             'urlParamEnabled'          => $optionStore->get('url_param_enabled', 'yes') === 'yes',
             'urlParamKey'              => $optionStore->get('url_param_key', 'currency'),
+            // Whether the visitor is signed in. currency-switcher.js uses this to
+            // skip the URL-param reload above entirely for a signed-in visitor: it
+            // exists to work around a guest's cookie not reliably reaching the
+            // server on the post-switch reload (issue #72), a problem signed-in
+            // visitors never had — UserMetaResolver (Priority 2) has always
+            // resolved their preference correctly. Routing them through
+            // UrlParamResolver too gained them nothing and cost them the same
+            // slower path guests needed, regressing their switch time to match
+            // guests' instead of keeping their own, already-fast one.
+            'isLoggedIn'               => is_user_logged_in(),
         ]);
     }
 

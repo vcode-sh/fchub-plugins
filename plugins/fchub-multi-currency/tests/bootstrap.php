@@ -403,6 +403,13 @@ if (!function_exists('get_current_user_id')) {
     }
 }
 
+if (!function_exists('is_user_logged_in')) {
+    function is_user_logged_in()
+    {
+        return ($GLOBALS['wp_mock_current_user_id'] ?? 0) > 0;
+    }
+}
+
 if (!function_exists('current_user_can')) {
     function current_user_can($capability, ...$args)
     {

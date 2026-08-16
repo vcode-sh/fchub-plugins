@@ -212,6 +212,36 @@ final class FrontendModuleTest extends TestCase
         $this->assertSame('curr', $config['urlParamKey']);
     }
 
+    /**
+     * currency-switcher.js only routes a logged-out visitor's post-switch reload
+     * through UrlParamResolver (issue #72 follow-up) — a signed-in visitor's
+     * preference already resolves correctly and quickly via UserMetaResolver, so
+     * the client needs to know login state to skip that path for them entirely.
+     */
+    #[Test]
+    public function testFrontendConfigExposesIsLoggedInFalseForAGuest(): void
+    {
+        $this->setOption('fchub_mc_settings', $this->switcherSettings());
+        $this->setWpdbMockRow(null);
+        $this->setCurrentUserId(0);
+
+        $config = FrontendModule::buildFrontendConfig();
+
+        $this->assertFalse($config['isLoggedIn']);
+    }
+
+    #[Test]
+    public function testFrontendConfigExposesIsLoggedInTrueForASignedInVisitor(): void
+    {
+        $this->setOption('fchub_mc_settings', $this->switcherSettings());
+        $this->setWpdbMockRow(null);
+        $this->setCurrentUserId(42);
+
+        $config = FrontendModule::buildFrontendConfig();
+
+        $this->assertTrue($config['isLoggedIn']);
+    }
+
     #[Test]
     public function testBuildPricingConfigCarriesPerCurrencyFormattingFields(): void
     {

@@ -297,6 +297,7 @@ The `fchubMcConfig` object is injected via `wp_localize_script` and available gl
 | `guestLocalStorageEnabled` | bool | Whether the guest localStorage fallback is active — mirrors `cookie_enabled`. See [Guest Currency Reconciliation](#guest-currency-reconciliation). |
 | `urlParamEnabled` | bool | Whether `UrlParamResolver` is in the resolver chain — mirrors `url_param_enabled`. See [Single Round-Trip Currency Switching](#single-round-trip-currency-switching). |
 | `urlParamKey` | string | The query parameter `UrlParamResolver` reads — mirrors `url_param_key` (default `currency`). |
+| `isLoggedIn` | bool | Whether the visitor is signed in (`is_user_logged_in()`). Used to skip the URL-parameter reload below for a signed-in visitor, who never needed it. |
 
 <Separator className="my-8" />
 
@@ -314,43 +315,56 @@ reconciliation fetch to correct itself — two slow round-trips stacked
 sequentially where a signed-in visitor only ever pays one.
 
 `currency-switcher.js`'s `switchCurrency()` already knows the exact currency
-it just persisted, so instead of a bare reload it builds the reload URL with
-that currency appended as the query parameter `UrlParamResolver` reads —
-`UrlParamResolver` is Priority 1 in the resolver chain
-(`ContextModule::buildResolverChain()`), ahead of the cookie and ahead of a
-signed-in visitor's saved account preference, and reads `$_GET` directly on
-any request, including this reload. That means the reload's own server-render
-resolves the correct currency in this one request, for every visitor, without
-depending on the cookie at all:
+it just persisted, so — for a **logged-out** visitor only — instead of a bare
+reload it builds the reload URL with that currency appended as the query
+parameter `UrlParamResolver` reads — `UrlParamResolver` is Priority 1 in the
+resolver chain (`ContextModule::buildResolverChain()`), ahead of the cookie,
+and reads `$_GET` directly on any request, including this reload. That means
+the reload's own server-render resolves the correct currency in this one
+request, without depending on the cookie at all:
 
 ```javascript
 // Simplified — see buildReloadUrl() and switchCurrency() in currency-switcher.js
-const url = new URL(window.location.href);
-url.searchParams.set(cfg.urlParamKey, currencyCode); // "currency" by default
 
-// Not window.location.href = url.toString() — that navigates to a new URL,
-// and any navigation to a new URL always opens a fresh history entry, which
-// the browser always scrolls to the top regardless of where the visitor was
-// on the page (confirmed live: this regressed scroll position on long pages).
+// isLoggedIn gates whether buildReloadUrl() is even called. A signed-in
+// visitor's preference already resolves correctly and quickly via
+// UserMetaResolver (Priority 2) — this whole mechanism exists to work around
+// a guest's cookie not reliably reaching the server on the reload, a problem
+// signed-in visitors never had. Routing them through it too gained them
+// nothing and cost them the same slower reload a guest needed it for
+// (confirmed live: this regressed signed-in switch time to match a guest's).
+const reloadUrl = cfg.isLoggedIn
+  ? window.location.href // unmodified — no currency param, UserMetaResolver resolves as always
+  : buildReloadUrl(currencyCode); // appends ?currency=, or null if urlParamEnabled is false
+
+// Not window.location.href = reloadUrl — that navigates to a new URL, and
+// any navigation to a new URL always opens a fresh history entry, which the
+// browser always scrolls to the top regardless of where the visitor was on
+// the page (confirmed live: this regressed scroll position on long pages).
 // replaceState() rewrites the *current* entry's URL in place with no
 // navigation, so the reload() that follows reloads that same entry instead
 // of navigating to a new one — preserving scroll position exactly the way a
-// plain reload() always did before this parameter existed. UrlParamResolver
-// resolves the same query string either way; only the browser API used to
-// get there differs.
-window.history.replaceState(window.history.state, "", url.toString());
-window.location.reload();
+// plain reload() always did. Applies to both branches above; only the URL
+// each ends up reloading differs.
+if (reloadUrl) {
+  window.history.replaceState(window.history.state, "", reloadUrl);
+  window.location.reload();
+} else {
+  window.location.reload();
+}
 ```
 
 Because `RECONCILABLE_SOURCES` excludes `url_param` (see below), a page that
-loads this way is never treated as a reconciliation candidate — the
-`currency-projection.js` fallback correctly stays out of it entirely, with no
-loading state and no second fetch.
+loads via the guest branch is never treated as a reconciliation candidate —
+the `currency-projection.js` fallback correctly stays out of it entirely,
+with no loading state and no second fetch. A signed-in visitor's reload never
+reaches that branch in the first place; it was never a reconciliation
+candidate to begin with (`RECONCILABLE_SOURCES` also excludes `user_meta`).
 
 If `urlParamEnabled` is `false` (the site owner disabled URL-parameter
-resolution in settings), `buildReloadUrl()` returns `null` and
-`switchCurrency()` falls back to a plain `window.location.reload()`, exactly
-as before — it never assumes a resolver that isn't in the chain.
+resolution in settings), `buildReloadUrl()` returns `null` for a guest and
+`switchCurrency()` falls back to a plain `window.location.reload()` — it
+never assumes a resolver that isn't in the chain.
 
 Once the reloaded page has settled, `currency-projection.js` removes the
 currency parameter from the visible URL again via `history.replaceState()` —
