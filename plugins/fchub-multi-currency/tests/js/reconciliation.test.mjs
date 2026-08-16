@@ -43,7 +43,8 @@ function isReconciliationCandidate(cfg, storedCurrency) {
 	return (
 		!!storedCurrency &&
 		storedCurrency !== cfg.displayCurrency &&
-		RECONCILABLE_SOURCES.indexOf(cfg.source || "") !== -1
+		RECONCILABLE_SOURCES.indexOf(cfg.source || "") !== -1 &&
+		!!cfg.urlParamEnabled
 	);
 }
 
@@ -103,37 +104,54 @@ describe("isAllowedCurrencyCode", () => {
 
 describe("isReconciliationCandidate", () => {
 	it("is NOT a candidate when there is no stored currency", () => {
-		const cfg = { displayCurrency: "USD", source: "default" };
+		const cfg = { displayCurrency: "USD", source: "default", urlParamEnabled: true };
 		assert.equal(isReconciliationCandidate(cfg, null), false);
 	});
 
 	it("is NOT a candidate when the stored currency already matches the page", () => {
-		const cfg = { displayCurrency: "EUR", source: "cookie" };
+		const cfg = { displayCurrency: "EUR", source: "cookie", urlParamEnabled: true };
 		assert.equal(isReconciliationCandidate(cfg, "EUR"), false);
 	});
 
 	it("IS a candidate when the source is 'default' (fallback) — the WAF-stripped-cookie symptom", () => {
-		const cfg = { displayCurrency: "USD", source: "default" };
+		const cfg = { displayCurrency: "USD", source: "default", urlParamEnabled: true };
 		assert.equal(isReconciliationCandidate(cfg, "EUR"), true);
 	});
 
 	it("IS a candidate when the source is 'cookie' but disagrees with a fresher localStorage value", () => {
-		const cfg = { displayCurrency: "EUR", source: "cookie" };
+		const cfg = { displayCurrency: "EUR", source: "cookie", urlParamEnabled: true };
 		assert.equal(isReconciliationCandidate(cfg, "GBP"), true);
 	});
 
 	it("IS a candidate when the source is 'geo'", () => {
-		const cfg = { displayCurrency: "USD", source: "geo" };
+		const cfg = { displayCurrency: "USD", source: "geo", urlParamEnabled: true };
 		assert.equal(isReconciliationCandidate(cfg, "EUR"), true);
 	});
 
 	it("is NEVER a candidate when the source is 'url_param' — an explicit link must win", () => {
-		const cfg = { displayCurrency: "USD", source: "url_param" };
+		const cfg = { displayCurrency: "USD", source: "url_param", urlParamEnabled: true };
 		assert.equal(isReconciliationCandidate(cfg, "EUR"), false);
 	});
 
 	it("is NEVER a candidate when the source is 'user_meta' — a signed-in visitor's saved preference must win", () => {
-		const cfg = { displayCurrency: "USD", source: "user_meta" };
+		const cfg = { displayCurrency: "USD", source: "user_meta", urlParamEnabled: true };
+		assert.equal(isReconciliationCandidate(cfg, "EUR"), false);
+	});
+
+	// Confirmed by reading ContextModule::buildResolverChain(): when
+	// url_param_enabled is off, UrlParamResolver isn't registered in the
+	// resolver chain at all — no query string, correct key or not, is ever
+	// read server-side in that configuration. reconcile()'s fetch resolves
+	// exclusively through that mechanism, so reconciliation is structurally
+	// incapable of succeeding here — it must never even be attempted, not
+	// fetched-and-silently-ignored.
+	it("is NEVER a candidate when urlParamEnabled is false — reconciliation is structurally incapable of succeeding without UrlParamResolver in the chain", () => {
+		const cfg = { displayCurrency: "USD", source: "default", urlParamEnabled: false };
+		assert.equal(isReconciliationCandidate(cfg, "EUR"), false);
+	});
+
+	it("is NEVER a candidate when urlParamEnabled is absent (defensive default)", () => {
+		const cfg = { displayCurrency: "USD", source: "default" };
 		assert.equal(isReconciliationCandidate(cfg, "EUR"), false);
 	});
 });
@@ -207,6 +225,7 @@ describe("Issue #72: cookie stripped by host edge/WAF layer for a guest", () => 
 			displayCurrency: "USD",
 			source: "default",
 			guestLocalStorageEnabled: true,
+			urlParamEnabled: true,
 			currencies: [{ code: "EUR" }],
 		};
 
@@ -232,6 +251,7 @@ describe("Issue #72: cookie stripped by host edge/WAF layer for a guest", () => 
 			displayCurrency: "GBP",
 			source: "user_meta",
 			guestLocalStorageEnabled: true,
+			urlParamEnabled: true,
 			currencies: [{ code: "EUR" }, { code: "GBP" }],
 		};
 
@@ -244,6 +264,7 @@ describe("Issue #72: cookie stripped by host edge/WAF layer for a guest", () => 
 			displayCurrency: "EUR",
 			source: "cookie",
 			guestLocalStorageEnabled: true,
+			urlParamEnabled: true,
 			currencies: [{ code: "EUR" }],
 		};
 
@@ -369,7 +390,7 @@ describe("Issue #72 follow-up: switching currency vs. arriving at a stale cached
 
 		// The server-render this reload triggers resolves via UrlParamResolver
 		// (Priority 1), so the freshly loaded page's own cfg.source is "url_param".
-		const cfg = { displayCurrency: "EUR", source: "url_param" };
+		const cfg = { displayCurrency: "EUR", source: "url_param", urlParamEnabled: true };
 		assert.equal(
 			isReconciliationCandidate(cfg, "EUR"),
 			false,
@@ -381,7 +402,7 @@ describe("Issue #72 follow-up: switching currency vs. arriving at a stale cached
 		// A guest arrives at a full-page cache HIT (or a WAF-stripped-cookie
 		// request): the server never saw the visitor's real preference, source
 		// falls through to cookie/geo/default, and localStorage disagrees.
-		const cfg = { displayCurrency: "USD", source: "default" };
+		const cfg = { displayCurrency: "USD", source: "default", urlParamEnabled: true };
 		assert.equal(
 			isReconciliationCandidate(cfg, "EUR"),
 			true,
@@ -410,10 +431,10 @@ const switcherSource = readFileSync(path.join(here, "..", "..", "assets", "js", 
 const switcherCssSource = readFileSync(path.join(here, "..", "..", "assets", "css", "currency-switcher.css"), "utf8");
 
 describe("Source invariant: currency-projection.js reconcile() fetch is not cacheable", () => {
-	it("reconcile()'s fetch call to /context?currency= sets cache: \"no-store\"", () => {
+	it("reconcile()'s fetch call to /context?<urlParamKey>= sets cache: \"no-store\"", () => {
 		// Anchored on the query string, which only reconcile()'s fetch call
 		// builds — this can't accidentally match the switcher's POST fetch.
-		const match = projectionSource.match(/fetch\(`\$\{restUrl\}\/context\?currency=[^`]*`,\s*\{([^}]*)\}/s);
+		const match = projectionSource.match(/fetch\(`\$\{restUrl\}\/context\?\$\{encodeURIComponent\(paramKey\)\}=[^`]*`,\s*\{([^}]*)\}/s);
 
 		assert.ok(match, "could not find reconcile()'s fetch(...) call in currency-projection.js");
 		assert.match(
@@ -733,6 +754,72 @@ describe("Source invariant: RECONCILABLE_SOURCES excludes url_param and user_met
 			sources,
 			["cookie", "geo", "default"],
 			"RECONCILABLE_SOURCES must stay exactly these three — url_param (an explicit link or this file's own switch-triggered reload) and user_meta (a signed-in visitor's saved preference) must never be second-guessed by a stale localStorage value",
+		);
+	});
+});
+
+// ─── Source invariant: reconciliation requires urlParamEnabled ────────────
+//
+// Caught by Codex's automated review on PR #149, confirmed by reading
+// ContextModule::buildResolverChain(): when url_param_enabled is off,
+// UrlParamResolver isn't registered in the resolver chain at all — no query
+// string, correct key or not, is ever read server-side in that
+// configuration. reconcile()'s fetch resolves exclusively through
+// UrlParamResolver, so reconciliation is structurally incapable of
+// succeeding when this setting is off. Before this fix, reconciliationCandidate
+// didn't check it, so a site with the setting off still fetched, held the
+// switcher in its loading state for the full RECONCILE_TIMEOUT_MS, and only
+// then gave up — for zero possible benefit.
+
+describe("Source invariant: reconciliationCandidate requires cfg.urlParamEnabled", () => {
+	it("currency-projection.js's real reconciliationCandidate expression includes !!cfg.urlParamEnabled", () => {
+		const match = projectionSource.match(/const reconciliationCandidate =\s*\r?\n([\s\S]{0,300}?);/);
+		assert.ok(match, "could not find the reconciliationCandidate assignment in currency-projection.js");
+		assert.match(
+			match[1],
+			/!!cfg\.urlParamEnabled/,
+			"reconciliationCandidate must require cfg.urlParamEnabled — reconciliation cannot possibly succeed when UrlParamResolver isn't in the resolver chain, so it must never even be attempted (no fetch, no switcher loading state held for the timeout) rather than attempted and left to time out for no reason",
+		);
+	});
+});
+
+// ─── Source invariant: reconcile()'s fetch uses the configured url param ──
+// ─── key, not a hardcoded "currency" literal ───────────────────────────────
+//
+// Caught by Codex's automated review on PR #149, confirmed by reading the
+// code: buildReloadUrl() in currency-switcher.js already correctly used
+// config.urlParamKey for this exact same purpose; reconcile() — written
+// earlier in this branch's history — never got the same treatment and
+// hardcoded the literal "currency" instead. On a site that customized
+// url_param_key, reconciliation would silently fail to correct a guest's
+// stale currency: the fetch resolves, returns 200, and just never carries
+// the key UrlParamResolver is actually configured to read — no error
+// anywhere, exactly the kind of silent failure this whole fix exists to
+// eliminate.
+
+describe("Source invariant: reconcile()'s fetch URL is built from cfg.urlParamKey, not a hardcoded literal", () => {
+	it("defines paramKey from cfg.urlParamKey with the same fallback buildReloadUrl() uses", () => {
+		const match = projectionSource.match(/function reconcile\(\) \{([\s\S]{0,1000}?)return fetch/);
+		assert.ok(match, "could not find reconcile()'s setup, before its fetch(...) call, in currency-projection.js");
+		assert.match(
+			match[1],
+			/const paramKey = cfg\.urlParamKey \|\| ["']currency["'];/,
+			'reconcile() must derive paramKey from cfg.urlParamKey (falling back to "currency" when unset), mirroring buildReloadUrl()\'s existing pattern in currency-switcher.js — not assume the default key is always in use',
+		);
+	});
+
+	it("builds the fetch URL's query string from paramKey, not a literal \"currency=\"", () => {
+		const match = projectionSource.match(/return fetch\(`([^`]*)`,/);
+		assert.ok(match, "could not find reconcile()'s fetch(...) template literal in currency-projection.js");
+		assert.doesNotMatch(
+			match[1],
+			/\?currency=/,
+			'reconcile()\'s fetch URL must not hardcode "?currency=" — a site that customized url_param_key would have UrlParamResolver silently never see this fetch\'s query string at all, since it only reads the configured key',
+		);
+		assert.match(
+			match[1],
+			/\?\$\{encodeURIComponent\(paramKey\)\}=/,
+			"reconcile()'s fetch URL must build its query string from the encoded paramKey variable",
 		);
 	});
 });

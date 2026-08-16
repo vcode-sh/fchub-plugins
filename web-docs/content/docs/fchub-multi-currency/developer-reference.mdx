@@ -22,12 +22,14 @@ All endpoints use the `fchub-mc/v1` namespace. Admin endpoints require `manage_o
 Returns the current resolved currency context, including the price-formatting
 metadata a client needs to fully re-render prices (not just the code and rate).
 
-Reads `?currency=` from the query string with top priority in the resolver
-chain — ahead of the cookie, and ahead of a signed-in visitor's saved account
-preference. This makes the endpoint usable for client-side reconciliation:
-`currency-projection.js` calls `GET /context?currency=<code>` to re-resolve a
-saved localStorage preference on hosts that strip the guest cookie, without
-depending on the cookie reaching the server at all.
+Reads `?currency=` (the `url_param_key` setting's default; customizable —
+see `urlParamKey` below) from the query string with top priority in the
+resolver chain — ahead of the cookie, and ahead of a signed-in visitor's
+saved account preference. This makes the endpoint usable for client-side
+reconciliation: `currency-projection.js` calls
+`GET /context?<urlParamKey>=<code>` to re-resolve a saved localStorage
+preference on hosts that strip the guest cookie, without depending on the
+cookie reaching the server at all.
 
 **Response:**
 
@@ -408,7 +410,13 @@ cookie round-tripping through that layer:
    baked-in `displayCurrency` on load. It only acts when the page's `source` is
    `cookie`, `geo`, or `default` — never `url_param` or `user_meta`, so an
    explicit link or a signed-in visitor's saved preference is never
-   second-guessed by a stale local value. The same symptom this also covers a
+   second-guessed by a stale local value — and only when `urlParamEnabled` is
+   true: the reconciliation fetch below resolves exclusively through
+   `UrlParamResolver`, which isn't in the resolver chain at all when
+   `url_param_enabled` is off, so reconciliation is structurally incapable of
+   succeeding in that configuration and is never attempted (no fetch, no
+   switcher loading state held for `RECONCILE_TIMEOUT_MS`) rather than tried
+   and left to time out for no reason. The same symptom this also covers a
    full-page/edge cache (Cloudflare, Rocket.net's own edge tier, etc.) serving
    a shared, anonymous-visitor snapshot of the page — the visitor's cookie
    never gets stripped in that case, it's simply irrelevant to what HTML the
@@ -421,15 +429,18 @@ cookie round-tripping through that layer:
    actually completes, at which point they go directly from whatever the
    page originally rendered to the corrected, converted values in one step.
    Only the trigger shows a loading state during the wait; prices get none.
-   The fetch itself is `GET {restUrl}/context?currency=<code>` — which
-   resolves via the URL query string, not the cookie — and on response,
-   reassigns the mutable projection state in place, clears and runs price
-   projection for the first time, and calls
-   `window.fchubMcSyncSwitcherDisplay()` again to reflect whatever the server
-   actually confirmed (normally the same value already shown; if the server
-   disagrees with the visitor's saved choice — rare — this corrects the
-   trigger to match the server instead). `fchub_mc:context_reconciled` fires
-   on `window` afterwards.
+   The fetch itself is `GET {restUrl}/context?<urlParamKey>=<code>` —
+   `urlParamKey` mirrors `url_param_key` (default `currency`, customizable in
+   settings; see `cfg.urlParamKey`) and is what the query string is actually
+   built from, not a hardcoded literal, since `UrlParamResolver` only reads
+   whichever key the site has configured. It resolves via the URL query
+   string, not the cookie — and on response, reassigns the mutable
+   projection state in place, clears and runs price projection for the
+   first time, and calls `window.fchubMcSyncSwitcherDisplay()` again to
+   reflect whatever the server actually confirmed (normally the same value
+   already shown; if the server disagrees with the visitor's saved choice —
+   rare — this corrects the trigger to match the server instead).
+   `fchub_mc:context_reconciled` fires on `window` afterwards.
 4. The localStorage value is validated against the base currency and enabled
    display currencies baked into the page (mirroring
    `AllowedCurrencyCheck::isAllowedCurrency()`) before it's ever trusted, and

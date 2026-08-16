@@ -21,8 +21,11 @@
  * paths it hasn't whitelisted (issue #72): the server then resolves the page to
  * the default currency even though the visitor picked something else. Since
  * REST paths on such hosts are typically exempted, reconciliation fetches
- * GET {restUrl}/context?currency=<code> — which resolves via the URL query
- * string, not the cookie — and re-projects with the corrected context.
+ * GET {restUrl}/context?<urlParamKey>=<code> (urlParamKey defaults to
+ * "currency", configurable — see cfg.urlParamKey) — which resolves via the
+ * URL query string, not the cookie — and re-projects with the corrected
+ * context. Only attempted at all when cfg.urlParamEnabled is true; see
+ * reconciliationCandidate below.
  *
  * Fires: fchub_mc:prices_projected (after each projection pass),
  *        fchub_mc:context_reconciled (after a successful reconciliation)
@@ -127,11 +130,24 @@
 	// Computed once up front, before the bail-out below, so a guest whose saved
 	// currency disagrees with this (possibly stale) page load isn't skipped by
 	// the "nothing to project" fast path.
+	//
+	// Also requires cfg.urlParamEnabled: reconcile()'s fetch resolves via the
+	// query string UrlParamResolver reads, and when url_param_enabled is off,
+	// UrlParamResolver isn't in the resolver chain at all (see
+	// ContextModule::buildResolverChain()) — no query string, correct key or
+	// not, is ever read server-side in that configuration. Reconciliation is
+	// structurally incapable of succeeding when this is false, so it must
+	// never be attempted: no fetch, no switcher loading state held for the
+	// full timeout, nothing to wait on for a correction that can't happen.
+	// Falling straight through to project whatever the page was served with
+	// is the honest behavior here, same as any other case where
+	// reconciliation isn't applicable.
 	const storedCurrencyAtLoad = readStoredCurrency();
 	const reconciliationCandidate =
 		!!storedCurrencyAtLoad &&
 		storedCurrencyAtLoad !== cfg.displayCurrency &&
-		RECONCILABLE_SOURCES.indexOf(cfg.source || "") !== -1;
+		RECONCILABLE_SOURCES.indexOf(cfg.source || "") !== -1 &&
+		!!cfg.urlParamEnabled;
 
 	// Bail out entirely if there's nothing to do — no conversion needed on the
 	// page as served, and no reason to suspect that's wrong. Preserves the
@@ -979,11 +995,19 @@
 	 */
 	function reconcile() {
 		const restUrl = cfg.restUrl || "/wp-json/fchub-mc/v1";
+		// Mirrors buildReloadUrl()'s paramKey fallback in currency-switcher.js —
+		// UrlParamResolver reads whatever key the site has configured via
+		// url_param_key (default "currency", customizable in settings), not a
+		// hardcoded literal. A site that customized this setting would
+		// otherwise have reconciliation silently fail to correct a guest's
+		// stale currency: the fetch would resolve, return 200, and just never
+		// carry the value the resolver chain is actually looking for.
+		const paramKey = cfg.urlParamKey || "currency";
 		const hasAbortController = typeof AbortController !== "undefined";
 		const controller = hasAbortController ? new AbortController() : null;
 		const timeoutId = hasAbortController ? setTimeout(() => controller.abort(), RECONCILE_TIMEOUT_MS) : null;
 
-		return fetch(`${restUrl}/context?currency=${encodeURIComponent(storedCurrencyAtLoad)}`, {
+		return fetch(`${restUrl}/context?${encodeURIComponent(paramKey)}=${encodeURIComponent(storedCurrencyAtLoad)}`, {
 			cache: "no-store",
 			headers: { Accept: "application/json" },
 			signal: controller ? controller.signal : undefined,
