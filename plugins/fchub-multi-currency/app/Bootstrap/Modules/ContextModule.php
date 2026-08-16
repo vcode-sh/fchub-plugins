@@ -290,7 +290,16 @@ final class ContextModule implements ModuleContract
         $baseCurrency = self::findCurrency($baseCode, $enabledCurrencies);
 
         if ($resolvedCode === $baseCode) {
-            return CurrencyContext::baseOnly($baseCurrency);
+            // The resolver still genuinely matched (UrlParam, UserMeta, Cookie,
+            // or Geo) — it just happened to resolve to the base currency. That's
+            // real, useful metadata about where the visitor's preference came
+            // from, not a fallback: pass $source through rather than letting
+            // baseOnly() default to Fallback ("default"), which would both
+            // misreport the source and — since RECONCILABLE_SOURCES treats
+            // "default" as reconcilable — risk client-side reconciliation
+            // second-guessing a source (url_param, user_meta) that must never
+            // be overridden.
+            return CurrencyContext::baseOnly($baseCurrency, $source);
         }
 
         $displayCurrency = self::findCurrency($resolvedCode, $enabledCurrencies);
@@ -302,7 +311,10 @@ final class ContextModule implements ModuleContract
         }
 
         if ($rate === null) {
-            return CurrencyContext::baseOnly($baseCurrency);
+            // Same reasoning as above: the resolver matched a real code, the
+            // rate lookup just failed — that's still $source's context, not a
+            // generic fallback.
+            return CurrencyContext::baseOnly($baseCurrency, $source);
         }
 
         return new CurrencyContext(
