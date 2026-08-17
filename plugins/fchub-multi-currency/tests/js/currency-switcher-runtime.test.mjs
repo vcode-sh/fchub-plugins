@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import vm from "node:vm";
 
-import { recoveryContext, runRecovery } from "./context-recovery-fixture.mjs";
+import { FakeClassList, recoveryContext, runRecovery } from "./context-recovery-fixture.mjs";
 
 const contextSource = readFileSync(
 	new URL("../../assets/js/currency-context.js", import.meta.url),
@@ -85,6 +85,7 @@ async function runSwitch({
 	const document = {
 		cookie: "",
 		readyState: "complete",
+		documentElement: { classList: new FakeClassList() },
 		querySelectorAll() {
 			return [];
 		},

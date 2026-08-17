@@ -9,7 +9,7 @@ const readJson = async (path) =>
 const expectedVersions = {
   'fchub-memberships': '1.4.6',
   'fchub-wishlist': '1.0.3',
-  'fchub-multi-currency': '1.4.6',
+  'fchub-multi-currency': '1.4.7',
   'fchub-p24': '1.0.5',
   'fchub-fakturownia': '1.1.3',
 }
@@ -30,11 +30,11 @@ const expectedPreviousReleases = {
     sha256: '44ce62f2b8f75def910221ae720791c60803ace786a89a1557de45de9d6f892b',
   },
   'fchub-multi-currency': {
-    version: '1.4.5',
-    tag: 'fchub-multi-currency/v1.4.5',
-    commit: '6bbe775ce443519588a65939ba83958568998e50',
-    asset: 'fchub-multi-currency-1.4.5.zip',
-    sha256: 'a5440d4c4dfacaa8711f442d9efbf2b382ec471ea7979504fd3b793e2a5a47bc',
+    version: '1.4.6',
+    tag: 'fchub-multi-currency/v1.4.6',
+    commit: '6cf6acec6b1d6efdc568a5d4fcd487b1977f834d',
+    asset: 'fchub-multi-currency-1.4.6.zip',
+    sha256: '8e861b27434b4fa521f136871f0fa62fb1ad886a76f71f3311ab859fac719816',
   },
   'fchub-p24': {
     version: '1.0.4',

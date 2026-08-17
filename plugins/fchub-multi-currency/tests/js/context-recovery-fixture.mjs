@@ -37,6 +37,7 @@ export function element({ attributes = {}, children = {}, lists = {}, classes = 
 		children,
 		lists,
 		classList: new FakeClassList(...classes),
+		disabled: false,
 		innerHTML: "",
 		textContent: "",
 		getAttribute(name) {
@@ -44,6 +45,9 @@ export function element({ attributes = {}, children = {}, lists = {}, classes = 
 		},
 		setAttribute(name, value) {
 			this.attributes[name] = String(value);
+		},
+		removeAttribute(name) {
+			delete this.attributes[name];
 		},
 		querySelector(selector) {
 			return this.children[selector] ?? null;
@@ -93,7 +97,9 @@ export async function runRecovery({
 	responseContext,
 	response = {},
 	selectors = {},
+	documentReadyState = "complete",
 	onFetch,
+	onPending,
 } = {}) {
 	const fetchCalls = [];
 	const replacedUrls = [];
@@ -108,6 +114,7 @@ export async function runRecovery({
 		cookieLifetimeDays: 90,
 		accountPersistenceEnabled: true,
 		isLoggedIn: false,
+		projectionEnabled: true,
 		resolverSource: "default",
 		urlParamEnabled: true,
 		urlParamKey: "currency",
@@ -118,6 +125,8 @@ export async function runRecovery({
 	};
 	const document = {
 		cookie,
+		readyState: documentReadyState,
+		documentElement: element(),
 		addEventListener(type, listener, options) {
 			const listeners = eventListeners.get(type) || [];
 			listeners.push({ listener, options });
@@ -192,6 +201,14 @@ export async function runRecovery({
 	};
 
 	vm.runInNewContext(readFileSync(scriptPath, "utf8"), sandbox, { filename: scriptPath.pathname });
+	if (typeof onPending === "function") {
+		await onPending({
+			document,
+			localStorage,
+			storageValues,
+			window,
+		});
+	}
 	await window.fchubMcContextReady;
 
 	return {

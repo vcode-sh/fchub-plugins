@@ -129,36 +129,43 @@ test("WordPress.org targets never receive the shared updater", () => {
   assert.match(build, /updater_sync_count/);
 });
 
-test("Stream is excluded from the path triggers, in the order that makes it work", () => {
+test("Stream runtime stays excluded while guarded metadata triggers CI", () => {
   assert.doesNotMatch(job(ci, "wporg-package"), /fchub-stream/);
 
-  const pullRequestPaths = ci.match(
-    /pull_request:\n\s+paths:\n((?:\s+- .*\n)+)/,
-  )?.[1];
-  assert.ok(pullRequestPaths, "Expected a paths filter on the pull request trigger");
+  const guardedMetadata = [
+    "plugins/fchub-stream/admin-app/package.json",
+    "plugins/fchub-stream/admin-app/package-lock.json",
+    "plugins/fchub-stream/portal-app/package.json",
+    "plugins/fchub-stream/portal-app/package-lock.json",
+    "plugins/fchub-stream/fchub-stream.php",
+    "plugins/fchub-stream/readme.txt",
+  ];
 
-  const entries = [...pullRequestPaths.matchAll(/^\s+- '([^']+)'$/gm)].map((m) => m[1]);
-  assert.ok(entries.length > 0, "Expected quoted path entries");
+  for (const event of ["push", "pull_request"]) {
+    const eventBlock = ci.slice(ci.search(new RegExp(`^  ${event}:$`, "m")));
+    const pathBlock = eventBlock.match(/^\s+paths:\n((?:\s+- .*\n)+)/m)?.[1];
+    assert.ok(pathBlock, `Expected a paths filter on the ${event} trigger`);
 
-  assert.deepEqual(
-    entries.filter((e) => !e.startsWith("!") && e.includes("fchub-stream")),
-    [],
-    "Stream is abandoned: nothing may include it",
-  );
+    const entries = [...pathBlock.matchAll(/^\s+- '([^']+)'$/gm)].map((match) => match[1]);
+    assert.ok(entries.length > 0, "Expected quoted path entries");
 
-  // GitHub applies these in sequence — a negative pattern excludes only what an
-  // earlier positive one matched, and a later positive one puts it back. So the
-  // exclusion has to sit after plugins/**, and nothing under plugins/ may follow
-  // it. Assert the ordering, not merely the presence: a correct-looking list in
-  // the wrong order silently runs the whole matrix on every Stream commit.
-  const wildcard = entries.indexOf("plugins/**");
-  const exclusion = entries.indexOf("!plugins/fchub-stream/**");
-  assert.notEqual(wildcard, -1, "Expected the plugins/** trigger");
-  assert.notEqual(exclusion, -1, "Expected Stream to be excluded from plugins/**");
-  assert.ok(exclusion > wildcard, "the exclusion must follow the pattern it narrows");
-  assert.deepEqual(
-    entries.slice(exclusion + 1).filter((e) => e.startsWith("plugins/")),
-    [],
-    "a later positive plugins/ pattern would re-include Stream",
-  );
+    const wildcard = entries.indexOf("plugins/**");
+    const exclusion = entries.indexOf("!plugins/fchub-stream/**");
+    assert.notEqual(wildcard, -1, "Expected the plugins/** trigger");
+    assert.notEqual(exclusion, -1, "Expected Stream runtime to be excluded from plugins/**");
+    assert.ok(exclusion > wildcard, "the exclusion must follow the pattern it narrows");
+
+    const includedStreamPaths = entries.filter(
+      (entry) => !entry.startsWith("!") && entry.includes("plugins/fchub-stream/"),
+    );
+    assert.deepEqual(
+      includedStreamPaths,
+      guardedMetadata,
+      `${event} may re-include only the Stream metadata owned by repository contracts`,
+    );
+    assert.ok(
+      guardedMetadata.every((entry) => entries.indexOf(entry) > exclusion),
+      `${event} metadata exceptions must follow the broad Stream exclusion`,
+    );
+  }
 });

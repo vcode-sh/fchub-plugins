@@ -21,6 +21,7 @@
 	let projectionShieldTimeout = null;
 	function releaseProjectionShield() {
 		document.documentElement.classList.remove("fchub-mc-projecting");
+		window.fchubMcCompleteRecovery?.();
 		if (projectionShieldTimeout !== null) {
 			clearTimeout(projectionShieldTimeout);
 			projectionShieldTimeout = null;
@@ -865,9 +866,14 @@
 
 	// Initial projection
 	function init() {
-		projectPrices();
-		observeDynamicUpdates();
-		listenForFluentCartEvents();
+		try {
+			projectPrices();
+			observeDynamicUpdates();
+			listenForFluentCartEvents();
+		} catch (error) {
+			console.error("[fchub-mc] Initial price projection failed:", error);
+			releaseProjectionShield();
+		}
 	}
 
 	if (document.readyState === "loading") {

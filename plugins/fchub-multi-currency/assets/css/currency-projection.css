@@ -1,0 +1,66 @@
+/**
+ * FCHub Multi-Currency — Price Projection Styles
+ */
+
+.fchub-mc-disclosure {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #f0f4f8;
+    border: 1px solid #d0d7de;
+    border-radius: 4px;
+    color: #57606a;
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+.fchub-mc-disclosure--drawer {
+    margin: 0.5rem 20px;
+}
+
+/**
+ * Hide stale amounts from cached-context recovery through the first completed
+ * projection pass. The layout remains stable because the elements keep their
+ * dimensions while hidden.
+ */
+:is(.fchub-mc-recovering, .fchub-mc-projecting) :is(
+    .fct-item-price,
+    .fct-compare-price,
+    .fct-min-price,
+    .fct-max-price,
+    .fct-product-item-price,
+    [data-fluent-cart-cart-list-item-price],
+    [data-fluent-cart-cart-list-item-total-price],
+    [data-fluent-cart-cart-total-price],
+    [data-fluent-cart-cart-total],
+    .fct-cart-item-price,
+    .fct-cart-item-total,
+    .fct_summary_value,
+    .fct_line_item_price,
+    .fct_line_item_total,
+    .fct_promo_price,
+    .fct_item_payment_info,
+    [data-fluent-cart-checkout-estimated-total],
+    [data-fluent-cart-checkout-subtotal],
+    .shipping-method-amount,
+    .fluent-cart-pricing-table-variant-price,
+    .fluent-cart-pricing-table-variant-compare-price,
+    .fct-modal-cs-line-price,
+    .fct_coupon_price,
+    .fct-coupon-price,
+    .fct-thank-you-page-order-items-total-value,
+    .fct-thank-you-page-order-items-list-price-inner,
+    .fct-thank-you-page-order-items-list-payment-info,
+    [data-fchub-mc-base]
+) {
+    visibility: hidden;
+}
+
+/* Reveal the most common prices if a third-party script strands the projection. */
+@keyframes fchub-mc-fouc-fallback {
+    to { visibility: visible; }
+}
+
+.fchub-mc-projecting .fct-item-price,
+.fchub-mc-projecting .fct-compare-price {
+    animation: fchub-mc-fouc-fallback 0s 2s forwards;
+}

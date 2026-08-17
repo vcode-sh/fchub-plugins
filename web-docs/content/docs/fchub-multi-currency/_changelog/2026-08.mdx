@@ -1,3 +1,53 @@
+### v1.4.7
+
+*Released 17 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.7)
+
+The stale currency no longer gets a four-second farewell tour.
+
+Reported and production-tested by
+[@ManniGH](https://github.com/ManniGH) in the follow-up on
+[#72](https://github.com/vcode-sh/fchub-plugins/issues/72), after 1.4.6 fixed the
+cache boundary but left one intermediate paint alive. Thank you for testing the
+awkward second half rather than declaring victory when the first half looked tidy.
+
+#### One lock now owns the whole correction
+
+After a guest confirms a currency, the destination page immediately reflects that
+choice in both switcher variants and keeps them disabled. Cached prices stay hidden
+rather than displaying the reload's old currency, even politely dimmed. The lock is
+released only after the cache-busted context response has been validated, every
+currency surface has converged and the first price projection has completed.
+
+A failed or malformed recovery restores the currency actually served by the page
+before unlocking. A preference changed during the request wins the race, controls
+that were disabled beforehand remain disabled, and stores with browser projection
+switched off finish at the context boundary instead of waiting for a script they
+quite deliberately declined to run.
+
+#### Earlier where it matters, smaller where it does not
+
+The shared recovery runtime now starts in the document head. That puts the lock in
+place before the body can paint and starts the correction request before the stale
+markup has finished parsing. The runtime is roughly 4 KB compressed; duplicating
+its resolver in a fashionable micro-bootstrap would have saved very little and
+created two opinions about which currency belongs to the visitor. One opinion is
+already plenty.
+
+Projection shielding moved into its own stylesheet, under 1 KB compressed, so a
+page without a visible switcher no longer downloads the full switcher stylesheet
+merely to hide stale prices. The complete projection selector set is checked
+against that stylesheet, which saves the next FluentCart price surface from being
+added to one list and forgotten in the other.
+
+A real browser lane held a deliberately stale USD document through a 4.5-second
+context delay. The recovery request started before first contentful paint; that
+paint contained no readable USD amount, and the page eventually revealed only the
+corrected EUR price with both selectors unlocked and no console errors. Runtime
+tests also challenge failed responses, storage and cookie races, pre-disabled
+controls, projection exceptions and projection-disabled stores.
+
+<Separator className="my-8" />
+
 ### v1.4.6
 
 *Released 17 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.6)

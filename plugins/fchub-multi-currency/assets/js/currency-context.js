@@ -7,6 +7,9 @@
 (() => {
 	const config = window.fchubMcConfig || {};
 	const storageKey = config.cookieName || "fchub_mc_currency";
+	const recoveryDisabledControls = new Set();
+	let recoveryActive = false;
+	let recoveryCurrency = "";
 
 	function normalizeCode(value) {
 		const code = typeof value === "string" ? value.trim().toUpperCase() : "";
@@ -208,8 +211,14 @@
 		const code = context.displayCurrency;
 		const textParts = {
 			code,
-			name: context.displayCurrencyName || code,
-			symbol: context.symbol || code,
+			name:
+				context.displayCurrencyName
+				|| selected?.querySelector(".fchub-mc-switcher__option-name")?.textContent
+				|| code,
+			symbol:
+				context.symbol
+				|| selected?.querySelector(".fchub-mc-switcher__option-symbol")?.textContent
+				|| code,
 		};
 		for (const [part, value] of Object.entries(textParts)) {
 			const element = trigger.querySelector(`.fchub-mc-switcher__${part}`);
@@ -248,6 +257,60 @@
 
 		syncTrigger(root.querySelector("[data-fchub-mc-trigger]"), context, selected);
 		syncSwitcherFooter(root, context.presentation?.switcher);
+	}
+
+	function setRecoveryControlState(control, busy) {
+		if (!control) return;
+
+		if (busy) {
+			if (control.disabled !== true) {
+				control.disabled = true;
+				recoveryDisabledControls.add(control);
+			}
+			return;
+		}
+
+		if (recoveryDisabledControls.has(control)) {
+			control.disabled = false;
+			recoveryDisabledControls.delete(control);
+		}
+	}
+
+	function setRecoveryRootState(root, className, busy) {
+		root.classList.toggle(className, busy);
+		if (busy) root.setAttribute("aria-busy", "true");
+		else root.removeAttribute("aria-busy");
+	}
+
+	function setRecoveryState(busy, currency = "") {
+		recoveryActive = busy;
+		if (busy && currency) recoveryCurrency = currency;
+		config.recoveryPending = busy;
+		document.documentElement.classList.toggle("fchub-mc-recovering", busy);
+
+		for (const root of document.querySelectorAll("[data-fchub-mc-switcher]")) {
+			setRecoveryRootState(root, "fchub-mc-switcher--loading", busy);
+			setRecoveryControlState(root.querySelector("[data-fchub-mc-trigger]"), busy);
+			if (busy && currency) syncSwitcher(root, { displayCurrency: currency });
+		}
+
+		for (const root of document.querySelectorAll("[data-fchub-mc-button-switcher]")) {
+			setRecoveryRootState(root, "fchub-mc-selector-buttons--loading", busy);
+			for (const button of root.querySelectorAll("[data-value]")) {
+				setRecoveryControlState(button, busy);
+				if (busy && currency) {
+					button.classList.toggle(
+						"is-active",
+						normalizeCode(button.getAttribute("data-value")) === currency,
+					);
+				}
+			}
+		}
+	}
+
+	function completeRecovery() {
+		if (!recoveryActive) return;
+		setRecoveryState(false);
 	}
 
 	function syncCurrentBlocks(presentation) {
@@ -324,6 +387,7 @@
 		const request = recoveryRequest(codes);
 		if (!request) return config;
 		const currency = request.currency;
+		setRecoveryState(true, currency);
 
 		const restUrl = String(config.restUrl || "/wp-json/fchub-mc/v1").replace(/\/+$/, "");
 		const explicitCurrency = currency ? `currency=${encodeURIComponent(currency)}&` : "";
@@ -349,6 +413,7 @@
 				readCookie(config.cookieName) !== request.cookieSnapshot ||
 				readStoredPreference() !== request.storageSnapshot
 			) {
+				applyContext(config);
 				return config;
 			}
 
@@ -356,9 +421,12 @@
 			applyContext(context);
 			stripConfirmedSwitchUrl(codes, currency);
 		} catch (error) {
+			applyContext(config);
 			console.warn("[fchub-mc] Currency context recovery failed:", error);
 		} finally {
 			if (timeout !== null) clearTimeout(timeout);
+			recoveryCurrency = normalizeCode(config.displayCurrency);
+			if (config.projectionEnabled !== true) completeRecovery();
 		}
 
 		return config;
@@ -367,5 +435,16 @@
 	// Capture runs before FluentCart's form handler constructs FormData.
 	document.addEventListener("submit", (event) => syncCheckoutCurrencyFields(event.target), true);
 	window.fchubMcPersistBrowserPreference = persistBrowserPreference;
+	window.fchubMcCompleteRecovery = completeRecovery;
 	window.fchubMcContextReady = recover();
+	if (document.readyState === "loading") {
+		document.addEventListener(
+			"DOMContentLoaded",
+			() => {
+				applyContext(config);
+				if (recoveryActive) setRecoveryState(true, recoveryCurrency);
+			},
+			{ once: true },
+		);
+	}
 })();

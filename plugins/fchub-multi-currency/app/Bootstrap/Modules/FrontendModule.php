@@ -39,7 +39,7 @@ final class FrontendModule implements ModuleContract
             FCHUB_MC_URL . 'assets/js/currency-context.js',
             [],
             (string) (@filemtime($contextPath) ?: FCHUB_MC_VERSION),
-            true,
+            false,
         );
 
         $projectionPath = FCHUB_MC_PATH . 'assets/js/currency-projection.js';
@@ -49,6 +49,14 @@ final class FrontendModule implements ModuleContract
             ['fchub-mc-context'],
             (string) (@filemtime($projectionPath) ?: FCHUB_MC_VERSION),
             true,
+        );
+
+        $projectionCssPath = FCHUB_MC_PATH . 'assets/css/currency-projection.css';
+        wp_register_style(
+            'fchub-mc-projection',
+            FCHUB_MC_URL . 'assets/css/currency-projection.css',
+            [],
+            (string) (@filemtime($projectionCssPath) ?: FCHUB_MC_VERSION),
         );
 
         $switcherJsPath = FCHUB_MC_PATH . 'assets/js/currency-switcher.js';
@@ -77,6 +85,7 @@ final class FrontendModule implements ModuleContract
 
         self::ensureContextAssetEnqueued();
         wp_enqueue_script('fchub-mc-projection');
+        wp_enqueue_style('fchub-mc-projection');
     }
 
     public static function ensureSwitcherAssetsEnqueued(): void
@@ -123,6 +132,7 @@ final class FrontendModule implements ModuleContract
             'cookieLifetimeDays'    => (int) $optionStore->get('cookie_lifetime_days', 90),
             'accountPersistenceEnabled' => $optionStore->get('account_persistence_enabled', 'yes') === 'yes',
             'isLoggedIn'            => get_current_user_id() > 0,
+            'projectionEnabled'     => Hooks::isEnabled() && FeatureFlags::isEnabled('js_projection'),
             'urlParamEnabled'       => $optionStore->get('url_param_enabled', 'yes') === 'yes',
             'urlParamKey'           => (string) $optionStore->get('url_param_key', 'currency'),
             'flagBaseUrl'           => FCHUB_MC_URL . 'assets/flags/4x3/',

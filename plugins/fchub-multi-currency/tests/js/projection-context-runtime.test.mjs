@@ -14,10 +14,11 @@ function deferred() {
 	return { promise, resolve };
 }
 
-function runtime() {
+function runtime(config = {}) {
 	const names = new Set();
 	const additions = [];
 	const timers = [];
+	const errors = [];
 	const context = deferred();
 	const document = {
 		documentElement: {
@@ -31,17 +32,23 @@ function runtime() {
 			},
 		},
 	};
+	names.add("fchub-mc-recovering");
 	const window = {
 		fchubMcContextReady: context.promise,
+		fchubMcCompleteRecovery() {
+			document.documentElement.classList.remove("fchub-mc-recovering");
+		},
 		fchubMcConfig: {
 			displayCurrency: "USD",
 			baseCurrency: "USD",
 			isBaseDisplay: true,
+			...config,
 		},
 	};
 	const execution = vm.runInNewContext(source, {
 		window,
 		document,
+		console: { error: (...args) => errors.push(args) },
 		setTimeout(callback, delay) {
 			timers.push({ callback, delay });
 			return timers.length;
@@ -49,13 +56,14 @@ function runtime() {
 		clearTimeout() {},
 	});
 
-	return { additions, context, document, execution, timers };
+	return { additions, context, document, errors, execution, timers };
 }
 
-it("keeps current prices visible while cached context recovery is pending", async () => {
+it("keeps the recovery shield in place until recovered prices finish projecting", async () => {
 	const state = runtime();
 
 	assert.equal(state.document.documentElement.classList.contains("fchub-mc-projecting"), false);
+	assert.equal(state.document.documentElement.classList.contains("fchub-mc-recovering"), true);
 	assert.equal(state.additions.length, 0);
 	assert.equal(state.timers.length, 0);
 
@@ -65,6 +73,7 @@ it("keeps current prices visible while cached context recovery is pending", asyn
 	assert.deepEqual(state.additions, ["fchub-mc-projecting"]);
 	assert.equal(state.timers[0]?.delay, 2000);
 	assert.equal(state.document.documentElement.classList.contains("fchub-mc-projecting"), false);
+	assert.equal(state.document.documentElement.classList.contains("fchub-mc-recovering"), false);
 });
 
 it("releases the shield when recovered context needs no projection", async () => {
@@ -74,4 +83,24 @@ it("releases the shield when recovered context needs no projection", async () =>
 	await state.execution;
 
 	assert.equal(state.document.documentElement.classList.contains("fchub-mc-projecting"), false);
+});
+
+it("releases both shields when the first projection pass throws", async () => {
+	const state = runtime({
+		displayCurrency: "EUR",
+		baseCurrency: "USD",
+		isBaseDisplay: false,
+		rate: 0.92,
+	});
+	state.document.querySelectorAll = () => {
+		throw new Error("broken storefront DOM");
+	};
+	state.document.readyState = "complete";
+
+	state.context.resolve();
+	await assert.doesNotReject(state.execution);
+
+	assert.equal(state.errors.length, 1);
+	assert.equal(state.document.documentElement.classList.contains("fchub-mc-projecting"), false);
+	assert.equal(state.document.documentElement.classList.contains("fchub-mc-recovering"), false);
 });

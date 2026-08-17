@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, currency, exchange-rates, ecommerce
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.4.6
+Stable tag: 1.4.7
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -91,6 +91,14 @@ The failed response is not persisted. Customer prices continue to use the last g
 
 == Changelog ==
 
+= 1.4.7 =
+
+* Kept guest switchers locked from the confirmed choice through context recovery and completed price projection. The visitor's code appears immediately; stale cached prices do not.
+* Started recovery before body parsing and moved price shielding into a dedicated sub-1 KB compressed stylesheet instead of loading the full switcher CSS everywhere.
+* Restored the served currency honestly after failures and preserved existing disabled controls, newer preferences and projection-disabled stores.
+* Added adversarial runtime coverage and a real 4.5-second delayed-browser measurement.
+* Thanks to @ManniGH for catching the remaining production-only reconciliation window in #72 and mapping the useful evidence from PR #149.
+
 = 1.4.6 =
 
 * Fixed guest switching on Rocket.net and other edge-cached storefronts. Confirmed choices use browser storage, a one-shot currency URL and unique no-store recovery requests. The URL is removed only after verification, so shared HTML cannot reset the selector.
@@ -105,14 +113,10 @@ The failed response is not persisted. Customer prices continue to use the last g
 
 = 1.4.5 =
 
-* Fixed guest currency choices on edge-cached pages. Cached HTML is now reconciled with the existing `fchub_mc_currency` cookie, without host-specific page exclusions or a second browser preference store.
-* Kept prices, ranges, variants, subscriptions, switchers, flags and currency context blocks on the same recovered currency, including base-currency, stale-URL and malformed-cookie fallbacks.
-* Stopped stale guest nonces, failed cookie or account writes and bare successful HTTP responses from being reported as saved currency changes.
-* Added proper Manual rate editing and saved manual or remote rates as complete snapshots. If one configured currency is missing, invalid or cannot be persisted, every previous rate remains active.
-* Prevented Manual mode from refreshing old rates into a new timestamp, delayed cache updates until database success, and excluded removed currencies from public rate and context responses.
-* Made FluentCart the authority for the store base currency, number format and cent-based price helpers. Also fixed signed rounding, zero-decimal output and repeat variant updates that could compound converted prices.
-* Captured display currency and rate during checkout so a later payment event cannot replace the customer's choice with an admin, webhook or another request's context.
-* Added browser-behaviour tests for the shipped JavaScript to CI, covering cached-page recovery, switch failures, price projection and Manual rate editing rather than merely admiring the source code.
+* Reconciled edge-cached pages with the guest cookie and kept prices, selectors and context blocks on one recovered currency.
+* Rejected stale nonces, failed persistence and decorative `2xx` responses instead of reporting a saved choice.
+* Saved manual and remote rates as complete snapshots, with FluentCart owning the base currency, number format and cent helpers.
+* Captured the display context at checkout and added shipped-JavaScript behaviour tests to CI.
 * Thanks to @ManniGH for the production report, Rocket.net investigation and PR #149 that drove the cached-page work in #72.
 
 = 1.4.4 =

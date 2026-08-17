@@ -17,6 +17,7 @@ final class FrontendModuleTest extends TestCase
         FrontendModule::registerAssets();
 
         $this->assertArrayHasKey('fchub-mc-context', $GLOBALS['wp_registered_scripts']);
+        $this->assertFalse($GLOBALS['wp_registered_scripts']['fchub-mc-context']['in_footer']);
         $this->assertSame(
             ['fchub-mc-context'],
             $GLOBALS['wp_registered_scripts']['fchub-mc-projection']['deps'],
@@ -25,6 +26,18 @@ final class FrontendModuleTest extends TestCase
             ['fchub-mc-context'],
             $GLOBALS['wp_registered_scripts']['fchub-mc-switcher']['deps'],
         );
+    }
+
+    #[Test]
+    public function testProjectionEnqueuesOnlyItsRecoveryShieldStylesWithoutAVisibleSwitcher(): void
+    {
+        FrontendModule::registerAssets();
+        FrontendModule::enqueueProjectionAssets();
+
+        $this->assertScriptEnqueued('fchub-mc-context');
+        $this->assertScriptEnqueued('fchub-mc-projection');
+        $this->assertStyleEnqueued('fchub-mc-projection');
+        $this->assertNotContains('fchub-mc-switcher', $GLOBALS['wp_enqueued_styles']);
     }
 
     /**
@@ -124,12 +137,26 @@ final class FrontendModuleTest extends TestCase
         $this->assertSame(30, $config['cookieLifetimeDays']);
         $this->assertTrue($config['accountPersistenceEnabled']);
         $this->assertFalse($config['isLoggedIn']);
+        $this->assertTrue($config['projectionEnabled']);
         $this->assertSame('default', $config['resolverSource']);
         $this->assertSame(['EUR', 'USD'], $config['allowedCurrencyCodes']);
         $this->assertTrue($config['urlParamEnabled']);
         $this->assertSame('money', $config['urlParamKey']);
         $this->assertArrayNotHasKey('presentation', $config);
         $this->assertArrayNotHasKey('rateValue', $config);
+    }
+
+    #[Test]
+    public function testFrontendConfigDoesNotWaitForProjectionWhenThePluginIsDisabled(): void
+    {
+        $this->setOption('fchub_mc_settings', array_merge($this->switcherSettings(), [
+            'enabled' => 'no',
+        ]));
+        $this->setWpdbMockRow(null);
+
+        $config = FrontendModule::buildFrontendConfig();
+
+        $this->assertFalse($config['projectionEnabled']);
     }
 
     #[Test]

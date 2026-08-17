@@ -364,6 +364,11 @@
     pointer-events: none;
 }
 
+.fchub-mc-selector-buttons--loading .fchub-mc-selector-buttons__button {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
 /* ----- Failed switch ----- */
 /* Only widgets currently showing an error wrap, so normal layout is untouched. */
 .fchub-mc-switcher:has(.fchub-mc-switcher__error) {
@@ -546,50 +551,4 @@
     --fchub-mc-text-secondary: #cbd5e1;
     --fchub-mc-badge-ok: #22c55e;
     --fchub-mc-badge-stale: #f87171;
-}
-
-/* ----- Disclosure notice ----- */
-.fchub-mc-disclosure {
-    margin-top: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    background: #f0f4f8;
-    border: 1px solid #d0d7de;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    color: #57606a;
-    line-height: 1.4;
-}
-
-.fchub-mc-disclosure--drawer {
-    margin: 0.5rem 20px;
-}
-
-/**
- * FOUC prevention — hide price elements briefly while JS projection runs.
- * The projection script adds .fchub-mc-projecting to <html> immediately,
- * then removes it after the first projection pass completes.
- */
-.fchub-mc-projecting .fct-item-price,
-.fchub-mc-projecting .fct-compare-price,
-.fchub-mc-projecting .fct-min-price,
-.fchub-mc-projecting .fct-max-price,
-.fchub-mc-projecting .fct-cart-item-price,
-.fchub-mc-projecting .fct-cart-item-total,
-.fchub-mc-projecting .fct_summary_value,
-.fchub-mc-projecting .fct_line_item_price,
-.fchub-mc-projecting .fct_line_item_total,
-.fchub-mc-projecting .fct_promo_price,
-.fchub-mc-projecting .fluent-cart-pricing-table-variant-price,
-.fchub-mc-projecting .fluent-cart-pricing-table-variant-compare-price,
-.fchub-mc-projecting [data-fchub-mc-base] {
-    visibility: hidden;
-}
-
-/* Safety fallback — remove FOUC class after 2s in case JS fails */
-@keyframes fchub-mc-fouc-fallback {
-    to { visibility: visible; }
-}
-.fchub-mc-projecting .fct-item-price,
-.fchub-mc-projecting .fct-compare-price {
-    animation: fchub-mc-fouc-fallback 0s 2s forwards;
 }
