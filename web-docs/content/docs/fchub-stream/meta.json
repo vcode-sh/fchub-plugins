@@ -1,7 +1,7 @@
 {
   "title": "FCHub Stream (Discontinued)",
   "root": true,
-  "description": "Discontinued and retained as-is without support or updates.",
+  "description": "Discontinued and unsupported, with critical maintenance fixes only.",
   "pages": [
     "---Introduction---",
     "index",

@@ -16,11 +16,6 @@
 // Composer autoloader.
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 
-// Load mock classes.
-if ( file_exists( __DIR__ . '/mocks.php' ) ) {
-	require_once __DIR__ . '/mocks.php';
-}
-
 // WordPress test library (if available).
 if ( file_exists( '/tmp/wordpress-tests-lib/includes/functions.php' ) ) {
 	require_once '/tmp/wordpress-tests-lib/includes/functions.php';
@@ -42,6 +37,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 if ( ! defined( 'WP_PLUGIN_DIR' ) ) {
 	define( 'WP_PLUGIN_DIR', ABSPATH . 'wp-content/plugins' );
+}
+
+// Load mock classes after the WordPress path constants are available.
+if ( file_exists( __DIR__ . '/mocks.php' ) ) {
+	require_once __DIR__ . '/mocks.php';
 }
 
 /**
@@ -346,7 +346,18 @@ if ( ! function_exists( 'add_filter' ) ) {
 	 * @return void
 	 */
 	function add_filter( $hook, $callback, $priority = 10, $args = 1 ) {
-		// Mock add_filter.
+		global $wp_filters;
+		if ( ! isset( $wp_filters ) ) {
+			$wp_filters = array();
+		}
+		if ( ! isset( $wp_filters[ $hook ] ) ) {
+			$wp_filters[ $hook ] = array();
+		}
+		$wp_filters[ $hook ][] = array(
+			'callback' => $callback,
+			'priority' => $priority,
+			'args'     => $args,
+		);
 	}
 }
 
@@ -509,6 +520,3 @@ if ( ! isset( $GLOBALS['wpdb'] ) ) {
 
 	$GLOBALS['wpdb'] = new MockWpdb();
 }
-
-echo "FCHub Stream Test Bootstrap Loaded\n";
-

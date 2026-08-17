@@ -4,6 +4,15 @@ import vueScopedCss from 'eslint-plugin-vue-scoped-css'
 import prettier from 'eslint-config-prettier'
 import vuePrettier from '@vue/eslint-config-prettier'
 
+const browserGlobals = {
+  alert: 'readonly',
+  confirm: 'readonly',
+  console: 'readonly',
+  document: 'readonly',
+  setTimeout: 'readonly',
+  window: 'readonly',
+}
+
 export default [
   // Base JavaScript rules
   js.configs.recommended,
@@ -36,9 +45,7 @@ export default [
       ecmaVersion: 2022,
       sourceType: 'module',
       globals: {
-        window: 'readonly',
-        document: 'readonly',
-        console: 'readonly',
+        ...browserGlobals,
         process: 'readonly',
       },
     },
@@ -63,11 +70,7 @@ export default [
         ecmaVersion: 2022,
         sourceType: 'module',
       },
-      globals: {
-        window: 'readonly',
-        document: 'readonly',
-        console: 'readonly',
-      },
+      globals: browserGlobals,
     },
     plugins: {
       'vue-scoped-css': vueScopedCss,
@@ -118,4 +121,3 @@ export default [
     },
   },
 ]
-

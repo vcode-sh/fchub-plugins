@@ -3,7 +3,7 @@
  * Plugin Name: FCHub - Stream
  * Plugin URI: https://github.com/vcode-sh/fchub-plugins
  * Description: Video streaming for FluentCommunity. Direct uploads to Cloudflare Stream or Bunny.net. Built because WordPress media library and video don't mix.
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * @since 0.0.1
  */
-define( 'FCHUB_STREAM_VERSION', '1.0.2' );
+define( 'FCHUB_STREAM_VERSION', '1.0.3' );
 
 /**
  * Plugin mode (production/development).
@@ -62,10 +62,30 @@ define( 'FCHUB_STREAM_FILE', __FILE__ );
 require_once __DIR__ . '/lib/GitHubUpdater.php';
 FCHub_GitHub_Updater::register( 'fchub-stream', plugin_basename( __FILE__ ), FCHUB_STREAM_VERSION );
 
-// Require Composer autoloader.
-if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
-	require __DIR__ . '/vendor/autoload.php';
-}
+/**
+ * Load plugin classes from the release package.
+ *
+ * Composer remains a development dependency and is not shipped to WordPress.
+ *
+ * @since 1.0.3
+ */
+spl_autoload_register(
+	static function ( $class_name ) {
+		$prefix = 'FCHubStream\\App\\';
+
+		if ( ! str_starts_with( $class_name, $prefix ) ) {
+			return;
+		}
+
+		$file = __DIR__ . '/app/' . str_replace( '\\', '/', substr( $class_name, strlen( $prefix ) ) ) . '.php';
+
+		if ( is_readable( $file ) ) {
+			require_once $file;
+		}
+	}
+);
+
+require_once __DIR__ . '/app/Utils/Logger.php';
 
 /**
  * Bootstrap the plugin.

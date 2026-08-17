@@ -12,9 +12,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-
-const props = defineProps({
+defineProps({
   icon: {
     type: Object,
     required: true,
@@ -31,23 +29,5 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-})
-
-// Auto-detect external links if external prop not provided
-const external = computed(() => {
-  if (props.external !== undefined) {
-    return props.external
-  }
-  // Only mark as external if href starts with http and is not the same domain
-  if (props.href?.startsWith('http')) {
-    try {
-      const hrefUrl = new URL(props.href)
-      const currentUrl = window.location
-      return hrefUrl.hostname !== currentUrl.hostname
-    } catch {
-      return false
-    }
-  }
-  return false
 })
 </script>

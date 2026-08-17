@@ -12,6 +12,7 @@
 namespace FCHubStream\App\Hooks\PortalIntegration;
 
 use FCHubStream\App\Services\StreamConfigService;
+use function FCHubStream\App\Utils\log_debug;
 
 /**
  * Class ShortcodeProcessor
@@ -78,25 +79,25 @@ class ShortcodeProcessor {
 	 * @return array Modified feed data with media_preview meta.
 	 */
 	public function process_shortcodes_before_save( $data, $request_data ) {
-		error_log( '[FCHub Stream] process_shortcodes_before_save() - CALLED' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-		error_log( '[FCHub Stream] request_data keys: ' . implode( ', ', array_keys( $request_data ) ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		log_debug( 'process_shortcodes_before_save() - CALLED' );
+		log_debug( 'request_data keys: ' . implode( ', ', array_keys( $request_data ) ) );
 
 		// Log message content to check for shortcode.
 		if ( isset( $request_data['message'] ) ) {
 			$message_preview = substr( $request_data['message'], 0, 200 );
-			error_log( '[FCHub Stream] request_data message: ' . $message_preview ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			log_debug( 'request_data message: ' . $message_preview );
 		}
 
 		// Check if this is an update (feed ID present in request_data).
 		$is_update = isset( $request_data['id'] ) || isset( $request_data['feed_id'] );
 		if ( $is_update ) {
-			error_log( '[FCHub Stream] process_shortcodes_before_save() - DETECTED UPDATE (feed ID: ' . ( $request_data['id'] ?? $request_data['feed_id'] ?? 'unknown' ) . ')' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			log_debug( 'process_shortcodes_before_save() - DETECTED UPDATE (feed ID: ' . ( $request_data['id'] ?? $request_data['feed_id'] ?? 'unknown' ) . ')' );
 		}
 
 		if ( isset( $request_data['media'] ) ) {
-			error_log( '[FCHub Stream] media object present: ' . wp_json_encode( $request_data['media'] ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			log_debug( 'media object present: ' . wp_json_encode( $request_data['media'] ) );
 		} else {
-			error_log( '[FCHub Stream] NO media object in request_data!' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			log_debug( 'NO media object in request_data!' );
 		}
 
 		// Only process if data is an array.
@@ -106,7 +107,7 @@ class ShortcodeProcessor {
 
 		// Check if media object contains our shortcode (from fetch interceptor).
 		if ( isset( $request_data['media']['html'] ) && strpos( $request_data['media']['html'], '[fchub_stream:' ) !== false ) {
-			error_log( '[FCHub Stream] process_shortcodes_before_save() - Found video in media.html' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			log_debug( 'process_shortcodes_before_save() - Found video in media.html' );
 
 			$shortcode = $request_data['media']['html'];
 			$pattern   = '/\[fchub_stream:([a-zA-Z0-9_-]+)(?:\s+provider="(cloudflare_stream|bunny_stream)")?\]/';
@@ -122,7 +123,7 @@ class ShortcodeProcessor {
 				// Get customer_subdomain from frontend (for Cloudflare encoding overlay).
 				$customer_subdomain = $request_data['media']['customer_subdomain'] ?? '';
 
-				error_log( '[FCHub Stream] process_shortcodes_before_save() - Video ID: ' . $video_id . ', Provider: ' . ( $provider ?? 'auto' ) . ', Status: ' . $status . ', Customer subdomain: ' . $customer_subdomain ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				log_debug( 'process_shortcodes_before_save() - Video ID: ' . $video_id . ', Provider: ' . ( $provider ?? 'auto' ) . ', Status: ' . $status . ', Customer subdomain: ' . $customer_subdomain );
 
 				// Get player HTML with actual status from frontend.
 				// Pass customer_subdomain as 4th parameter for encoding overlay.
@@ -158,7 +159,7 @@ class ShortcodeProcessor {
 				$data['message']          = trim( $data['message'] );
 				$data['message_rendered'] = trim( $data['message_rendered'] );
 
-				error_log( '[FCHub Stream] process_shortcodes_before_save() - Created media_preview and removed shortcode from message' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				log_debug( 'process_shortcodes_before_save() - Created media_preview and removed shortcode from message' );
 
 				return $data;
 			}
@@ -174,16 +175,16 @@ class ShortcodeProcessor {
 		// CRITICAL: Check both message_rendered AND message (during updates, shortcode may be in message only).
 		$matches = null;
 		if ( preg_match( $pattern, $message_rendered, $matches ) ) {
-			error_log( '[FCHub Stream] process_shortcodes_before_save() - Found shortcode in message_rendered' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			log_debug( 'process_shortcodes_before_save() - Found shortcode in message_rendered' );
 		} elseif ( preg_match( $pattern, $message, $matches ) ) {
-			error_log( '[FCHub Stream] process_shortcodes_before_save() - Found shortcode in message (not in message_rendered)' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			log_debug( 'process_shortcodes_before_save() - Found shortcode in message (not in message_rendered)' );
 		}
 
 		if ( $matches ) {
 			$video_id = $matches[1];
 			$provider = $matches[2] ?? null;
 
-			error_log( '[FCHub Stream] process_shortcodes_before_save() - Found shortcode: video_id=' . $video_id . ', provider=' . ( $provider ?? 'auto' ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			log_debug( 'process_shortcodes_before_save() - Found shortcode: video_id=' . $video_id . ', provider=' . ( $provider ?? 'auto' ) );
 
 			// Get player HTML with pending status (fallback for old shortcodes).
 			$player_html = $this->player_renderer->get_player_html( $video_id, $provider, 'pending' );
@@ -228,7 +229,7 @@ class ShortcodeProcessor {
 			if ( isset( $body_params['media']['replaces_video_id'] ) ) {
 				$data['meta']['media_preview']['replaces_video_id'] = $body_params['media']['replaces_video_id'];
 				$data['meta']['media_preview']['replaces_provider'] = $body_params['media']['replaces_provider'] ?? $enabled_provider;
-				error_log( '[FCHub Stream] process_shortcodes_before_save() - Video replacement detected: old=' . $body_params['media']['replaces_video_id'] . ', new=' . $video_id ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				log_debug( 'process_shortcodes_before_save() - Video replacement detected: old=' . $body_params['media']['replaces_video_id'] . ', new=' . $video_id );
 			}
 
 			// Remove shortcode from message and message_rendered.
@@ -239,7 +240,7 @@ class ShortcodeProcessor {
 			$data['message']          = trim( $data['message'] );
 			$data['message_rendered'] = trim( $data['message_rendered'] );
 
-			error_log( '[FCHub Stream] process_shortcodes_before_save() - Created media_preview and removed shortcode' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			log_debug( 'process_shortcodes_before_save() - Created media_preview and removed shortcode' );
 		}
 
 		return $data;

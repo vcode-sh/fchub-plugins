@@ -4,7 +4,6 @@
  *
  * This file returns a callable that initializes the FCHub Stream plugin.
  * It handles:
- * - Loading the Composer autoloader
  * - Hooking into FluentCommunity
  * - Registering activation/deactivation hooks
  *
@@ -33,11 +32,6 @@ use function FCHubStream\App\Utils\log_debug;
  * @return void
  */
 return function ( $file ) {
-	// Ensure autoloader is loaded before registering hooks.
-	if ( file_exists( __DIR__ . '/../vendor/autoload.php' ) ) {
-		require_once __DIR__ . '/../vendor/autoload.php';
-	}
-
 	/**
 	 * Register video deletion hooks EARLY (before portal loads).
 	 *
@@ -147,10 +141,6 @@ return function ( $file ) {
 	register_activation_hook(
 		$file,
 		function ( $network_wide = false ) {
-			// Ensure autoloader is loaded.
-			if ( file_exists( __DIR__ . '/../vendor/autoload.php' ) ) {
-				require_once __DIR__ . '/../vendor/autoload.php';
-			}
 			\FCHubStream\App\Hooks\Handlers\ActivationHandler::handle( $network_wide );
 		}
 	);
@@ -165,10 +155,6 @@ return function ( $file ) {
 	register_deactivation_hook(
 		$file,
 		function ( $network_wide = false ) {
-			// Ensure autoloader is loaded.
-			if ( file_exists( __DIR__ . '/../vendor/autoload.php' ) ) {
-				require_once __DIR__ . '/../vendor/autoload.php';
-			}
 			\FCHubStream\App\Hooks\Handlers\DeactivationHandler::handle( $network_wide );
 		}
 	);

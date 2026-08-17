@@ -186,6 +186,34 @@ if ( ! function_exists( 'sanitize_text_field' ) ) {
 	}
 }
 
+if ( ! function_exists( 'absint' ) ) {
+	/**
+	 * Mock absint function.
+	 *
+	 * @since 1.0.3
+	 *
+	 * @param mixed $value Value to convert.
+	 * @return int Absolute integer value.
+	 */
+	function absint( $value ) {
+		return abs( (int) $value );
+	}
+}
+
+if ( ! function_exists( 'wp_salt' ) ) {
+	/**
+	 * Return a deterministic salt for encryption tests.
+	 *
+	 * @since 1.0.3
+	 *
+	 * @param string $scheme Salt scheme.
+	 * @return string Test salt.
+	 */
+	function wp_salt( $scheme = 'auth' ) {
+		return hash( 'sha256', 'fchub-stream-test-' . $scheme );
+	}
+}
+
 if ( ! function_exists( 'esc_attr' ) ) {
 	/**
 	 * Mock esc_attr function.

@@ -79,14 +79,6 @@ class Application implements ArrayAccess {
 	);
 
 	/**
-	 * Cached composer.json data.
-	 *
-	 * @since 1.0.0
-	 * @var array|null
-	 */
-	protected static $composer = null;
-
-	/**
 	 * Constructor.
 	 *
 	 * Initializes the application container and bootstraps the plugin.
@@ -124,36 +116,12 @@ class Application implements ArrayAccess {
 	}
 
 	/**
-	 * Set application-level namespace from composer.json.
+	 * Set the application-level namespace used for route resolution.
 	 *
 	 * @since 1.0.0
 	 */
 	protected function set_app_level_namespace() {
-		$composer = $this->get_composer();
-
-		$this->bindings['__namespace__'] = $composer['extra']['wpfluent']['namespace']['current'];
-	}
-
-	/**
-	 * Get composer.json data.
-	 *
-	 * Loads and caches the composer.json file contents.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @param string|null $section Optional. Specific section to retrieve. Default null.
-	 *
-	 * @return array|mixed Full composer data or specific section.
-	 */
-	public function get_composer( $section = null ) {
-		if ( is_null( static::$composer ) ) {
-			static::$composer = json_decode(
-				file_get_contents( $this->base_path . 'composer.json' ), // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-				true
-			);
-		}
-
-		return $section ? static::$composer[ $section ] : static::$composer;
+		$this->bindings['__namespace__'] = 'FCHubStream';
 	}
 
 	/**

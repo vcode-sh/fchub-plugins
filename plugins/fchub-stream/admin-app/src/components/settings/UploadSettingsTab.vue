@@ -258,8 +258,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
-import streamApi from '../../services/streamApi'
+import { ref, computed, watch } from 'vue'
 
 const props = defineProps({
   settings: {
@@ -313,7 +312,8 @@ const hasChanges = computed(() => {
 
   return (
     localSettings.value.max_file_size_mb !== (props.settings.max_file_size_mb ?? 500) ||
-    JSON.stringify(localSettings.value.allowed_formats.sort()) !== JSON.stringify((props.settings.allowed_formats ?? []).sort()) ||
+    JSON.stringify([...localSettings.value.allowed_formats].sort()) !==
+      JSON.stringify([...(props.settings.allowed_formats ?? [])].sort()) ||
     localSettings.value.max_duration_seconds !== (props.settings.max_duration_seconds ?? 0) ||
     localSettings.value.auto_publish !== (props.settings.auto_publish ?? true) ||
     localSettings.value.polling_interval !== (props.settings.polling_interval ?? 30) ||
@@ -415,4 +415,3 @@ async function handleReset() {
   border: none;
 }
 </style>
-

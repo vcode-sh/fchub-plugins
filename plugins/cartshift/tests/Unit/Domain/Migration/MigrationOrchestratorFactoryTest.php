@@ -350,6 +350,10 @@ final class MigrationOrchestratorFactoryTest extends PluginTestCase
         ]);
         $GLOBALS['_cartshift_test_wc_products'][21] = $variation;
 
+        // The refusal reports itself through Logger::error(); PHPUnit captures
+        // error_log() output and fails the test unless the call declares it.
+        $this->expectErrorLog();
+
         $result = MigrationOrchestratorFactory::createOrphanVariant(900, $this->orphan(['id' => 21]));
 
         $this->assertNull(
@@ -480,6 +484,9 @@ final class MigrationOrchestratorFactoryTest extends PluginTestCase
         $state->start(['product']);
 
         $GLOBALS['_cartshift_test_queries'] = [];
+
+        // As above: the refusal also goes out through Logger::error().
+        $this->expectErrorLog();
 
         $this->factory($state)->forRun(['product']);
 

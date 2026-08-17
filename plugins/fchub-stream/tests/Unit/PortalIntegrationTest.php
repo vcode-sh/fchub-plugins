@@ -14,7 +14,11 @@ namespace FCHubStream\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use FCHubStream\App\Hooks\PortalIntegration;
-use FCHubStream\App\Services\StreamConfigService;
+use FCHubStream\App\Hooks\PortalIntegration\AssetManager;
+use FCHubStream\App\Hooks\PortalIntegration\ConfigProvider;
+use FCHubStream\App\Hooks\PortalIntegration\ShortcodeProcessor;
+use FCHubStream\App\Hooks\PortalIntegration\VideoPlayerRenderer;
+use FCHubStream\App\Hooks\PortalIntegration\VideoValidator;
 
 /**
  * Unit tests for Portal Integration.
@@ -32,6 +36,18 @@ class PortalIntegrationTest extends TestCase {
 	 * @var PortalIntegration
 	 */
 	private $portal_integration;
+
+	/** @var AssetManager */
+	private $asset_manager;
+
+	/** @var ConfigProvider */
+	private $config_provider;
+
+	/** @var ShortcodeProcessor */
+	private $shortcode_processor;
+
+	/** @var VideoPlayerRenderer */
+	private $player_renderer;
 
 	/**
 	 * Set up test environment.
@@ -60,8 +76,14 @@ class PortalIntegrationTest extends TestCase {
 			define( 'FCHUB_STREAM_URL', 'https://example.com/wp-content/plugins/fchub-stream/' );
 		}
 
-		// Create instance.
-		$this->portal_integration = new PortalIntegration();
+		$this->player_renderer    = new VideoPlayerRenderer();
+		$this->asset_manager      = new AssetManager();
+		$this->config_provider    = new ConfigProvider();
+		$this->shortcode_processor = new ShortcodeProcessor(
+			$this->player_renderer,
+			new VideoValidator()
+		);
+		$this->portal_integration  = new PortalIntegration();
 	}
 
 	/**
@@ -147,17 +169,15 @@ class PortalIntegrationTest extends TestCase {
 	public function test_add_portal_scripts() {
 		$data_vars = array();
 
-		$result = $this->portal_integration->add_portal_scripts( $data_vars );
+		$result = $this->asset_manager->add_portal_scripts( $data_vars );
 
 		// Check that js_files key is added.
 		$this->assertArrayHasKey( 'js_files', $result );
 
-		// Check that fchub_stream_portal is added.
-		if ( isset( $result['js_files']['fchub_stream_portal'] ) ) {
-			$this->assertArrayHasKey( 'url', $result['js_files']['fchub_stream_portal'] );
-			$this->assertArrayHasKey( 'deps', $result['js_files']['fchub_stream_portal'] );
-			$this->assertStringContainsString( 'fchub-stream-portal.js', $result['js_files']['fchub_stream_portal']['url'] );
-		}
+		$this->assertArrayHasKey( 'fchub_stream_portal', $result['js_files'] );
+		$this->assertArrayHasKey( 'url', $result['js_files']['fchub_stream_portal'] );
+		$this->assertSame( array(), $result['js_files']['fchub_stream_portal']['deps'] );
+		$this->assertStringContainsString( 'fchub-stream-portal.js?v=', $result['js_files']['fchub_stream_portal']['url'] );
 	}
 
 	/**
@@ -185,7 +205,7 @@ class PortalIntegrationTest extends TestCase {
 		);
 
 		$vars   = array();
-		$result = $this->portal_integration->add_portal_vars( $vars );
+		$result = $this->config_provider->add_portal_vars( $vars );
 
 		// Check that fchubStreamSettings is added.
 		$this->assertArrayHasKey( 'fchubStreamSettings', $result );
@@ -218,7 +238,7 @@ class PortalIntegrationTest extends TestCase {
 	public function test_add_video_types() {
 		$types = array();
 
-		$result = $this->portal_integration->add_video_types( $types );
+		$result = $this->asset_manager->add_video_types( $types );
 
 		// Check that video types are added.
 		$this->assertContains( 'video/mp4', $result );
@@ -242,7 +262,7 @@ class PortalIntegrationTest extends TestCase {
 	public function test_allow_iframe_in_kses() {
 		$allowed_tags = array();
 
-		$result = $this->portal_integration->allow_iframe_in_kses( $allowed_tags, 'post' );
+		$result = $this->player_renderer->allow_iframe_in_kses( $allowed_tags, 'post' );
 
 		// Check that iframe is allowed.
 		$this->assertArrayHasKey( 'iframe', $result );
@@ -269,7 +289,7 @@ class PortalIntegrationTest extends TestCase {
 	public function test_allow_iframe_in_kses_non_post_context() {
 		$allowed_tags = array();
 
-		$result = $this->portal_integration->allow_iframe_in_kses( $allowed_tags, 'comment' );
+		$result = $this->player_renderer->allow_iframe_in_kses( $allowed_tags, 'comment' );
 
 		// Check that iframe is NOT added for non-post context.
 		$this->assertEmpty( $result );
@@ -300,7 +320,7 @@ class PortalIntegrationTest extends TestCase {
 			),
 		);
 
-		$result = $this->portal_integration->process_shortcodes_before_save( $data, $request_data );
+		$result = $this->shortcode_processor->process_shortcodes_before_save( $data, $request_data );
 
 		// Check that media_preview is created.
 		$this->assertArrayHasKey( 'meta', $result );
@@ -334,7 +354,7 @@ class PortalIntegrationTest extends TestCase {
 
 		$request_data = array();
 
-		$result = $this->portal_integration->process_shortcodes_before_save( $data, $request_data );
+		$result = $this->shortcode_processor->process_shortcodes_before_save( $data, $request_data );
 
 		// Check that shortcode is removed from message.
 		$this->assertEquals( 'Check this out:', $result['message'] );
@@ -364,7 +384,7 @@ class PortalIntegrationTest extends TestCase {
 
 		$request_data = array();
 
-		$result = $this->portal_integration->process_shortcodes_before_save( $data, $request_data );
+		$result = $this->shortcode_processor->process_shortcodes_before_save( $data, $request_data );
 
 		// Check that data is unchanged.
 		$this->assertEquals( $data, $result );
@@ -383,6 +403,15 @@ class PortalIntegrationTest extends TestCase {
 	 * @return void
 	 */
 	public function test_process_shortcodes_in_response() {
+		global $wp_options;
+		$wp_options['fchub_stream_config'] = array(
+			'provider' => 'bunny',
+			'bunny'    => array(
+				'enabled'    => true,
+				'library_id' => '12345',
+			),
+		);
+
 		$data = array(
 			'feed' => array(
 				'id'               => 1,
@@ -391,7 +420,7 @@ class PortalIntegrationTest extends TestCase {
 			),
 		);
 
-		$result = $this->portal_integration->process_shortcodes_in_response( $data, array() );
+		$result = $this->shortcode_processor->process_shortcodes_in_response( $data, array() );
 
 		// Check that shortcode is replaced.
 		$this->assertStringContainsString( 'fchub-stream-player-wrapper', $result['feed']['message_rendered'] );
@@ -419,7 +448,7 @@ class PortalIntegrationTest extends TestCase {
 			),
 		);
 
-		$result = $this->portal_integration->process_shortcodes_in_response( $data, array() );
+		$result = $this->shortcode_processor->process_shortcodes_in_response( $data, array() );
 
 		// Check that data is unchanged.
 		$this->assertEquals( $data, $result );
@@ -437,6 +466,15 @@ class PortalIntegrationTest extends TestCase {
 	 * @return void
 	 */
 	public function test_process_shortcodes_in_feeds() {
+		global $wp_options;
+		$wp_options['fchub_stream_config'] = array(
+			'provider' => 'bunny',
+			'bunny'    => array(
+				'enabled'    => true,
+				'library_id' => '12345',
+			),
+		);
+
 		$data = array(
 			'feeds' => array(
 				'data' => array(
@@ -454,7 +492,7 @@ class PortalIntegrationTest extends TestCase {
 			),
 		);
 
-		$result = $this->portal_integration->process_shortcodes_in_feeds( $data, array() );
+		$result = $this->shortcode_processor->process_shortcodes_in_feeds( $data, array() );
 
 		// Check that first feed's shortcode is replaced.
 		$this->assertStringContainsString( 'fchub-stream-player-wrapper', $result['feeds']['data'][0]['message_rendered'] );
@@ -484,7 +522,7 @@ class PortalIntegrationTest extends TestCase {
 			),
 		);
 
-		$result = $this->portal_integration->process_shortcodes_in_feeds( $data, array() );
+		$result = $this->shortcode_processor->process_shortcodes_in_feeds( $data, array() );
 
 		// Check that data is unchanged.
 		$this->assertEquals( $data, $result );
@@ -504,7 +542,7 @@ class PortalIntegrationTest extends TestCase {
 	 */
 	public function test_add_portal_css() {
 		ob_start();
-		$this->portal_integration->add_portal_css();
+		$this->asset_manager->add_portal_css();
 		$output = ob_get_clean();
 
 		// Check that CSS is output.
@@ -534,7 +572,7 @@ class PortalIntegrationTest extends TestCase {
 		);
 
 		$vars   = array();
-		$result = $this->portal_integration->add_portal_vars( $vars );
+		$result = $this->config_provider->add_portal_vars( $vars );
 
 		// Check that upload is disabled.
 		$this->assertFalse( $result['fchubStreamSettings']['enabled'] );
@@ -567,7 +605,7 @@ class PortalIntegrationTest extends TestCase {
 				'meta'             => array(),
 			);
 
-			$result = $this->portal_integration->process_shortcodes_before_save( $data, array() );
+			$result = $this->shortcode_processor->process_shortcodes_before_save( $data, array() );
 
 			$this->assertArrayHasKey( 'media_preview', $result['meta'], "Failed for shortcode: $shortcode" );
 			$this->assertEquals( $expected_id, $result['meta']['media_preview']['video_id'], "Wrong ID for shortcode: $shortcode" );

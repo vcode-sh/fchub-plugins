@@ -155,13 +155,49 @@ test('Only the scope job diffs commits, with full history and a full-run fallbac
   assert.match(changes, /node scripts\/ci-scope\.mjs --all/)
 })
 
-test('The repository contract job checks the catalogue and the documentation', () => {
+test('The repository contract job checks the catalogue, plugin metadata, and documentation', () => {
   const contract = job(ci, 'repository-contract')
 
   assert.match(contract, /node --test tests\/repository\/fchub-catalog\.test\.mjs/)
+  assert.match(
+    contract,
+    /node --test tests\/repository\/plugin-dependency-locks\.test\.mjs tests\/repository\/plugin-version-contract\.test\.mjs/,
+  )
   assert.match(contract, /node scripts\/sync-fchub-catalog\.mjs --check/)
   assert.match(contract, /node scripts\/check-fchub-docs\.mjs/)
   assert.doesNotMatch(contract, /continue-on-error:\s*true/)
+})
+
+test('CI re-includes the discontinued Stream metadata guarded by repository contracts', () => {
+  const guardedStreamPaths = [
+    'plugins/fchub-stream/admin-app/package.json',
+    'plugins/fchub-stream/admin-app/package-lock.json',
+    'plugins/fchub-stream/portal-app/package.json',
+    'plugins/fchub-stream/portal-app/package-lock.json',
+    'plugins/fchub-stream/fchub-stream.php',
+    'plugins/fchub-stream/readme.txt',
+  ]
+  const contractPaths = [
+    'tests/repository/plugin-dependency-locks.test.mjs',
+    'tests/repository/plugin-version-contract.test.mjs',
+  ]
+
+  for (const event of ['push', 'pull_request']) {
+    const filters = paths(ci, event)
+    const streamExclusion = filters.indexOf('!plugins/fchub-stream/**')
+    assert.notEqual(streamExclusion, -1, `Expected Stream to remain excluded by default on ${event}`)
+
+    for (const required of guardedStreamPaths) {
+      assert.ok(
+        filters.indexOf(required) > streamExclusion,
+        `${event} must re-include ${required} after the broad Stream exclusion`,
+      )
+    }
+
+    for (const required of contractPaths) {
+      assert.ok(filters.includes(required), `${event} must react to ${required}`)
+    }
+  }
 })
 
 test('Docs CI watches the FCHub sources its own checks read', () => {

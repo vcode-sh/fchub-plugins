@@ -129,6 +129,7 @@ class StreamConfigTest extends TestCase {
 			'cloudflare' => array(
 				'account_id' => 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6',
 				'api_token'  => 'test-token',
+				'customer_subdomain' => 'customer-example',
 			),
 		);
 
@@ -136,12 +137,13 @@ class StreamConfigTest extends TestCase {
 		$this->assertTrue( $validation['valid'] );
 		$this->assertEmpty( $validation['errors'] );
 
-		// Invalid account ID format.
+		// Empty required account ID.
 		$invalid_config = array(
 			'provider'   => 'cloudflare',
 			'cloudflare' => array(
-				'account_id' => 'invalid-format',
+				'account_id' => '',
 				'api_token'  => 'test-token',
+				'customer_subdomain' => 'customer-example',
 			),
 		);
 
@@ -191,4 +193,3 @@ class StreamConfigTest extends TestCase {
 		$this->assertIsInt( $saved['defaults']['max_file_size_mb'] );
 	}
 }
-

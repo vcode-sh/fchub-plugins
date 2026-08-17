@@ -3,33 +3,33 @@
     "file": "chunks/_plugin-vue_export-helper-C-5Tye29.js",
     "name": "_plugin-vue_export-helper"
   },
-  "_message-box-C5q2_fRN.js": {
-    "file": "chunks/message-box-C5q2_fRN.js",
+  "_message-box-CNOpMS_R.js": {
+    "file": "chunks/message-box-CNOpMS_R.js",
     "name": "message-box",
     "imports": [
-      "_useApi-CROJJdhE-BlQVSHu_.js"
+      "_useApi-CROJJdhE-B6V5Fx-A.js"
     ]
   },
   "_rolldown-runtime-hePW80VL.js": {
     "file": "chunks/rolldown-runtime-hePW80VL.js",
     "name": "rolldown-runtime"
   },
-  "_useApi-CROJJdhE-BlQVSHu_.js": {
-    "file": "chunks/useApi-CROJJdhE-BlQVSHu_.js",
+  "_useApi-CROJJdhE-B6V5Fx-A.js": {
+    "file": "chunks/useApi-CROJJdhE-B6V5Fx-A.js",
     "name": "useApi-CROJJdhE",
     "imports": [
       "_rolldown-runtime-hePW80VL.js"
     ]
   },
   "resources/admin/main.js": {
-    "file": "fchub-portal-extender-admin-JXJdJTYN.js",
+    "file": "fchub-portal-extender-admin-fCihqlPB.js",
     "name": "main",
     "src": "resources/admin/main.js",
     "isEntry": true,
     "imports": [
       "_rolldown-runtime-hePW80VL.js",
-      "_useApi-CROJJdhE-BlQVSHu_.js",
-      "_message-box-C5q2_fRN.js"
+      "_useApi-CROJJdhE-B6V5Fx-A.js",
+      "_message-box-CNOpMS_R.js"
     ],
     "dynamicImports": [
       "resources/admin/pages/EndpointList.vue",
@@ -37,28 +37,28 @@
     ]
   },
   "resources/admin/pages/EndpointEditor.vue": {
-    "file": "chunks/EndpointEditor-mfp1jT7s.js",
+    "file": "chunks/EndpointEditor-BNNouS9Z.js",
     "name": "EndpointEditor",
     "src": "resources/admin/pages/EndpointEditor.vue",
     "isDynamicEntry": true,
     "imports": [
-      "_useApi-CROJJdhE-BlQVSHu_.js",
+      "_useApi-CROJJdhE-B6V5Fx-A.js",
       "__plugin-vue_export-helper-C-5Tye29.js"
     ]
   },
   "resources/admin/pages/EndpointList.vue": {
-    "file": "chunks/EndpointList-cuynx_6w.js",
+    "file": "chunks/EndpointList-DZH-gn0a.js",
     "name": "EndpointList",
     "src": "resources/admin/pages/EndpointList.vue",
     "isDynamicEntry": true,
     "imports": [
-      "_useApi-CROJJdhE-BlQVSHu_.js",
-      "_message-box-C5q2_fRN.js",
+      "_useApi-CROJJdhE-B6V5Fx-A.js",
+      "_message-box-CNOpMS_R.js",
       "__plugin-vue_export-helper-C-5Tye29.js"
     ]
   },
   "style.css": {
-    "file": "assets/style-bgyFXCxx.css",
+    "file": "assets/style-B0eYRufr.css",
     "src": "style.css"
   }
 }

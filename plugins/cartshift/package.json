@@ -11,12 +11,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "vue": "^3.5.30"
+    "vue": "^3.5.41"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.5",
+    "@vitejs/plugin-vue": "^6.0.8",
     "@vue/test-utils": "^2.4.11",
-    "happy-dom": "^20.11.1",
+    "happy-dom": "^20.11.2",
     "vite": "^8.2.1",
     "vitest": "^4.1.10"
   },

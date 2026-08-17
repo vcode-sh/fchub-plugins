@@ -1,0 +1,14 @@
+### v1.0.3
+
+*Unreleased maintenance fix*
+
+FCHub Stream is still discontinued. This release simply makes the archived download behave like a plugin rather than a small escape room.
+
+- Fixed the release ZIP so it loads its own PHP classes without missing Composer development files.
+- Updated the admin and portal dependency trees, including the vulnerable packages GitHub quite reasonably complained about.
+- Fixed current Vite builds, an admin settings mutation, and a dead support-button branch.
+- Restored the PHP suite: it now runs 24 actual tests instead of exiting successfully before discovering any.
+- Added package, dependency, version, and CI contracts so the same failures are caught before another release.
+- Moved routine upload diagnostics behind `WP_DEBUG`, where debug logs traditionally live.
+
+Provider settings, stored videos, upload behaviour, and FluentCommunity routes are unchanged. Discontinued still means unsupported; it no longer needs to mean knowingly broken.

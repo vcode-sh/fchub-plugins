@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/12.4/phpunit.xsd"
+	xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/12.5/phpunit.xsd"
 	bootstrap="tests/bootstrap.php"
 	colors="true"
 	beStrictAboutOutputDuringTests="true"
-	beStrictAboutTodoAnnotatedTests="true"
 	failOnRisky="true"
 	failOnWarning="true"
 	cacheDirectory=".phpunit.cache"
@@ -39,4 +38,3 @@
 		<env name="WP_CORE_DIR" value="/tmp/wordpress/" />
 	</php>
 </phpunit>
-

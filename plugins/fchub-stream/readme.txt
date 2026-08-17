@@ -5,7 +5,7 @@ Tags: video, streaming, cloudflare, bunny.net, fluentcommunity, upload, media
 Requires at least: 6.7
 Tested up to: 6.9.0
 Requires PHP: 8.3
-Stable tag: 1.0.0
+Stable tag: 1.0.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -59,6 +59,13 @@ Post gone? Video gone too. Automatic cleanup. No manual video management. You're
 I did use it. Until video 47. Then I snapped. Built this instead. My therapist approved.
 
 == Changelog ==
+
+= 1.0.3 =
+* Fixed downloaded ZIPs failing to load Stream's PHP classes without Composer development files.
+* Updated the admin and portal dependency locks, including security fixes.
+* Fixed current Vite builds and the admin settings issues they exposed.
+* Restored the PHP test suite so it runs real tests and checks the packaged plugin bootstrap.
+* Stopped routine upload diagnostics from filling production logs.
 
 = 1.0.0 =
 * Open source release under GPLv2.

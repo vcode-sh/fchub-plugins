@@ -7,6 +7,12 @@ on:
     paths:
       - 'plugins/**'
       - '!plugins/fchub-stream/**'
+      - 'plugins/fchub-stream/admin-app/package.json'
+      - 'plugins/fchub-stream/admin-app/package-lock.json'
+      - 'plugins/fchub-stream/portal-app/package.json'
+      - 'plugins/fchub-stream/portal-app/package-lock.json'
+      - 'plugins/fchub-stream/fchub-stream.php'
+      - 'plugins/fchub-stream/readme.txt'
       - 'web-docs/lib/versions.json'
       - '.github/workflows/ci.yml'
       - '.github/workflows/ci-memberships-contract.test.mjs'
@@ -23,6 +29,8 @@ on:
       - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/check-fchub-docs.mjs'
       - 'tests/repository/fchub-catalog.test.mjs'
+      - 'tests/repository/plugin-dependency-locks.test.mjs'
+      - 'tests/repository/plugin-version-contract.test.mjs'
       - 'tests/repository/wporg-package-contract.test.mjs'
       - 'tests/repository/wporg-updater-sync-contract.test.mjs'
       - 'tests/repository/wporg-metadata-contract.test.mjs'
@@ -37,6 +45,12 @@ on:
     paths:
       - 'plugins/**'
       - '!plugins/fchub-stream/**'
+      - 'plugins/fchub-stream/admin-app/package.json'
+      - 'plugins/fchub-stream/admin-app/package-lock.json'
+      - 'plugins/fchub-stream/portal-app/package.json'
+      - 'plugins/fchub-stream/portal-app/package-lock.json'
+      - 'plugins/fchub-stream/fchub-stream.php'
+      - 'plugins/fchub-stream/readme.txt'
       - 'web-docs/lib/versions.json'
       - '.github/workflows/ci.yml'
       - '.github/workflows/ci-memberships-contract.test.mjs'
@@ -53,6 +67,8 @@ on:
       - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/check-fchub-docs.mjs'
       - 'tests/repository/fchub-catalog.test.mjs'
+      - 'tests/repository/plugin-dependency-locks.test.mjs'
+      - 'tests/repository/plugin-version-contract.test.mjs'
       - 'tests/repository/wporg-package-contract.test.mjs'
       - 'tests/repository/wporg-updater-sync-contract.test.mjs'
       - 'tests/repository/wporg-metadata-contract.test.mjs'
@@ -404,7 +420,7 @@ jobs:
           echo "Build validation passed: $JS_COUNT JS file(s) in assets/dist/"
 
   repository-contract:
-    name: Repository contract (catalogue, docs)
+    name: Repository contract (catalogue, plugin metadata, docs)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -426,6 +442,9 @@ jobs:
 
       - name: Run catalogue contract
         run: node --test tests/repository/fchub-catalog.test.mjs
+
+      - name: Run plugin metadata contracts
+        run: node --test tests/repository/plugin-dependency-locks.test.mjs tests/repository/plugin-version-contract.test.mjs
 
       - name: Verify FCHub documentation
         run: node scripts/check-fchub-docs.mjs
