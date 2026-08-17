@@ -207,6 +207,7 @@ test('Docs CI watches the FCHub sources its own checks read', () => {
     // The plugin's own sources left this repository with it. What remains
     // here is what this repository still owns and its own checks still read.
     for (const required of [
+      'scripts/check-fluentcart-api-link.mjs',
       'scripts/check-fchub-docs.mjs',
       'scripts/sync-fchub-catalog.mjs',
     ]) {
