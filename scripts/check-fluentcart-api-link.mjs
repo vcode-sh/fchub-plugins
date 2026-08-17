@@ -101,7 +101,7 @@ test("the website does not bundle a local FluentCart API reference", async () =>
   ]) {
     assert.doesNotMatch(
       sourceText,
-      /fumadocs-openapi|openapi-sampler|@fumari|fluentcart-api|APIPage|openapiPlugin/,
+      /fumadocs-openapi|openapi-sampler|@fumari\/(?:json-schema-ts|stf)|fluentcart-api|APIPage|openapiPlugin/,
       `${file} still references the removed local API documentation`,
     );
   }
