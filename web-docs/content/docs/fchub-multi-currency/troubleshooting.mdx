@@ -14,10 +14,10 @@ import { Separator } from '@/components/ui/separator';
     Check that the master switch is on: **FluentCart > Settings > Multi-Currency > General > Enabled**. When disabled, no frontend output happens at all — no projection, no switcher, no disclosure.
   </Accordion>
   <Accordion title="No display currencies configured">
-    The plugin needs at least one display currency to do anything useful. Go to the **Currencies** tab and add currencies. Your base currency should be in the list too if you want visitors to switch back to it.
+    The plugin needs at least one display currency to do anything useful. Go to the **Currencies** tab and add currencies. Once one is configured, FluentCart's base currency is included in the switcher automatically.
   </Accordion>
   <Accordion title="No exchange rates available">
-    If rates haven't been fetched yet, the plugin has nothing to convert with. Check the **Exchange Rates** tab — if the rates table is empty, click **Refresh Now** or wait for the cron job. If the refresh fails, check your API key and provider settings.
+    If rates haven't been fetched yet, the plugin has nothing to convert with. A non-base selection is rejected before it is saved, so it cannot appear to work and then jump back on the next page. Check the **Exchange Rates** tab — if the rates table is empty, click **Refresh Now** or wait for the cron job. If the refresh fails, check your API key and provider settings.
   </Accordion>
   <Accordion title="JavaScript errors blocking projection">
     The price projection engine is JavaScript. If another plugin or theme throws a JS error before the projection script runs, it may never execute.
@@ -34,9 +34,9 @@ import { Separator } from '@/components/ui/separator';
   <Accordion title="Prices showing in base currency despite switching">
     If you've switched to EUR but prices still show in USD, the context resolution may be failing. Check:
 
-    1. **Cookie blocked** — verify the `fchub_mc_currency` cookie exists in the browser. There is nothing to recover when the browser refuses to store the preference.
-    2. **Recovery request blocked** — cached pages are repaired through `GET /fchub-mc/v1/context`, with browser and intermediary caching disabled. Check the Network tab for a failed request.
-    3. **Old HTML still cached after an update** — purge the page or edge cache once so it serves the recovery runtime added in 1.4.5. Per-page cache exclusions are not required after that.
+    1. **Browser persistence blocked** — verify the `fchub_mc_currency` cookie or local-storage entry exists. Both carry the same confirmed three-letter code; if the browser blocks both, there is nowhere to remember a guest choice.
+    2. **Recovery request blocked** — cached pages are repaired through `GET /fchub-mc/v1/context?currency=EUR`, which does not depend on the cookie reaching WordPress. Check the Network tab for a failed request.
+    3. **Old HTML still cached after an update** — purge the page or edge cache once so it serves the current recovery runtime. Per-page cache exclusions are not required after that.
   </Accordion>
 </Accordions>
 
@@ -106,9 +106,9 @@ import { Separator } from '@/components/ui/separator';
   <Accordion title="Currency switch doesn't stick">
     After selecting a currency, the page reloads but the old currency appears.
 
-    1. **Cookie blocked** — check that the `fchub_mc_currency` cookie is being set. Some privacy plugins or browser settings may block it
+    1. **Browser persistence blocked** — check that the `fchub_mc_currency` cookie or local-storage mirror is being written. Some privacy plugins or browser settings may block both
     2. **REST API error** — `POST /context` must return `persisted: true`. The switcher deliberately stays put when the server could not save anything.
-    3. **Recovery API unavailable** — an edge-cached page may initially contain another currency, but `GET /context` should correct it before projection. A firewall rule blocking WordPress REST requests rather spoils that plan.
+    3. **Recovery API unavailable** — an edge-cached page may initially contain another currency, but `GET /context?currency=...` should correct it without relying on the cookie. A firewall rule blocking WordPress REST requests rather spoils that plan.
     4. **Account request rejected** — signed-in visitors use the current WordPress REST nonce. Reload a genuinely old account page if its nonce has expired; guest requests intentionally send no nonce.
   </Accordion>
   <Accordion title="No-JS fallback works, but does not remember the selection">

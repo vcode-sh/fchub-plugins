@@ -20,6 +20,7 @@ final class Constants
     public const COOKIE_DAYS = 90;
 
     public const USER_META_KEY = '_fchub_mc_currency';
+    public const CHECKOUT_CURRENCY_FIELD = '_fchub_mc_display_currency';
 
     public const TABLE_RATE_HISTORY = 'fchub_mc_rate_history';
     public const TABLE_EVENT_LOG = 'fchub_mc_event_log';

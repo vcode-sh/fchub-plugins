@@ -6,16 +6,12 @@ namespace FChubMultiCurrency\Integration;
 
 use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Actions\SaveOrderSnapshotAction;
-use FChubMultiCurrency\Domain\Enums\ResolverSource;
-use FChubMultiCurrency\Domain\Enums\StaleRateFallback;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
-use FChubMultiCurrency\Domain\Services\ExchangeRateService;
-use FChubMultiCurrency\Domain\ValueObjects\Currency;
 use FChubMultiCurrency\Domain\ValueObjects\CurrencyContext;
-use FChubMultiCurrency\Storage\ExchangeRateRepository;
+use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Storage\PreferenceRepository;
-use FChubMultiCurrency\Storage\RatesCacheStore;
+use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Support\FluentCartEvent;
 use FChubMultiCurrency\Support\Hooks;
 
@@ -25,8 +21,25 @@ final class OrderSnapshotHooks
 {
     public static function register(): void
     {
+        add_action('fluent_cart/before_payment_methods', [self::class, 'renderCheckoutCurrencyField'], 10, 1);
         add_action('fluent_cart/checkout/prepare_other_data', [self::class, 'captureAtCheckout'], 10, 1);
         add_action('fluent_cart/order_paid_done', [self::class, 'saveSnapshot'], 10, 1);
+    }
+
+    /** Carries the display choice inside FluentCart's own checkout form. */
+    public static function renderCheckoutCurrencyField(): void
+    {
+        if (!Hooks::isEnabled()) {
+            return;
+        }
+
+        $context = self::resolveCurrentContext(new OptionStore());
+
+        echo '<input type="hidden" name="'
+            . esc_attr(Constants::CHECKOUT_CURRENCY_FIELD)
+            . '" value="'
+            . esc_attr($context->displayCurrency->code)
+            . '" data-fchub-mc-checkout-currency />';
     }
 
     /**
@@ -46,12 +59,7 @@ final class OrderSnapshotHooks
         }
 
         $optionStore = new OptionStore();
-        $contextService = new CurrencyContextService(
-            ContextModule::buildResolverChain($optionStore),
-            $optionStore,
-        );
-
-        $context = $contextService->resolve();
+        $context = self::resolveCheckoutContext($data, $optionStore);
 
         if (!$context->isBaseDisplay) {
             $order->updateMeta('_fchub_mc_display_currency', $context->displayCurrency->code);
@@ -62,6 +70,39 @@ final class OrderSnapshotHooks
             // Sentinel: mark as "captured" so saveSnapshot() knows checkout ran
             $order->updateMeta('_fchub_mc_display_currency', $context->baseCurrency->code);
         }
+    }
+
+    /**
+     * Prefer the validated browser field because an edge-cached request can carry a stale cookie.
+     *
+     * @param array<string, mixed> $data
+     */
+    private static function resolveCheckoutContext(array $data, OptionStore $optionStore): CurrencyContext
+    {
+        $requestData = $data['request_data'] ?? null;
+        $submitted = is_array($requestData)
+            ? ($requestData[Constants::CHECKOUT_CURRENCY_FIELD] ?? null)
+            : null;
+
+        if (is_string($submitted)) {
+            $code = strtoupper(sanitize_text_field(wp_unslash($submitted)));
+            if (SelectableCurrencyCodes::fromSettings($optionStore->all())->contains($code)) {
+                $context = ContextModule::resolveSelectablePreference($optionStore, $code);
+                if ($context !== null) {
+                    return $context;
+                }
+            }
+        }
+
+        return self::resolveCurrentContext($optionStore);
+    }
+
+    private static function resolveCurrentContext(OptionStore $optionStore): CurrencyContext
+    {
+        return (new CurrencyContextService(
+            ContextModule::buildResolverChain($optionStore),
+            $optionStore,
+        ))->resolve();
     }
 
     public static function saveSnapshot($eventData): void
@@ -95,8 +136,8 @@ final class OrderSnapshotHooks
         }
 
         $optionStore = new OptionStore();
-        $context = self::buildFallbackContext($preferredCode, $optionStore);
-        if ($context === null) {
+        $context = ContextModule::resolveSelectablePreference($optionStore, $preferredCode);
+        if ($context === null || $context->isBaseDisplay) {
             return;
         }
 
@@ -106,79 +147,5 @@ final class OrderSnapshotHooks
         );
         $action = new SaveOrderSnapshotAction($contextService);
         $action->execute($order, $context);
-    }
-
-    /**
-     * Build a CurrencyContext for a specific currency code, validated against enabled currencies.
-     * Returns null if the code is not enabled or no rate is available (better than a wrong snapshot).
-     */
-    private static function buildFallbackContext(string $code, OptionStore $optionStore): ?CurrencyContext
-    {
-        $settings = $optionStore->all();
-        $baseCurrencyCode = strtoupper((string) ($settings['base_currency'] ?? 'USD'));
-        $enabledCurrencies = $settings['display_currencies'] ?? [];
-        if (!is_array($enabledCurrencies)) {
-            $enabledCurrencies = [];
-        }
-
-        $code = strtoupper($code);
-
-        // Validate against enabled currencies
-        $isEnabled = false;
-        foreach ($enabledCurrencies as $currencyData) {
-            if (is_array($currencyData) && strtoupper($currencyData['code'] ?? '') === $code) {
-                $isEnabled = true;
-                break;
-            }
-        }
-
-        if (!$isEnabled) {
-            return null;
-        }
-
-        if ($code === $baseCurrencyCode) {
-            return null; // Base currency = no snapshot needed
-        }
-
-        $rateService = new ExchangeRateService(new ExchangeRateRepository(), new RatesCacheStore());
-        $staleFallback = StaleRateFallback::tryFrom((string) ($settings['stale_fallback'] ?? 'base'))
-            ?? StaleRateFallback::Base;
-        $maxRateAge = max(1, (int) ($settings['stale_threshold_hrs'] ?? 24)) * HOUR_IN_SECONDS;
-        $rate = $rateService->getUsableRate($baseCurrencyCode, $code, $maxRateAge, $staleFallback);
-
-        if ($rate === null) {
-            return null;
-        }
-
-        $baseCurrency = self::findCurrency($baseCurrencyCode, $enabledCurrencies);
-        $displayCurrency = self::findCurrency($code, $enabledCurrencies);
-
-        return new CurrencyContext(
-            displayCurrency: $displayCurrency,
-            baseCurrency: $baseCurrency,
-            rate: $rate,
-            source: ResolverSource::UserMeta,
-            isBaseDisplay: false,
-        );
-    }
-
-    /**
-     * @param array<int|string, mixed> $enabledCurrencies
-     */
-    private static function findCurrency(string $code, array $enabledCurrencies): Currency
-    {
-        foreach ($enabledCurrencies as $currencyData) {
-            if (is_array($currencyData) && strtoupper($currencyData['code'] ?? '') === strtoupper($code)) {
-                return Currency::from($currencyData);
-            }
-        }
-
-        return Currency::from([
-            'code'     => $code,
-            'name'     => $code,
-            'symbol'   => $code,
-            'decimals' => 2,
-            'position' => 'left',
-        ]);
     }
 }

@@ -36,10 +36,17 @@ The master switch. Flip it to **Enabled** and the plugin starts working — pric
 
 ### Base Currency
 
-This is the currency your store actually charges in. FluentCart processes payments in this currency. Every exchange rate is calculated relative to it. If your Stripe or PayPal is set to GBP, this should be GBP.
+This is the currency your store actually charges in. FluentCart processes payments
+in this currency, and every exchange rate is calculated relative to it. Multi-Currency
+reads it directly from **FluentCart → Settings → Store Setup**; there is no second
+editable base-currency setting here to drift out of date.
 
 <Callout type="warn" title="Think Before Changing">
-Switching your base currency after you've been running for a while? Old exchange rates become meaningless — they were calculated against the previous base. The next automatic refresh will fetch new rates for the new base. Your existing orders are fine though — they recorded which base currency was active when the customer paid.
+Switching your base currency after you've been running for a while? Rates saved for
+the previous base are ignored immediately, so the storefront safely falls back to
+the new base until a complete replacement set exists. Refresh the configured remote
+provider, or save a complete set on the Manual provider. Existing orders keep the
+base currency and rate captured when they were placed.
 </Callout>
 
 ### Default Display Currency
@@ -56,11 +63,24 @@ yourstore.com/shop?currency=GBP
 
 Handy for email campaigns or regional ads. The "URL Parameter Key" field lets you change `currency` to something else if it conflicts with another plugin (unlikely, but possible).
 
+For logged-out visitors, a successful switch also reloads once through this
+parameter. That lets the server render the selected currency before a shared edge
+cache gets a chance to ignore the preference cookie. The browser verifies that
+currency through a uniquely cache-busted request, then removes only the one-shot
+parameter. Campaign links stay in the address bar unless they match an already
+confirmed browser choice.
+
 ### Cookie Persistence
 
-Should the plugin remember which currency a visitor picked? When enabled, their choice is saved in a browser cookie for 90 days (configurable). They come back next week — still in EUR. No need to pick again. The cookie contains only the three-letter currency code and is readable by the storefront recovery script so an edge-cached page can correct itself.
+Should the plugin remember which currency a visitor picked? When enabled, their
+choice is saved in a browser cookie and mirrored in local storage for the same
+configurable lifetime, 90 days by default. They come back next week — still in EUR.
+No need to pick again. The cookie contains the three-letter code; the mirror contains
+the same code and its expiry time. It exists so the storefront can recover when an
+edge host serves one shared page without consulting the cookie.
 
-When disabled, every page load starts fresh from the default display currency. Most stores want this **on**.
+When disabled, the browser mirror is removed and every page load starts fresh from
+the default display currency. Most stores want this **on**.
 
 ### Account Persistence
 
@@ -83,7 +103,10 @@ This is where you build the menu of currencies your visitors can choose from.
 
 ![Currencies tab with EUR, USD, and GBP configured](/multi-currency/fluentcart-multi-currency-currencies.webp)
 
-Use the search field at the top to find currencies from FluentCart's catalogue (180+ currencies). Click one to add it to your list. Each currency in the table shows:
+Use the search field at the top to find currencies from FluentCart's own catalogue.
+Click one to add it to your list. Multi-Currency does not maintain a competing list:
+names, symbols and zero-decimal defaults come from the FluentCart 1.6.1 currency
+APIs. Each currency in the table shows:
 
 - **Flag** — the emoji flag for that country/region
 - **Code** — the three-letter code (EUR, GBP, PLN, etc.)
@@ -99,7 +122,10 @@ You can customise:
 - decimal separator
 - thousand separator
 
-for each currency individually. Hit the red **x** to remove one.
+for each currency individually. FluentCart identifies zero-decimal currencies; its
+catalogue otherwise defaults to two decimals, so set three or four here when your
+display currency needs them. Hit the red **x** to remove one. If it was the default
+display currency, the default safely returns to FluentCart's base currency.
 
 Drag currencies up or down to control the order they appear in the [currency switcher](/docs/fchub-multi-currency/currency-switcher). The order you set here is the order your visitors see.
 
@@ -112,9 +138,18 @@ Drag currencies up or down to control the order they appear in the [currency swi
   src="https://files.vcode.sh/fchub/docs/multi-currency/fluentcart-multi-currency-dnd.mp4"
 />
 
-<Callout type="info" title="Don't Forget Your Base Currency">
-If your base currency is USD and you want visitors to be able to switch *back* to USD from the switcher, add USD to this list too. The switcher only shows currencies that appear here.
+<Callout type="info" title="The Base Currency Is Automatic">
+Once at least one display currency is configured, the switcher includes FluentCart's
+base currency automatically. You may keep it in the list to control its order and
+presentation, but you do not have to add it merely to let visitors switch back.
 </Callout>
+
+After adding or removing currencies, save this page and then refresh the remote
+provider or save the complete Manual rate set. A configured currency without a
+usable rate cannot be selected; the switcher keeps the existing preference and says
+why. An older stored preference whose rate later becomes unusable safely resolves
+to the base currency. Optimistic exchange rates are not a feature, despite what the
+average crypto dashboard suggests.
 
 <Separator className="my-8" />
 
@@ -325,8 +360,8 @@ If something looks off — a red badge, a missing dependency, stale rates — th
 
 Just installed? Here's the fastest path to a working multi-currency store:
 
-1. **General tab** → Make sure it's **Enabled**. Set your base currency.
-2. **Currencies tab** → Add the currencies your customers use. Don't forget your base currency if you want it in the switcher.
+1. **General tab** → Make sure it is **Enabled** and confirm the base currency read from FluentCart. Change it in FluentCart Store Setup if needed.
+2. **Currencies tab** → Add the display currencies your customers use, then save. FluentCart's base currency is included automatically.
 3. **Exchange Rates tab** → Pick a provider (ECB is free and works great for major currencies). Hit **Refresh Now**.
 4. **Checkout tab** → Leave disclosure enabled. Customise the text if you want.
 5. **Drop the shortcode** → Add `[fchub_currency_switcher]` to your header, menu, or wherever makes sense. See [Currency Switcher](/docs/fchub-multi-currency/currency-switcher) for details.
@@ -344,7 +379,7 @@ That's it. Five steps, five minutes, and your store now speaks multiple currenci
     | Key | Type | Default | Description |
     |---|---|---|---|
     | `enabled` | string | `yes` | Master switch |
-    | `base_currency` | string | `USD` | Base transaction currency |
+    | `base_currency` | string | FluentCart store currency | Read-only base transaction currency |
     | `display_currencies` | array | `[]` | Array of currency config objects |
     | `default_display_currency` | string | `USD` | Fallback display currency |
     | `url_param_enabled` | string | `yes` | URL parameter switching |
@@ -354,13 +389,12 @@ That's it. Five steps, five minutes, and your store now speaks multiple currenci
     | `geo_enabled` | string | `no` | Geolocation auto-detect |
     | `geo_provider` | string | `ip_api` | Geolocation provider slug |
     | `geo_api_key` | string | `""` | Geolocation API key |
-    | `rate_provider` | string | `exchange_rate_api` | Exchange rate provider |
+    | `rate_provider` | string | `manual` | Exchange rate provider |
     | `rate_provider_api_key` | string | `""` | Rate provider API key |
     | `rate_refresh_interval_hrs` | int | `6` | Cron refresh interval (hours) |
     | `stale_threshold_hrs` | int | `24` | Stale rate threshold (hours) |
     | `stale_fallback` | string | `base` | Stale behaviour: `base` or `last_known` |
     | `rounding_mode` | string | `half_up` | Rounding mode |
-    | `rounding_precision` | int | `2` | Rounding precision |
     | `checkout_disclosure_enabled` | string | `yes` | Checkout disclosure notice |
     | `checkout_disclosure_text` | string | `Your payment will be processed in {base_currency}.` | Disclosure template |
     | `show_rate_freshness_badge` | string | `yes` | Switcher rate badge |

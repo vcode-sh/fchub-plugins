@@ -43,13 +43,13 @@
     "fchub-multi-currency": {
       "displayName": "FCHub Multi-Currency",
       "mainFile": "fchub-multi-currency.php",
-      "firstWpOrgVersion": "1.4.5",
+      "firstWpOrgVersion": "1.4.6",
       "previousRelease": {
-        "version": "1.4.4",
-        "tag": "fchub-multi-currency/v1.4.4",
-        "commit": "e6f870913dd2c4b5786a500ddfb5cd314b82f9f7",
-        "asset": "fchub-multi-currency-1.4.4.zip",
-        "sha256": "0cc482ce1eb6bc3015625a3f90cab92a0bbe09c06cf921bb56c5eaf2dff30f1a"
+        "version": "1.4.5",
+        "tag": "fchub-multi-currency/v1.4.5",
+        "commit": "6bbe775ce443519588a65939ba83958568998e50",
+        "asset": "fchub-multi-currency-1.4.5.zip",
+        "sha256": "a5440d4c4dfacaa8711f442d9efbf2b382ec471ea7979504fd3b793e2a5a47bc"
       },
       "requiresWordPress": "7.0",
       "requiresPhp": "8.3",

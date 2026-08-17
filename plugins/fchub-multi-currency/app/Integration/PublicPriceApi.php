@@ -5,13 +5,10 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Integration;
 
 use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
-use FChubMultiCurrency\Domain\Enums\RoundingMode;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
-use FChubMultiCurrency\Domain\Services\RoundingPolicy;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Hooks;
 use FluentCart\Api\CurrencySettings;
-use FluentCart\App\Helpers\CurrenciesHelper;
 use FluentCart\App\Models\Order;
 
 defined('ABSPATH') || exit;
@@ -40,19 +37,11 @@ final class PublicPriceApi
             return CurrencySettings::getPriceHtml($basePrice);
         }
 
-        $converted = function_exists('bcmul')
-            ? bcmul((string) $basePrice, $context->rate->rate, 8)
-            : (string) ($basePrice * (float) $context->rate->rate);
-        $roundingMode = RoundingMode::tryFrom((string) $optionStore->get('rounding_mode', 'half_up'))
-            ?? RoundingMode::HalfUp;
-        $decimals = $context->displayCurrency->decimals;
-        $minorUnitPrecision = max(0, 2 - min(2, $decimals));
-        $rounded = (new RoundingPolicy($roundingMode, $minorUnitPrecision))->apply($converted);
-
-        return CurrencySettings::getPriceHtml(
-            $rounded,
+        return DisplayPriceFormatter::format(
+            $basePrice,
+            $context->rate->rate,
             $context->displayCurrency->code,
-            $decimals > 0,
+            $optionStore,
         );
     }
 
@@ -91,12 +80,11 @@ final class PublicPriceApi
             return CurrencySettings::getPriceHtml($basePrice);
         }
 
-        $converted = round($basePrice * (float) $rate, 2);
-
-        return CurrencySettings::getPriceHtml(
-            $converted,
+        return DisplayPriceFormatter::format(
+            $basePrice,
+            (string) $rate,
             (string) $displayCurrency,
-            !CurrenciesHelper::isZeroDecimal((string) $displayCurrency),
+            new OptionStore(),
         );
     }
 }

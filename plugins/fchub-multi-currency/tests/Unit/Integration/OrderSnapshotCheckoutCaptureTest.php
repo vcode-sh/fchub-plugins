@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Tests\Unit\Integration;
 
 use FChubMultiCurrency\Integration\OrderSnapshotHooks;
+use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Tests\Support\TestCase;
 use PHPUnit\Framework\Attributes\Test;
 
@@ -114,6 +115,84 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
 
         // Guest should still get the snapshot via checkout capture
         $this->assertSame('GBP', $this->order->getMeta('_fchub_mc_display_currency'));
+    }
+
+    #[Test]
+    public function testCheckoutFieldCarriesTheServerResolvedCurrencyWithoutChangingPaymentCurrency(): void
+    {
+        $this->configureMultiCurrency('GBP');
+        $_COOKIE['fchub_mc_currency'] = 'GBP';
+
+        ob_start();
+        OrderSnapshotHooks::renderCheckoutCurrencyField();
+        $field = (string) ob_get_clean();
+
+        $this->assertStringContainsString('type="hidden"', $field);
+        $this->assertStringContainsString('name="' . Constants::CHECKOUT_CURRENCY_FIELD . '"', $field);
+        $this->assertStringContainsString('value="GBP"', $field);
+        $this->assertStringContainsString('data-fchub-mc-checkout-currency', $field);
+        $this->assertStringNotContainsString('currency="GBP"', $field);
+    }
+
+    #[Test]
+    public function testCheckoutRequestWinsOverAStaleGuestCookie(): void
+    {
+        $this->configureMultiCurrency('EUR', '0.92000000');
+        $_COOKIE['fchub_mc_currency'] = 'USD';
+
+        OrderSnapshotHooks::captureAtCheckout([
+            'order' => $this->order,
+            'request_data' => [Constants::CHECKOUT_CURRENCY_FIELD => 'eur'],
+        ]);
+
+        $this->assertSame('EUR', $this->order->getMeta('_fchub_mc_display_currency'));
+        $this->assertSame('0.92000000', $this->order->getMeta('_fchub_mc_rate'));
+    }
+
+    #[Test]
+    public function testTamperedCheckoutCurrencyCannotOverrideAValidServerContext(): void
+    {
+        $this->configureMultiCurrency('GBP');
+        $_COOKIE['fchub_mc_currency'] = 'GBP';
+
+        OrderSnapshotHooks::captureAtCheckout([
+            'order' => $this->order,
+            'request_data' => [Constants::CHECKOUT_CURRENCY_FIELD => 'NOPE'],
+        ]);
+
+        $this->assertSame('GBP', $this->order->getMeta('_fchub_mc_display_currency'));
+        $this->assertSame('0.79000000', $this->order->getMeta('_fchub_mc_rate'));
+    }
+
+    #[Test]
+    public function testConfiguredCheckoutCurrencyWithoutARateFallsBackToTheServerContext(): void
+    {
+        $this->configureMultiCurrency('GBP');
+        $this->setWpdbMockRow(null);
+        $_COOKIE['fchub_mc_currency'] = 'USD';
+
+        OrderSnapshotHooks::captureAtCheckout([
+            'order' => $this->order,
+            'request_data' => [Constants::CHECKOUT_CURRENCY_FIELD => 'EUR'],
+        ]);
+
+        $this->assertSame('USD', $this->order->getMeta('_fchub_mc_display_currency'));
+        $this->assertSame('', $this->order->getMeta('_fchub_mc_rate'));
+    }
+
+    #[Test]
+    public function testCheckoutCanExplicitlyCaptureTheFluentCartBaseCurrency(): void
+    {
+        $this->configureMultiCurrency('GBP');
+        $_COOKIE['fchub_mc_currency'] = 'GBP';
+
+        OrderSnapshotHooks::captureAtCheckout([
+            'order' => $this->order,
+            'request_data' => [Constants::CHECKOUT_CURRENCY_FIELD => 'USD'],
+        ]);
+
+        $this->assertSame('USD', $this->order->getMeta('_fchub_mc_display_currency'));
+        $this->assertSame('', $this->order->getMeta('_fchub_mc_rate'));
     }
 
     #[Test]

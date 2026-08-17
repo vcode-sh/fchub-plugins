@@ -30,6 +30,7 @@ final class ContextController
     public const CODE_INVALID_PAYLOAD = 'invalid_payload';
     public const CODE_CURRENCY_REQUIRED = 'currency_required';
     public const CODE_INVALID_CURRENCY = 'invalid_currency';
+    public const CODE_RATE_UNAVAILABLE = 'rate_unavailable';
     public const CODE_PERSISTENCE_UNAVAILABLE = 'persistence_unavailable';
 
     public function get(\WP_REST_Request $request): \WP_REST_Response
@@ -48,7 +49,7 @@ final class ContextController
             }
 
             $context = CurrencyContextService::applyContextFilter(
-                ContextModule::resolveCookiePreference($optionStore, $currencyCode),
+                ContextModule::resolveExplicitPreference($optionStore, $currencyCode),
             );
         } else {
             $contextService = new CurrencyContextService(
@@ -120,6 +121,26 @@ final class ContextController
                 self::CODE_INVALID_CURRENCY,
                 __('Invalid currency code.', 'fchub-multi-currency'),
                 422,
+            );
+        }
+
+        if (ContextModule::resolveSelectablePreference($optionStore, $currencyCode) === null) {
+            EventLogger::log('context_switch_rate_unavailable', get_current_user_id(), [
+                'currency' => $currencyCode,
+                'source' => 'rest',
+            ]);
+
+            return self::failure(
+                self::CODE_RATE_UNAVAILABLE,
+                __(
+                    'This currency cannot be selected because no usable exchange rate is available. Please try again later.',
+                    'fchub-multi-currency',
+                ),
+                409,
+                [
+                    'currency'  => $currencyCode,
+                    'persisted' => false,
+                ],
             );
         }
 

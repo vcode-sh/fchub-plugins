@@ -86,6 +86,32 @@ final class SettingsAdminControllerTest extends TestCase
     }
 
     #[Test]
+    public function testRemovingTheDefaultDisplayCurrencyFallsBackToFluentCartsBase(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'default_display_currency' => 'EUR',
+            'display_currencies' => [
+                ['code' => 'EUR', 'name' => 'Euro', 'symbol' => '€'],
+                ['code' => 'GBP', 'name' => 'British Pound', 'symbol' => '£'],
+            ],
+        ]);
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params([
+            'default_display_currency' => 'EUR',
+            'display_currencies' => [
+                ['code' => 'GBP', 'name' => 'British Pound', 'symbol' => '£'],
+            ],
+        ]);
+
+        $response = (new SettingsAdminController())->save($request);
+        $settings = $response->get_data()['data']['settings'];
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame('USD', $settings['base_currency']);
+        $this->assertSame('USD', $settings['default_display_currency']);
+    }
+
+    #[Test]
     public function invalidProviderIsRejectedWithoutSavingOrScheduling(): void
     {
         $controller = new SettingsAdminController();

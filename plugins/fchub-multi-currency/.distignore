@@ -14,6 +14,7 @@ phpunit.xml.dist
 *.md
 .DS_Store
 Thumbs.db
+biome.json
 phpcs.xml
 phpstan.neon
 phpstan-bootstrap.php

@@ -137,7 +137,7 @@
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
             <span class="setting-label">Cookie Persistence</span>\
-            <div class="form-note">Remember visitor currency preference in browser cookies. Disable this and logged-out visitors cannot keep a currency choice at all — the switcher reverts to the default display currency on the very next page load, and the switch is reported as failed rather than silently ignored.</div>\
+            <div class="form-note">Remember a guest currency in a cookie and matching browser-storage fallback. Disable this and logged-out visitors cannot keep a currency choice at all — the switch is reported as failed rather than silently ignored.</div>\
         </div>\
         <div class="setting-fields-inner">\
             <el-radio-group v-model="settings.cookie_enabled">\
@@ -274,7 +274,10 @@
 				}
 			},
 			removeCurrency: function (index) {
-				this.settings.display_currencies.splice(index, 1);
+				var removed = this.settings.display_currencies.splice(index, 1)[0];
+				if (removed && removed.code === this.settings.default_display_currency) {
+					this.settings.default_display_currency = this.settings.base_currency;
+				}
 				if (this._sortable) {
 					this._sortable.destroy();
 					this._sortable = null;

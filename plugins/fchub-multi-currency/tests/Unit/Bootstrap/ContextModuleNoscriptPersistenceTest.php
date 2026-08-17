@@ -8,6 +8,7 @@ use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Frontend\CurrencySwitcherRenderer;
 use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Tests\Support\TestCase;
+use FluentCart\Api\CurrencySettings;
 use PHPUnit\Framework\Attributes\Test;
 
 final class ContextModuleNoscriptPersistenceTest extends TestCase
@@ -71,6 +72,35 @@ final class ContextModuleNoscriptPersistenceTest extends TestCase
 
         ContextModule::persistPostedCurrencyPreference();
 
+        $this->assertArrayNotHasKey(Constants::COOKIE_KEY, $_COOKIE);
+        $this->assertHookNotFired('fchub_mc/context_switched');
+    }
+
+    #[Test]
+    public function testConfiguredCurrencyWithoutAUsableRateIsNotPersisted(): void
+    {
+        CurrencySettings::setMock(['currency' => 'USD']);
+        $this->setOption('fchub_mc_settings', [
+            'enabled'            => 'yes',
+            'cookie_enabled'     => 'yes',
+            'display_currencies' => [[
+                'code' => 'EUR',
+                'name' => 'Euro',
+                'symbol' => '€',
+                'decimals' => 2,
+                'position' => 'right_space',
+            ]],
+        ]);
+        $this->setWpdbMockRow(null);
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_POST = [
+            CurrencySwitcherRenderer::NOSCRIPT_FIELD => 'EUR',
+            CurrencySwitcherRenderer::NOSCRIPT_NONCE => 'valid',
+        ];
+
+        ContextModule::persistPostedCurrencyPreference();
+
+        $this->assertCount(0, $GLOBALS['fchub_mc_setcookie_calls']);
         $this->assertArrayNotHasKey(Constants::COOKIE_KEY, $_COOKIE);
         $this->assertHookNotFired('fchub_mc/context_switched');
     }

@@ -65,7 +65,8 @@ class Helper
             'JPY' => "\xc2\xa5",
             default => '$',
         };
-        $formatted = number_format($decimal, 2, '.', '');
+        $decimals = \FluentCart\Api\CurrencySettings::get('is_zero_decimal') ? 0 : 2;
+        $formatted = number_format($decimal, $decimals, '.', '');
 
         return $withCurrency ? ($sign . $formatted) : $formatted;
     }
@@ -174,6 +175,8 @@ final class CurrencySettings
         bool $showDecimal = true,
     ): string
     {
+        $showDecimal = $showDecimal && !self::get('is_zero_decimal');
+
         return sprintf(
             '%s %s',
             $currencyCode,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Integration;
 
+use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Logger;
 
 defined('ABSPATH') || exit;
@@ -140,15 +141,23 @@ final class FluentCrmSmartCodes
                 if (!$displayCurrency || !$rate) {
                     return $defaultValue;
                 }
-                $displayCents = (int) round($order->total_amount * (float) $rate);
-                return \FluentCart\App\Helpers\Helper::toDecimal($displayCents, true, $displayCurrency);
+                return DisplayPriceFormatter::format(
+                    (float) $order->total_amount,
+                    (string) $rate,
+                    (string) $displayCurrency,
+                    new OptionStore(),
+                );
 
             case 'display_subtotal':
                 if (!$displayCurrency || !$rate) {
                     return $defaultValue;
                 }
-                $displayCents = (int) round($order->subtotal * (float) $rate);
-                return \FluentCart\App\Helpers\Helper::toDecimal($displayCents, true, $displayCurrency);
+                return DisplayPriceFormatter::format(
+                    (float) $order->subtotal,
+                    (string) $rate,
+                    (string) $displayCurrency,
+                    new OptionStore(),
+                );
 
             case 'exchange_rate':
                 return $rate ?: '1';

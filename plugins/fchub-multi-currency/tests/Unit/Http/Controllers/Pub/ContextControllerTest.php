@@ -14,6 +14,14 @@ use PHPUnit\Framework\Attributes\Test;
 
 final class ContextControllerTest extends TestCase
 {
+    private const EUR = [
+        'code' => 'EUR',
+        'name' => 'Euro',
+        'symbol' => '€',
+        'decimals' => 2,
+        'position' => 'right_space',
+    ];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -247,15 +255,64 @@ final class ContextControllerTest extends TestCase
     }
 
     #[Test]
+    public function testSetRejectsAConfiguredCurrencyWithoutAUsableRateBeforePersistingIt(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency'      => 'USD',
+            'display_currencies' => [self::EUR],
+        ]);
+        $this->setWpdbMockRow(null);
+
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params(['currency' => 'EUR']);
+
+        $response = (new ContextController())->set($request);
+        $data = $response->get_data()['data'];
+
+        $this->assertSame(409, $response->get_status());
+        $this->assertSame(ContextController::CODE_RATE_UNAVAILABLE, $data['code']);
+        $this->assertSame('EUR', $data['currency']);
+        $this->assertFalse($data['persisted']);
+        $this->assertCount(0, $GLOBALS['fchub_mc_setcookie_calls']);
+        $this->assertHookNotFired('fchub_mc/context_switched');
+    }
+
+    #[Test]
+    public function testSetAcceptsAStaleRateWhenLastKnownFallbackIsExplicitlyEnabled(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'base_currency'      => 'USD',
+            'stale_threshold_hrs' => 24,
+            'stale_fallback'     => 'last_known',
+            'display_currencies' => [self::EUR],
+        ]);
+        $this->setWpdbMockRow([
+            'base_currency' => 'USD',
+            'quote_currency' => 'EUR',
+            'rate' => '0.92000000',
+            'provider' => 'manual',
+            'fetched_at' => gmdate('Y-m-d H:i:s', time() - (48 * HOUR_IN_SECONDS)),
+        ]);
+
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params(['currency' => 'EUR']);
+
+        $response = (new ContextController())->set($request);
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame(ContextController::CODE_SAVED, $response->get_data()['data']['code']);
+        $this->assertCount(1, $GLOBALS['fchub_mc_setcookie_calls']);
+    }
+
+    #[Test]
     public function testSetReportsFailureForGuestWhenCookiePersistenceIsDisabled(): void
     {
         $this->setOption('fchub_mc_settings', [
             'base_currency'      => 'USD',
             'cookie_enabled'     => 'no',
-            'display_currencies' => [
-                ['code' => 'EUR'],
-            ],
+            'display_currencies' => [self::EUR],
         ]);
+        $this->setFreshEurRate();
 
         $request = new \WP_REST_Request('POST', '/');
         $request->set_json_params(['currency' => 'EUR']);
@@ -276,8 +333,9 @@ final class ContextControllerTest extends TestCase
         $this->setOption('fchub_mc_settings', [
             'base_currency' => 'USD',
             'cookie_enabled' => 'yes',
-            'display_currencies' => [['code' => 'EUR']],
+            'display_currencies' => [self::EUR],
         ]);
+        $this->setFreshEurRate();
         $GLOBALS['fchub_mc_setcookie_result'] = false;
         $request = new \WP_REST_Request('POST', '/');
         $request->set_json_params(['currency' => 'EUR']);
@@ -297,10 +355,9 @@ final class ContextControllerTest extends TestCase
         $this->setOption('fchub_mc_settings', [
             'base_currency'      => 'USD',
             'cookie_enabled'     => 'no',
-            'display_currencies' => [
-                ['code' => 'EUR'],
-            ],
+            'display_currencies' => [self::EUR],
         ]);
+        $this->setFreshEurRate();
 
         $request = new \WP_REST_Request('POST', '/');
         $request->set_json_params(['currency' => 'EUR']);
@@ -322,10 +379,9 @@ final class ContextControllerTest extends TestCase
             'base_currency'               => 'USD',
             'cookie_enabled'              => 'no',
             'account_persistence_enabled' => 'no',
-            'display_currencies'          => [
-                ['code' => 'EUR'],
-            ],
+            'display_currencies'          => [self::EUR],
         ]);
+        $this->setFreshEurRate();
 
         $request = new \WP_REST_Request('POST', '/');
         $request->set_json_params(['currency' => 'EUR']);
@@ -394,13 +450,29 @@ final class ContextControllerTest extends TestCase
                 422,
                 ContextController::CODE_INVALID_CURRENCY,
             ],
+            'rate unavailable' => [
+                static function (self $case): \WP_REST_Request {
+                    $case->setOption('fchub_mc_settings', [
+                        'base_currency'      => 'USD',
+                        'display_currencies' => [self::EUR],
+                    ]);
+                    $case->setWpdbMockRow(null);
+                    $request = new \WP_REST_Request('POST', '/');
+                    $request->set_json_params(['currency' => 'EUR']);
+
+                    return $request;
+                },
+                409,
+                ContextController::CODE_RATE_UNAVAILABLE,
+            ],
             'persistence unavailable' => [
                 static function (self $case): \WP_REST_Request {
                     $case->setOption('fchub_mc_settings', [
                         'base_currency'      => 'USD',
                         'cookie_enabled'     => 'no',
-                        'display_currencies' => [['code' => 'EUR']],
+                        'display_currencies' => [self::EUR],
                     ]);
+                    $case->setFreshEurRate();
                     $request = new \WP_REST_Request('POST', '/');
                     $request->set_json_params(['currency' => 'EUR']);
 
@@ -413,8 +485,9 @@ final class ContextControllerTest extends TestCase
                 static function (self $case): \WP_REST_Request {
                     $case->setOption('fchub_mc_settings', [
                         'base_currency'      => 'USD',
-                        'display_currencies' => [['code' => 'EUR']],
+                        'display_currencies' => [self::EUR],
                     ]);
+                    $case->setFreshEurRate();
                     $request = new \WP_REST_Request('POST', '/');
                     $request->set_json_params(['currency' => 'EUR']);
 
@@ -450,5 +523,16 @@ final class ContextControllerTest extends TestCase
         $codes = array_column(self::outcomeCodeProvider(), 2);
 
         $this->assertSame($codes, array_unique($codes), 'Two outcomes share a code, so clients cannot tell them apart.');
+    }
+
+    private function setFreshEurRate(): void
+    {
+        $this->setWpdbMockRow([
+            'base_currency' => 'USD',
+            'quote_currency' => 'EUR',
+            'rate' => '0.92000000',
+            'provider' => 'manual',
+            'fetched_at' => current_time('mysql'),
+        ]);
     }
 }

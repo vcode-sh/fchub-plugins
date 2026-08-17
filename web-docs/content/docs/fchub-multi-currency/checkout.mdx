@@ -7,11 +7,17 @@ import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { Separator } from '@/components/ui/separator';
 
-Three things happen when someone browses your store in a different currency: every price on the page converts instantly, checkout tells them what they'll actually be charged, and the order records what they saw. No surprises, no confused customers emailing you at 2am.
+Three things happen when someone browses your store in a different currency: the
+page resolves and converts as one currency, checkout tells them what they will
+actually be charged, and the order records what they saw. No surprises, no confused
+customers emailing you at 2am.
 
 ## Automatic Price Conversion
 
-The moment a visitor picks a currency, every price on the page updates — product cards, "From" prices, compare prices, cart totals, pricing tables, the lot. No page reload, no waiting. It just happens.
+After the server confirms a visitor's choice, the storefront reloads once with that
+currency resolved. Every price on the returned page then moves together — product
+cards, "From" prices, compare prices, cart totals, pricing tables, the lot. Later
+cart, quantity and variant changes are converted in place without another reload.
 
 This works across your entire FluentCart storefront:
 
@@ -90,13 +96,22 @@ This means you can always answer:
 - **"What did the customer actually see?"** — dispute resolution sorted
 - **"What was the FX rate on this order?"** — reporting and compliance sorted
 
-If the customer was browsing in your base currency (no conversion), the snapshot is skipped — there's nothing to record.
+The final display code travels inside FluentCart's own regular or modal checkout
+form. The server validates that code and resolves the rate itself, so a stale edge
+cookie cannot rewrite the order and the browser cannot submit a made-up price. If
+the customer was browsing in the base currency, the order records that base code as
+the capture marker and stores no unnecessary FX rate.
 
 <Separator className="my-8" />
 
-## No Flash of Wrong Prices
+## Slow Recovery Does Not Blank the Storefront
 
-You know that awkward moment where a page loads showing USD prices for half a second before switching to EUR? That doesn't happen here. The plugin hides price elements during the initial conversion pass and reveals them only after everything's been converted. If something goes wrong, a 2-second safety timeout unhides everything regardless — so your visitors are never staring at blank price tags.
+On an edge-cached page, the browser may need a fresh context request before it knows
+which currency belongs to this visitor. Existing prices remain visible while that
+request is pending. Once the answer arrives, a short projection shield applies the
+new currency as one update; a 2-second safety timeout still releases it if projection
+itself fails. A slow edge is annoying enough without replacing every price with
+white space for dramatic effect.
 
 <Separator className="my-8" />
 
@@ -108,7 +123,9 @@ Want to convert a price in your own custom template? Add one attribute:
 <span data-fchub-mc-base="99.99">$99.99</span>
 ```
 
-The conversion engine picks it up automatically and rewrites the content with the converted amount. No JavaScript, no API calls — just add the attribute and it works.
+The conversion engine picks it up automatically and rewrites the content with the
+converted amount. No custom JavaScript or API call is needed — just add the
+attribute and the existing storefront runtime does the work.
 
 <Separator className="my-8" />
 
@@ -122,7 +139,11 @@ The conversion engine picks it up automatically and rewrites the content with th
 
     The disclosure is also injected via FluentCart's checkout fragment system (`fluent_cart/checkout/after_patch_checkout_data_fragments`), making it available to the Vue checkout component.
 
-    Order snapshot meta keys: `_fchub_mc_display_currency`, `_fchub_mc_base_currency`, `_fchub_mc_rate`, `_fchub_mc_disclosure_version`.
+    The regular and modal forms carry only `_fchub_mc_display_currency`. The server
+    validates it during `fluent_cart/checkout/prepare_other_data`, computes the
+    usable rate, and writes the snapshot meta keys:
+    `_fchub_mc_display_currency`, `_fchub_mc_base_currency`, `_fchub_mc_rate`,
+    `_fchub_mc_disclosure_version`.
 
     See the [Developer Reference](/docs/fchub-multi-currency/developer-reference) for the full API, hooks, and schema.
   </Accordion>

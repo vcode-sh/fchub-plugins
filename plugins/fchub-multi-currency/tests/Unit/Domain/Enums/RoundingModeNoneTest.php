@@ -55,8 +55,7 @@ final class RoundingModeNoneTest extends TestCase
         // 10000 cents * 4.3217 = 43217 cents → PLN 432.17.
         $result = \fchub_mc_format_price(10000.0);
 
-        $this->assertStringContainsString('432.17', $result);
-        $this->assertStringContainsString('PLN', $result);
+        $this->assertSame('432.17zl', $result);
     }
 
     #[Test]
@@ -123,9 +122,7 @@ final class RoundingModeNoneTest extends TestCase
         // 1000 cents * 149.85 = 149850 cents → JPY 1498.50 in FluentCart's storage scale.
         $result = \fchub_mc_format_price(1000.0);
 
-        // Should contain the integer value, no decimal places
-        $this->assertStringContainsString('JPY', $result);
-        $this->assertMatchesRegularExpression('/1,?498/', $result);
+        $this->assertSame('¥1,498', $result);
     }
 
     #[Test]

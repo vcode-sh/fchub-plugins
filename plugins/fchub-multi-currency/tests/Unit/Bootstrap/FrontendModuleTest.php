@@ -107,10 +107,11 @@ final class FrontendModuleTest extends TestCase
     }
 
     #[Test]
-    public function testFrontendConfigExposesOnlyTheInputsNeededForCookieRecovery(): void
+    public function testFrontendConfigExposesOnlyTheInputsNeededForBrowserRecovery(): void
     {
         $this->setOption('fchub_mc_settings', array_merge($this->switcherSettings(), [
             'cookie_enabled' => 'yes',
+            'cookie_lifetime_days' => 30,
             'account_persistence_enabled' => 'yes',
             'url_param_key' => 'money',
         ]));
@@ -120,6 +121,7 @@ final class FrontendModuleTest extends TestCase
 
         $this->assertSame('fchub_mc_currency', $config['cookieName']);
         $this->assertTrue($config['cookiePersistenceEnabled']);
+        $this->assertSame(30, $config['cookieLifetimeDays']);
         $this->assertTrue($config['accountPersistenceEnabled']);
         $this->assertFalse($config['isLoggedIn']);
         $this->assertSame('default', $config['resolverSource']);

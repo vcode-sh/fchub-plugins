@@ -20,8 +20,9 @@ All endpoints use the `fchub-mc/v1` namespace. Admin endpoints require `manage_o
 <Tab value="GET /context">
 
 Returns the current resolved currency context. An optional `currency=EUR`
-query resolves that allowed browser-cookie preference for cached-page recovery,
-independently of the public URL-parameter setting. Every response uses
+query resolves that allowed browser preference for cached-page recovery without
+depending on a cookie reaching WordPress, independently of the public
+URL-parameter setting. Every response uses
 `Cache-Control: no-store` because visitor context makes an excellent cache key
 and a dreadful shared response.
 
@@ -59,9 +60,10 @@ and a dreadful shared response.
 <Tab value="POST /context">
 
 Sets the visitor's currency preference. Saves to the cookie and, for an
-authenticated request, user meta. Guest calls omit `X-WP-Nonce`; signed-in calls
-include the current REST nonce so WordPress may authenticate the account. A
-confirmed write fires `fchub_mc/context_switched`.
+authenticated request, user meta. After a confirmed write, the storefront mirrors
+the same code in local storage for the configured cookie lifetime. Guest calls omit
+`X-WP-Nonce`; signed-in calls include the current REST nonce so WordPress may
+authenticate the account. A confirmed write fires `fchub_mc/context_switched`.
 
 **Request body:**
 
@@ -84,10 +86,14 @@ confirmed write fires `fchub_mc/context_switched`.
 }
 ```
 
-The code is validated against the base and configured display currencies.
+The code is validated against the base and configured display currencies. A
+non-base currency must also resolve a usable rate under the configured stale-rate
+policy before either persistence channel is touched.
+
 Failures use stable outcome codes and `persisted: false`: malformed JSON returns
-400, a disabled module 403, unavailable persistence 409, an invalid currency
-422, and rate limiting 429. These responses also use `Cache-Control: no-store`.
+400, a disabled module 403, `rate_unavailable` or unavailable persistence 409, an
+invalid currency 422, and rate limiting 429. These responses also use
+`Cache-Control: no-store`.
 
 </Tab>
 <Tab value="GET /rates">
@@ -202,9 +208,21 @@ Also includes event counts and the most-switched currencies when event logging h
 |---|---|---|
 | `fluent_cart/integration/addons` | filter | Registers the plugin as a FluentCart addon |
 | `fluent_cart/checkout/after_patch_checkout_data_fragments` | filter | Injects disclosure text into checkout fragments |
+| `fluent_cart/before_payment_methods` | action | Adds the validated display-currency field inside regular and modal checkout forms |
+| `fluent_cart/checkout/prepare_other_data` | action | Captures that checkout field before the order is finalised |
 | `fluent_cart/order_paid_done` | action | Triggers order snapshot and FluentCRM sync |
 | `fluent_cart/store_settings/values` | filter | Adds multi-currency fields to store settings API |
 | `fluent_cart/loading_app` | action | Enqueues admin JS bundle |
+
+### Extending FluentCart's currency catalogue
+
+The Currencies tab reads FluentCart's filtered catalogue rather than a private
+copy. A currency added through `fluent_cart/accepted_currencies` therefore appears
+in Multi-Currency as well. Supply its symbol through
+`fluent_cart/global_currency_symbols`; add it to
+`fluent_cart/zero_decimal_currencies` when appropriate. A custom currency still
+needs a complete Manual rate unless the selected remote provider actually returns
+it. The provider cannot quote a currency merely because we asked it nicely.
 
 <Separator className="my-8" />
 
@@ -212,14 +230,29 @@ Also includes event counts and the most-switched currencies when event logging h
 
 ### `fchub_mc_format_price(float $basePrice): string`
 
-Converts a base-currency price to the visitor's display currency and returns formatted HTML.
+Converts a FluentCart base-currency amount in minor units to the visitor's display
+currency and returns a formatted price string.
 
 ```php
-echo fchub_mc_format_price(99.99);
+echo fchub_mc_format_price(10000); // FluentCart stores 100.00 as 10000
 // Output: "€92.14" (when display currency is EUR with rate 0.9214)
 ```
 
-Falls back to FluentCart's native formatter when the plugin is disabled or the visitor is in the base currency. Uses `bcmul` for precision when bcmath is available.
+Falls back to FluentCart's native formatter when the plugin is disabled or the
+visitor is in the base currency. Converted output uses the selected display
+currency's own decimals, separators, symbol and position rather than inheriting
+the base currency's decimal rules. Uses `bcmul` for precision when bcmath is
+available.
+
+### `fchub_mc_get_order_display_currency(int $orderId): ?string`
+
+Returns the display currency captured for an order, or `null` when no
+Multi-Currency snapshot exists.
+
+### `fchub_mc_format_order_price(float $basePrice, int $orderId): string`
+
+Formats FluentCart minor units with the rate captured on that order. It falls back
+to FluentCart's base formatter when the order has no display-currency snapshot.
 
 ### JavaScript Globals
 
@@ -238,7 +271,8 @@ window.fchubMcProjectPrices(document.getElementById('my-container'));
 
 | Event | Target | Description |
 |---|---|---|
-| `fchub_mc:context_changed` | `document` | Fired before page reload after currency switch |
+| `fchub_mc:context_changed` | `window` | Fired before page reload after a confirmed currency switch |
+| `fchub_mc:context_switch_failed` | `window` | Fired when the preference was not confirmed; includes `currency`, `message`, HTTP `status` and stable `code` |
 | `fchub_mc:prices_projected` | `document` | Fired after each projection pass |
 
 <Separator className="my-8" />
@@ -285,22 +319,32 @@ The widget implements the combobox/listbox pattern:
 
 ## JavaScript Configuration Object
 
-The `fchubMcConfig` object is injected via `wp_localize_script` and available globally:
+The `fchubMcConfig` object is emitted as typed JSON before the shared context script
+and is available globally:
 
 | Key | Type | Description |
 |---|---|---|
-| `rate` | string | Current exchange rate |
+| `rate` | number | Current exchange rate |
 | `displayCurrency` | string | Display currency code |
+| `displayCurrencyName` | string | Display currency name |
 | `baseCurrency` | string | Base currency code |
 | `decimals` | int | Display currency decimal places |
 | `symbol` | string | Display currency symbol |
 | `position` | string | Symbol position (`left`, `right`, `left_space`, `right_space`) |
 | `isBaseDisplay` | bool | Whether display equals base |
+| `resolverSource` | string | Winning resolver: `url_param`, `user_meta`, `cookie`, `geo`, or `default` |
 | `roundingMode` | string | Rounding mode slug |
-| `roundingPrecision` | int | Rounding precision |
 | `restUrl` | string | REST API base URL |
 | `nonce` | string | WP REST nonce |
 | `currencies` | array | All display currencies with flags |
+| `allowedCurrencyCodes` | array | Base plus configured display currency codes accepted by browser recovery |
+| `cookieName` | string | Cookie and local-storage key, currently `fchub_mc_currency` |
+| `cookiePersistenceEnabled` | bool | Whether guest browser persistence is enabled |
+| `cookieLifetimeDays` | int | Shared cookie and local-storage lifetime |
+| `accountPersistenceEnabled` | bool | Whether signed-in preferences use user meta |
+| `isLoggedIn` | bool | Whether the rendered request belongs to an authenticated visitor |
+| `urlParamEnabled` | bool | Whether storefront links may resolve a currency query parameter |
+| `urlParamKey` | string | Configured storefront currency query key |
 | `baseCurrencySign` | string | Base currency symbol |
 | `baseCurrencyPosition` | string | Base currency symbol position |
 | `baseCurrencyCode` | string | Base currency ISO code |
@@ -309,6 +353,32 @@ The `fchubMcConfig` object is injected via `wp_localize_script` and available gl
 | `baseDecimals` | int | Base currency decimal places |
 | `disclosureEnabled` | bool | Whether checkout disclosure is active |
 | `disclosureText` | string\|null | Rendered disclosure text with tokens replaced |
+
+### Cached Guest Recovery
+
+Some edge hosts serve the same anonymous HTML whether the request carries no
+currency cookie, `EUR` or `USD`. The browser contract therefore treats the cookie
+and local-storage record as two transports for one confirmed guest preference:
+
+1. `POST /context` must return `persisted: true` before the browser mirror is written.
+2. A guest reloads through the configured currency URL parameter, so the first
+   returned document resolves correctly without the cookie.
+3. The explicit currency is revalidated through `GET /context?currency=<code>` with
+   a one-use `_fchub_mc` cache-buster. A confirmed switch parameter is removed only
+   after that succeeds; unrelated query values, fragments and genuine direct links
+   remain.
+4. On later shared-cache hits, `currency-context.js` compares the valid, unexpired
+   browser mirror with the rendered context and requests
+   `GET /context?currency=<code>` with a one-use `_fchub_mc` cache-buster when
+   they differ.
+5. An explicit URL preference or signed-in `user_meta` context wins over the browser
+   mirror. A cookie or mirror changed during recovery also wins over the older
+   response.
+
+The local-storage record contains the currency code and expiry timestamp. Legacy
+plain-code values are migrated, while expired, malformed and no-longer-configured
+currencies are removed. Disabling cookie persistence removes the mirror as well;
+it is not a back door around the setting.
 
 <Separator className="my-8" />
 
@@ -386,6 +456,11 @@ Deletes for a given email address:
 - `_fchub_mc_currency` user meta
 - All `fchub_mc_event_log` rows for the user
 
+Browser cookie and local-storage values are held by the visitor's browser rather
+than WordPress, so the server-side eraser cannot reach them. They expire on the
+configured cookie lifetime and can be removed immediately by clearing this site's
+browser data or disabling cookie persistence and loading the storefront once.
+
 <Separator className="my-8" />
 
 ## Constants Reference
@@ -402,6 +477,7 @@ All constants are defined in `FChubMultiCurrency\Support\Constants`:
 | `COOKIE_KEY` | `fchub_mc_currency` | Browser cookie name |
 | `COOKIE_DAYS` | `90` | Default cookie lifetime |
 | `USER_META_KEY` | `_fchub_mc_currency` | WP user meta key |
+| `CHECKOUT_CURRENCY_FIELD` | `_fchub_mc_display_currency` | Validated display choice posted with FluentCart checkout |
 | `TABLE_RATE_HISTORY` | `fchub_mc_rate_history` | Rate history table (without prefix) |
 | `TABLE_EVENT_LOG` | `fchub_mc_event_log` | Event log table (without prefix) |
 | `FC_ADDON_SLUG` | `fchub-multi-currency` | FluentCart addon registration slug |

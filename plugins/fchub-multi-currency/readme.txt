@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, currency, exchange-rates, ecommerce
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.4.5
+Stable tag: 1.4.6
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -63,7 +63,7 @@ Privacy: https://openexchangerates.org/privacy
 
 == Data storage and privacy ==
 
-The selected currency preference can be stored locally in a browser cookie for the configured lifetime, which defaults to 90 days. When account persistence is enabled, the preference is also stored in WordPress user metadata until the user changes it, uses the WordPress Privacy Tools eraser, or the site owner removes plugin data.
+The selected currency preference can be stored locally in a browser cookie and a matching local-storage fallback for the configured lifetime, which defaults to 90 days. The fallback lets a cached storefront recover the same choice when an edge host does not vary pages by cookie. The cookie contains the three-letter currency code; the local-storage record contains the same code and its expiry time. When account persistence is enabled, the preference is also stored in WordPress user metadata until the user changes it, uses the WordPress Privacy Tools eraser, or the site owner removes plugin data.
 
 The plugin stores rate history in a custom database table. Automated refreshes prune rate history older than 90 days. The event log records currency and rate activity; user-linked entries can be exported and erased through WordPress Privacy Tools. Operational event entries otherwise remain until the site owner removes plugin data.
 
@@ -90,6 +90,18 @@ No. Manual is the no-network default. A scheduled refresh is created only after 
 The failed response is not persisted. Customer prices continue to use the last good or manually entered rates according to the configured stale-rate fallback.
 
 == Changelog ==
+
+= 1.4.6 =
+
+* Fixed guest switching on Rocket.net and other edge-cached storefronts. Confirmed choices use browser storage, a one-shot currency URL and unique no-store recovery requests. The URL is removed only after verification, so shared HTML cannot reset the selector.
+* Matched the mirror to the cookie lifetime, migrated existing preferences, rejected invalid data and kept explicit links and signed-in accounts in charge.
+* Kept prices visible while a slow recovery request is pending, then projected the resolved currency as one update.
+* Passed the validated display code through both FluentCart checkout forms, so order metadata records what the customer saw despite a stale cookie. Payment remains in the base currency.
+* Formatted PHP helper and FluentCRM prices with the display currency's own decimals, separators, symbol and position, including zero-decimal bases and three-or-four-decimal display currencies.
+* Returned the default display currency to FluentCart's base when its configured currency is removed.
+* Rejected a non-base currency before saving it when no usable exchange rate exists, instead of accepting the click and quietly showing the base currency.
+* Added runtime and PHP tests for cache, storage, expiry, failed persistence, races, checkout hand-off and number-format boundaries.
+* Thanks to @ManniGH for reproducing the real Rocket.net cache boundary, testing it in production and contributing PR #149. The first fix did not go wide enough; this one follows the evidence.
 
 = 1.4.5 =
 

@@ -82,6 +82,15 @@ final class ContextModule implements ModuleContract
             return;
         }
 
+        if (self::resolveSelectablePreference($optionStore, $currencyCode) === null) {
+            EventLogger::log('context_switch_rate_unavailable_noscript', get_current_user_id(), [
+                'currency' => $currencyCode,
+                'source' => 'noscript',
+            ]);
+
+            return;
+        }
+
         $result = (new PersistContextAction(
             new PreferenceRepository(),
             $optionStore,
@@ -240,9 +249,9 @@ final class ContextModule implements ModuleContract
     }
 
     /**
-     * Resolves a validated browser cookie without consulting public URL settings.
+     * Resolves a validated browser preference without consulting public URL settings.
      */
-    public static function resolveCookiePreference(OptionStore $optionStore, string $currencyCode): CurrencyContext
+    public static function resolveExplicitPreference(OptionStore $optionStore, string $currencyCode): CurrencyContext
     {
         $settings = $optionStore->all();
         $baseCode = strtoupper((string) ($settings['base_currency'] ?? 'USD'));
@@ -263,6 +272,32 @@ final class ContextModule implements ModuleContract
             $staleFallback,
             ResolverSource::Cookie,
         );
+    }
+
+    /** @deprecated 1.4.6 Use resolveExplicitPreference(). */
+    public static function resolveCookiePreference(OptionStore $optionStore, string $currencyCode): CurrencyContext
+    {
+        return self::resolveExplicitPreference($optionStore, $currencyCode);
+    }
+
+    /** Resolves a preference only when the selected currency has a usable server-side context. */
+    public static function resolveSelectablePreference(
+        OptionStore $optionStore,
+        string $currencyCode,
+    ): ?CurrencyContext {
+        $code = strtoupper($currencyCode);
+        $context = CurrencyContextService::applyContextFilter(
+            self::resolveExplicitPreference($optionStore, $code),
+        );
+
+        if ($context->displayCurrency->code !== $code) {
+            return null;
+        }
+        if ($code !== $context->baseCurrency->code && $context->isBaseDisplay) {
+            return null;
+        }
+
+        return $context;
     }
 
     /**

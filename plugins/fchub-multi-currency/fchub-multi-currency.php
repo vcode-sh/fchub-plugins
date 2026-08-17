@@ -4,7 +4,7 @@
  * Plugin Name: FCHub Multi-Currency
  * Plugin URI: https://fchub.co/docs/fchub-multi-currency
  * Description: Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure
- * Version: 1.4.5
+ * Version: 1.4.6
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -21,7 +21,7 @@ declare(strict_types=1);
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_MC_VERSION', '1.4.5');
+define('FCHUB_MC_VERSION', '1.4.6');
 define('FCHUB_MC_FILE', __FILE__);
 define('FCHUB_MC_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_MC_URL', plugin_dir_url(__FILE__));
@@ -165,7 +165,7 @@ add_action('admin_notices', function () {
  * or the visitor is browsing in the base currency.
  *
  * @param float $basePrice Price in FluentCart's cent-based storage unit
- * @return string Formatted price HTML
+ * @return string Formatted price
  */
 function fchub_mc_format_price(float $basePrice): string
 {
@@ -196,7 +196,7 @@ function fchub_mc_get_order_display_currency(int $orderId): ?string
  *
  * @param float $basePrice Price in FluentCart's cent-based storage unit
  * @param int $orderId FluentCart order ID
- * @return string Formatted price HTML
+ * @return string Formatted price
  */
 function fchub_mc_format_order_price(float $basePrice, int $orderId): string
 {

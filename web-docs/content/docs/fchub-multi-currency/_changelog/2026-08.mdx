@@ -1,3 +1,100 @@
+### v1.4.6
+
+*Released 17 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.6)
+
+The edge cache was not impressed by `Cache-Control`. Fair enough; it had already
+ignored the cookie.
+
+Reported and production-tested by
+[@ManniGH](https://github.com/ManniGH) in
+[#72](https://github.com/vcode-sh/fchub-plugins/issues/72), with the working path
+contributed in [PR #149](https://github.com/vcode-sh/fchub-plugins/pull/149).
+Thank you for spending a week finding the actual hosting boundary, then another two
+days proving the repair while 1.4.5 was still admiring its green local tests.
+
+#### A guest switch now survives the first cached reload
+
+Rocket.net serves the same cached HTML whether a guest sends no currency cookie,
+`EUR` or `USD`. The first 1.4.5 repair still reloaded that shared URL and expected a
+browser-readable cookie to rescue it afterwards. That was narrower than the real
+failure and, unsurprisingly, the real failure remained.
+
+After the server confirms a guest choice, the storefront now mirrors that same
+three-letter code in local storage and reloads through the configured currency URL
+parameter. The URL resolver runs before the cookie, so the returned HTML already
+has the selected currency even when the edge never forwards the cookie. Signed-in
+visitors keep their account-backed path, and a failed save still writes nothing and
+reloads nothing.
+
+The browser revalidates that first currency URL through the cache-busted context
+endpoint before removing the one-shot parameter. If an edge ignores the query and
+serves the wrong document, the currency is repaired first. If recovery fails, the
+parameter stays put. Other query values and fragments survive the cleanup, while a
+real currency link without the matching confirmed browser choice remains a real
+currency link. No vanishing evidence tricks, tempting though they may be.
+
+#### The mirror is a fallback, not a second opinion
+
+The cookie and local-storage value carry the same confirmed choice. Existing cookie
+preferences and Manni's plain local-storage value migrate automatically. The mirror
+expires on the site's configured cookie lifetime, disappears when cookie persistence
+is disabled, and is discarded when malformed, expired or no longer allowed.
+
+Explicit currency links and signed-in account preferences remain higher priority.
+A response already in flight cannot overwrite a newer cookie or browser mirror, and
+blocked local storage falls back to the existing cookie path rather than breaking
+the switcher.
+
+Every recovery request now uses a unique context URL as well as `no-store`. That
+covers both the normal browser-mirror path and the rarer inverse case where cached
+HTML claims another guest's cookie but this browser has no preference at all. One
+shared endpoint no longer gets to recycle yesterday's answer with a straight face.
+
+Prices remain visible while that recovery request is pending. Once the currency is
+known, the short projection shield still keeps the final rewrite together; it no
+longer turns a slow edge request into several seconds of decorative blank space.
+
+#### Checkout records the currency the customer actually saw
+
+FluentCart 1.6.1 puts `fluent_cart/before_payment_methods` inside both regular and
+modal checkout forms, then exposes the submitted fields through
+`fluent_cart/checkout/prepare_other_data`. Multi-Currency now uses that path to send
+the final browser display code with checkout. The server validates the code and
+resolves its own rate; the browser never supplies a price or payment currency.
+
+This matters after cached-page recovery: the displayed currency can be correct while
+the request cookie is still the stale value Rocket.net delivered. Order metadata now
+records what the customer saw, while FluentCart continues charging exclusively in
+its own base currency.
+
+#### Display currencies keep their own number format
+
+FluentCart's formatter quite reasonably assumes it is formatting the store currency.
+Asked to format another code, it still applies the base currency's zero-decimal
+rule. That made a JPY-base store turn a converted EUR `6.25` into `6` in PHP helpers
+and FluentCRM output.
+
+Converted server-side prices now use the configured display currency's decimals,
+separators, symbol and position. Zero-decimal, two-decimal and three-or-four-decimal
+display currencies share the same rounding contract as browser projection. Removing
+the current default display currency also returns the default to FluentCart's base,
+rather than leaving an impressive but impossible setting behind.
+
+A non-base choice is now accepted only when the server can resolve a usable rate
+under the configured stale-rate policy. Missing or rejected stale rates leave the
+existing preference untouched and return a clear error, rather than saving a choice
+that the next page would immediately ignore.
+
+The runtime suite now challenges the Rocket-style cookie-less path, immediate guest
+reload, an edge ignoring that reload query, safe URL cleanup, account and
+explicit-link precedence, disabled settings, expiry, malformed
+and conflicting storage, failed persistence, unavailable browser storage, cookie and
+storage races, checkout hand-off, stale submitted fields, tampered codes, slow
+recovery, unavailable rates, last-known fallback, zero-decimal bases and
+three-decimal display currencies.
+
+<Separator className="my-8" />
+
 ### v1.4.5
 
 *Released 17 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.5)

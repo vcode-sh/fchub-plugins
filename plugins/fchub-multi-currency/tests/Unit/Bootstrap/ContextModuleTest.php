@@ -27,7 +27,7 @@ final class ContextModuleTest extends TestCase
         ]);
         $this->setWpdbMockRow(null);
 
-        $context = ContextModule::resolveCookiePreference(new OptionStore(), 'EUR');
+        $context = ContextModule::resolveExplicitPreference(new OptionStore(), 'EUR');
 
         $this->assertTrue($context->isBaseDisplay);
         $this->assertSame('USD', $context->displayCurrency->code);
@@ -42,11 +42,24 @@ final class ContextModuleTest extends TestCase
             'display_currencies' => [],
         ]);
 
-        $context = ContextModule::resolveCookiePreference(new OptionStore(), 'USD');
+        $context = ContextModule::resolveExplicitPreference(new OptionStore(), 'USD');
 
         $this->assertSame('US Dollar', $context->displayCurrency->name);
         $this->assertSame('$', $context->displayCurrency->symbol);
         $this->assertSame('left', $context->displayCurrency->position->value);
+    }
+
+    #[Test]
+    public function testCookiePreferenceEntryPointRemainsCompatibleWithVersionOneFourFive(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'display_currencies' => [],
+        ]);
+
+        $context = ContextModule::resolveCookiePreference(new OptionStore(), 'USD');
+
+        $this->assertSame('USD', $context->displayCurrency->code);
+        $this->assertTrue($context->isBaseDisplay);
     }
 
     #[Test]

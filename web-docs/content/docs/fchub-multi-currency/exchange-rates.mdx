@@ -175,7 +175,8 @@ The `RateHistoryQuery::forPair()` method returns the last 30 rows for any curren
 
 ## Rounding
 
-After the exchange rate multiplication, the resulting amount is rounded according to your settings:
+After the exchange rate multiplication, the resulting amount is rounded according
+to your settings. These examples use a two-decimal display currency:
 
 | Mode | Behaviour | Example (input: 12.345) |
 |---|---|---|
@@ -185,12 +186,12 @@ After the exchange rate multiplication, the resulting amount is rounded accordin
 | **Ceil** | Always round up | `12.35` |
 | **Floor** | Always round down | `12.34` |
 
-The precision setting controls the granularity:
+The display currency's **Decimals** value controls the granularity:
 
-| Precision | Rounds To | Example (input: 12.345, Half Up) |
+| Decimals | Rounds To | Example (input: 12.3456, Half Up) |
 |---|---|---|
-| 0 | Nearest cent | `12.35` |
-| 1 | Nearest 10 cents | `12.30` |
-| 2 | Nearest whole unit | `12.00` |
+| 0 | Nearest whole unit | `12` |
+| 2 | Nearest hundredth | `12.35` |
+| 3 | Nearest thousandth | `12.346` |
 
 Rounding is applied identically in both the PHP `fchub_mc_format_price()` function and the JavaScript projection engine.

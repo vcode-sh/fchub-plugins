@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Tests\Unit;
 
 use FChubMultiCurrency\Tests\Support\TestCase;
+use FluentCart\Api\CurrencySettings;
 use PHPUnit\Framework\Attributes\Test;
 
 final class FormatPriceTest extends TestCase
@@ -92,8 +93,7 @@ final class FormatPriceTest extends TestCase
         $result = \fchub_mc_format_price(10000.0);
 
         // FluentCart prices are cents: 10000 * 0.92 = 9200 cents → EUR 92.00.
-        $this->assertStringContainsString('92.00', $result);
-        $this->assertStringContainsString('EUR', $result);
+        $this->assertSame('€92.00', $result);
     }
 
     #[Test]
@@ -108,5 +108,105 @@ final class FormatPriceTest extends TestCase
         $result = \fchub_mc_format_price(12345.0);
 
         $this->assertStringContainsString('123.45', $result);
+    }
+
+    #[Test]
+    public function testDisplayDecimalsDoNotInheritAZeroDecimalBaseCurrency(): void
+    {
+        CurrencySettings::setMock([
+            'currency' => 'JPY',
+            'currency_position' => 'before',
+            'is_zero_decimal' => true,
+        ]);
+        $this->setOption('fchub_mc_settings', [
+            'enabled' => 'yes',
+            'base_currency' => 'USD',
+            'rounding_mode' => 'half_up',
+            'display_currencies' => [[
+                'code' => 'EUR',
+                'name' => 'Euro',
+                'symbol' => '€',
+                'decimals' => 2,
+                'position' => 'right_space',
+                'decimal_separator' => ',',
+                'thousand_separator' => '.',
+            ]],
+        ]);
+        $this->setWpdbMockRow([
+            'base_currency' => 'JPY',
+            'quote_currency' => 'EUR',
+            'rate' => '0.00625000',
+            'provider' => 'manual',
+            'fetched_at' => current_time('mysql'),
+        ]);
+        $_COOKIE['fchub_mc_currency'] = 'EUR';
+
+        $result = \fchub_mc_format_price(100000.0);
+
+        $this->assertSame('6,25 €', $result);
+    }
+
+    #[Test]
+    public function testPhpFormatterHonoursThreeDecimalDisplayCurrencies(): void
+    {
+        CurrencySettings::setMock(['currency' => 'USD']);
+        $this->setOption('fchub_mc_settings', [
+            'enabled' => 'yes',
+            'base_currency' => 'USD',
+            'rounding_mode' => 'half_up',
+            'display_currencies' => [[
+                'code' => 'KWD',
+                'name' => 'Kuwaiti Dinar',
+                'symbol' => 'KD',
+                'decimals' => 3,
+                'position' => 'left_space',
+                'decimal_separator' => '.',
+                'thousand_separator' => ',',
+            ]],
+        ]);
+        $this->setWpdbMockRow([
+            'base_currency' => 'USD',
+            'quote_currency' => 'KWD',
+            'rate' => '0.30712500',
+            'provider' => 'manual',
+            'fetched_at' => current_time('mysql'),
+        ]);
+        $_COOKIE['fchub_mc_currency'] = 'KWD';
+
+        $result = \fchub_mc_format_price(12345.0);
+
+        $this->assertSame('KD 37.915', $result);
+    }
+
+    #[Test]
+    public function testPhpFormatterKeepsTheMinusBeforeTheCurrencyAndCanDisableGrouping(): void
+    {
+        CurrencySettings::setMock(['currency' => 'USD']);
+        $this->setOption('fchub_mc_settings', [
+            'enabled' => 'yes',
+            'base_currency' => 'USD',
+            'rounding_mode' => 'half_down',
+            'display_currencies' => [[
+                'code' => 'EUR',
+                'name' => 'Euro',
+                'symbol' => '€',
+                'decimals' => 2,
+                'position' => 'left_space',
+                'decimal_separator' => ',',
+                'thousand_separator' => 'none',
+            ]],
+        ]);
+        $this->setWpdbMockRow([
+            'base_currency' => 'USD',
+            'quote_currency' => 'EUR',
+            'rate' => '1.00000000',
+            'provider' => 'manual',
+            'fetched_at' => current_time('mysql'),
+        ]);
+        $_COOKIE['fchub_mc_currency'] = 'EUR';
+
+        $result = \fchub_mc_format_price(-123456.5);
+
+        $this->assertSame('-€ 1234,56', $result);
     }
 }

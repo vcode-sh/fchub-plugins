@@ -1,12 +1,12 @@
 /**
  * FCHub Multi-Currency — Cached Context Recovery
  *
- * Repairs currency state when an edge cache serves HTML generated for another
- * guest preference. The existing currency cookie remains the only preference
- * store; this script merely asks the uncached context endpoint to resolve it.
+ * Repairs currency state when an edge cache serves shared HTML. Guest choices
+ * are mirrored in local storage because some hosts do not vary pages by cookie.
  */
 (() => {
 	const config = window.fchubMcConfig || {};
+	const storageKey = config.cookieName || "fchub_mc_currency";
 
 	function normalizeCode(value) {
 		const code = typeof value === "string" ? value.trim().toUpperCase() : "";
@@ -37,33 +37,153 @@
 		return "";
 	}
 
-	function hasExplicitUrlPreference(codes) {
-		if (config.urlParamEnabled !== true || !config.urlParamKey) return false;
+	function readStoredPreference() {
+		try {
+			return window.localStorage.getItem(storageKey) || "";
+		} catch {
+			return "";
+		}
+	}
+
+	function removeStoredPreference() {
+		try {
+			window.localStorage.removeItem(storageKey);
+		} catch {
+			// Cookie persistence remains available when browser storage is blocked.
+		}
+	}
+
+	function writeStoredPreference(currency) {
+		const lifetimeDays = Math.max(1, Math.min(365, Number(config.cookieLifetimeDays) || 90));
+		const value = JSON.stringify({
+			currency,
+			expiresAt: Date.now() + lifetimeDays * 86400000,
+		});
+
+		try {
+			window.localStorage.setItem(storageKey, value);
+		} catch {
+			// Cookie persistence remains available when browser storage is blocked.
+		}
+	}
+
+	function storedCurrency(codes) {
+		const raw = readStoredPreference();
+		if (!raw) return "";
+
+		const legacyCode = normalizeCode(raw);
+		if (codes.includes(legacyCode)) {
+			writeStoredPreference(legacyCode);
+			return legacyCode;
+		}
+
+		try {
+			const value = JSON.parse(raw);
+			const code = normalizeCode(value?.currency);
+			const expiresAt = Number(value?.expiresAt);
+			if (codes.includes(code) && Number.isFinite(expiresAt) && expiresAt > Date.now()) return code;
+		} catch {
+			// Invalid browser data is discarded below.
+		}
+
+		removeStoredPreference();
+		return "";
+	}
+
+	function persistBrowserPreference(value) {
+		const code = normalizeCode(value);
+		if (config.cookiePersistenceEnabled !== true) {
+			removeStoredPreference();
+			return;
+		}
+		if (allowedCodes().includes(code)) writeStoredPreference(code);
+	}
+
+	function syncCheckoutCurrencyFields(root) {
+		if (!root || typeof root.querySelectorAll !== "function") return;
+
+		const code = normalizeCode(config.displayCurrency);
+		if (!allowedCodes().includes(code)) return;
+
+		for (const field of root.querySelectorAll("[data-fchub-mc-checkout-currency]")) {
+			field.value = code;
+		}
+	}
+
+	function explicitUrlCurrency(codes) {
+		if (config.urlParamEnabled !== true || !config.urlParamKey) return "";
 
 		const params = new URLSearchParams(window.location.search || "");
 		const urlCode = normalizeCode(params.get(config.urlParamKey));
-		return urlCode !== "" && codes.includes(urlCode);
+		return codes.includes(urlCode) ? urlCode : "";
 	}
 
-	function recoveryRequest() {
+	function stripConfirmedSwitchUrl(codes, confirmedCurrency) {
+		if (
+			config.cookiePersistenceEnabled !== true ||
+			config.urlParamEnabled !== true ||
+			!config.urlParamKey ||
+			typeof window.history?.replaceState !== "function"
+		) {
+			return;
+		}
+
+		try {
+			const url = new URL(window.location.href);
+			const urlCode = normalizeCode(url.searchParams.get(config.urlParamKey));
+			const confirmedCode = normalizeCode(confirmedCurrency);
+			if (
+				!codes.includes(urlCode) ||
+				confirmedCode !== urlCode ||
+				normalizeCode(config.displayCurrency) !== urlCode ||
+				storedCurrency(codes) !== urlCode
+			) {
+				return;
+			}
+
+			url.searchParams.delete(config.urlParamKey);
+			window.history.replaceState(window.history.state, "", url.toString());
+		} catch {
+			// URL cleanup is cosmetic; the resolved currency remains authoritative.
+		}
+	}
+
+	function recoveryRequest(codes) {
+		if (config.cookiePersistenceEnabled !== true) {
+			removeStoredPreference();
+		}
+
+		const urlCurrency = explicitUrlCurrency(codes);
+		if (urlCurrency !== "") {
+			return {
+				currency: urlCurrency,
+				cookieSnapshot: readCookie(config.cookieName),
+				storageSnapshot: readStoredPreference(),
+			};
+		}
+
 		if (config.cookiePersistenceEnabled !== true) return null;
 		if (config.resolverSource === "user_meta") return null;
 		if (config.isLoggedIn === true && config.accountPersistenceEnabled === true) return null;
 
-		const codes = allowedCodes();
-		if (hasExplicitUrlPreference(codes)) return null;
+		const validStoredCode = storedCurrency(codes);
 
 		const rawCookie = readCookie(config.cookieName);
 		const cookieCode = normalizeCode(rawCookie);
 		const validCookieCode = codes.includes(cookieCode) ? cookieCode : "";
-		if (validCookieCode !== "") {
-			return validCookieCode === normalizeCode(config.displayCurrency)
-				? null
-				: { currency: validCookieCode, cookieSnapshot: rawCookie };
+		if (!validStoredCode && validCookieCode) writeStoredPreference(validCookieCode);
+
+		const currency = validStoredCode || validCookieCode;
+		const snapshots = {
+			cookieSnapshot: rawCookie,
+			storageSnapshot: readStoredPreference(),
+		};
+		if (currency !== "") {
+			return currency === normalizeCode(config.displayCurrency) ? null : { currency, ...snapshots };
 		}
 
 		return ["cookie", "url_param"].includes(config.resolverSource)
-			? { currency: "", cookieSnapshot: rawCookie }
+			? { currency: "", ...snapshots }
 			: null;
 	}
 
@@ -184,6 +304,7 @@
 		}
 
 		syncContextBlocks(context);
+		syncCheckoutCurrencyFields(document);
 	}
 
 	function isValidContext(context) {
@@ -199,14 +320,14 @@
 	}
 
 	async function recover() {
-		const request = recoveryRequest();
+		const codes = allowedCodes();
+		const request = recoveryRequest(codes);
 		if (!request) return config;
 		const currency = request.currency;
 
 		const restUrl = String(config.restUrl || "/wp-json/fchub-mc/v1").replace(/\/+$/, "");
-		const endpoint = currency
-			? `${restUrl}/context?currency=${encodeURIComponent(currency)}`
-			: `${restUrl}/context`;
+		const explicitCurrency = currency ? `currency=${encodeURIComponent(currency)}&` : "";
+		const endpoint = `${restUrl}/context?${explicitCurrency}_fchub_mc=${Date.now()}`;
 		const controller = typeof AbortController === "function" ? new AbortController() : null;
 		const timeout = controller ? setTimeout(() => controller.abort(), 15000) : null;
 
@@ -224,12 +345,16 @@
 			if (!response.ok || !isValidContext(context)) {
 				throw new Error(`Currency context recovery failed (HTTP ${response.status || 0}).`);
 			}
-			if (readCookie(config.cookieName) !== request.cookieSnapshot) {
+			if (
+				readCookie(config.cookieName) !== request.cookieSnapshot ||
+				readStoredPreference() !== request.storageSnapshot
+			) {
 				return config;
 			}
 
 			Object.assign(config, context);
 			applyContext(context);
+			stripConfirmedSwitchUrl(codes, currency);
 		} catch (error) {
 			console.warn("[fchub-mc] Currency context recovery failed:", error);
 		} finally {
@@ -239,5 +364,8 @@
 		return config;
 	}
 
+	// Capture runs before FluentCart's form handler constructs FormData.
+	document.addEventListener("submit", (event) => syncCheckoutCurrencyFields(event.target), true);
+	window.fchubMcPersistBrowserPreference = persistBrowserPreference;
 	window.fchubMcContextReady = recover();
 })();

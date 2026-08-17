@@ -28,7 +28,7 @@ final class RateLimiterIpTest extends TestCase
 
         $this->setOption('fchub_mc_settings', [
             'base_currency'      => 'USD',
-            'display_currencies' => [['code' => 'EUR']],
+            'display_currencies' => [],
         ]);
     }
 
@@ -47,7 +47,7 @@ final class RateLimiterIpTest extends TestCase
 
         $controller = new ContextController();
         $request = new \WP_REST_Request('POST', '/');
-        $request->set_json_params(['currency' => 'EUR']);
+        $request->set_json_params(['currency' => 'USD']);
 
         $controller->set($request);
 
@@ -66,7 +66,7 @@ final class RateLimiterIpTest extends TestCase
 
         $controller = new ContextController();
         $request = new \WP_REST_Request('POST', '/');
-        $request->set_json_params(['currency' => 'EUR']);
+        $request->set_json_params(['currency' => 'USD']);
 
         $controller->set($request);
 
@@ -86,7 +86,7 @@ final class RateLimiterIpTest extends TestCase
 
         $controller = new ContextController();
         $request = new \WP_REST_Request('POST', '/');
-        $request->set_json_params(['currency' => 'EUR']);
+        $request->set_json_params(['currency' => 'USD']);
 
         $controller->set($request);
 
@@ -105,7 +105,7 @@ final class RateLimiterIpTest extends TestCase
 
         $controller = new ContextController();
         $request = new \WP_REST_Request('POST', '/');
-        $request->set_json_params(['currency' => 'EUR']);
+        $request->set_json_params(['currency' => 'USD']);
 
         $controller->set($request);
 
@@ -122,7 +122,7 @@ final class RateLimiterIpTest extends TestCase
 
         $controller = new ContextController();
         $request = new \WP_REST_Request('POST', '/');
-        $request->set_json_params(['currency' => 'EUR']);
+        $request->set_json_params(['currency' => 'USD']);
 
         $controller->set($request);
 
@@ -137,7 +137,7 @@ final class RateLimiterIpTest extends TestCase
 
         $controller = new ContextController();
         $request = new \WP_REST_Request('POST', '/');
-        $request->set_json_params(['currency' => 'EUR']);
+        $request->set_json_params(['currency' => 'USD']);
 
         // First IP
         $_SERVER['REMOTE_ADDR'] = '10.0.0.1';
@@ -164,7 +164,7 @@ final class RateLimiterIpTest extends TestCase
 
         $controller = new ContextController();
         $request = new \WP_REST_Request('POST', '/');
-        $request->set_json_params(['currency' => 'EUR']);
+        $request->set_json_params(['currency' => 'USD']);
 
         $response = $controller->set($request);
 
@@ -182,7 +182,7 @@ final class RateLimiterIpTest extends TestCase
 
         $controller = new ContextController();
         $request = new \WP_REST_Request('POST', '/');
-        $request->set_json_params(['currency' => 'EUR']);
+        $request->set_json_params(['currency' => 'USD']);
 
         $response = $controller->set($request);
 

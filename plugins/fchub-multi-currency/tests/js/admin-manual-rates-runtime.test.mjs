@@ -11,6 +11,23 @@ describe("FluentCart admin currency ownership", () => {
 		assert.doesNotMatch(template, /v-model="settings\.base_currency"/);
 		assert.match(template, /Managed in FluentCart/);
 	});
+
+	it("falls back to FluentCart's base when the selected default is removed", () => {
+		const { page } = loadAdminRuntime();
+		const state = {
+			_sortable: null,
+			settings: {
+				base_currency: "USD",
+				default_display_currency: "EUR",
+				display_currencies: [{ code: "EUR" }, { code: "GBP" }],
+			},
+		};
+
+		page.components.CurrencySettings.methods.removeCurrency.call(state, 0);
+
+		assert.equal(state.settings.default_display_currency, "USD");
+		assert.deepEqual(JSON.parse(JSON.stringify(state.settings.display_currencies)), [{ code: "GBP" }]);
+	});
 });
 
 describe("manual rate workflow", () => {

@@ -28,12 +28,12 @@ final class RateLimitTest extends TestCase
     {
         $this->setOption('fchub_mc_settings', [
             'base_currency'      => 'USD',
-            'display_currencies' => [['code' => 'EUR']],
+            'display_currencies' => [],
         ]);
 
         $controller = new ContextController();
         $request = new \WP_REST_Request('POST', '/');
-        $request->set_json_params(['currency' => 'EUR']);
+        $request->set_json_params(['currency' => 'USD']);
 
         $response = $controller->set($request);
 
@@ -45,7 +45,7 @@ final class RateLimitTest extends TestCase
     {
         $this->setOption('fchub_mc_settings', [
             'base_currency'      => 'USD',
-            'display_currencies' => [['code' => 'EUR']],
+            'display_currencies' => [],
         ]);
 
         // Simulate 30 requests already made by setting the transient directly
@@ -55,7 +55,7 @@ final class RateLimitTest extends TestCase
 
         $controller = new ContextController();
         $request = new \WP_REST_Request('POST', '/');
-        $request->set_json_params(['currency' => 'EUR']);
+        $request->set_json_params(['currency' => 'USD']);
 
         $response = $controller->set($request);
 
@@ -69,7 +69,7 @@ final class RateLimitTest extends TestCase
     {
         $this->setOption('fchub_mc_settings', [
             'base_currency'      => 'USD',
-            'display_currencies' => [['code' => 'EUR']],
+            'display_currencies' => [],
         ]);
 
         $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
@@ -77,7 +77,7 @@ final class RateLimitTest extends TestCase
 
         $controller = new ContextController();
         $request = new \WP_REST_Request('POST', '/');
-        $request->set_json_params(['currency' => 'EUR']);
+        $request->set_json_params(['currency' => 'USD']);
 
         // First request — transient should be 1 after
         $controller->set($request);

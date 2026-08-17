@@ -120,6 +120,7 @@ final class FrontendModule implements ModuleContract
             'allowedCurrencyCodes'  => SelectableCurrencyCodes::fromSettings($optionStore->all())->all(),
             'cookieName'            => Constants::COOKIE_KEY,
             'cookiePersistenceEnabled' => $optionStore->get('cookie_enabled', 'yes') === 'yes',
+            'cookieLifetimeDays'    => (int) $optionStore->get('cookie_lifetime_days', 90),
             'accountPersistenceEnabled' => $optionStore->get('account_persistence_enabled', 'yes') === 'yes',
             'isLoggedIn'            => get_current_user_id() > 0,
             'urlParamEnabled'       => $optionStore->get('url_param_enabled', 'yes') === 'yes',

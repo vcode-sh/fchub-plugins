@@ -136,12 +136,12 @@ The active currency is highlighted in blue. At the bottom, a rate freshness badg
   <Step>
     **Preference is saved**
 
-    Their choice is remembered — in a browser cookie (sticks for 90 days) and in their account if they're logged in. No need to pick again next time.
+    Their choice is remembered in a browser cookie and matching local-storage fallback for the configured lifetime (90 days by default). If they're logged in, it is also saved to their account. No need to pick again next time.
   </Step>
   <Step>
     **Page refreshes with new prices**
 
-    The page reloads and every price on the site is now in the selected currency. Product cards, cart totals, checkout — everything updates.
+    The page reloads once through a currency URL, verifies the selected currency, then removes that one-shot parameter. Product cards, cart totals, checkout — everything is now in the selected display currency.
   </Step>
 </Steps>
 

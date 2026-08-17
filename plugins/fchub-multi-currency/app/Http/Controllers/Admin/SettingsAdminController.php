@@ -7,6 +7,7 @@ namespace FChubMultiCurrency\Http\Controllers\Admin;
 use FChubMultiCurrency\Domain\Enums\CurrencyPosition;
 use FChubMultiCurrency\Domain\Enums\RateProvider;
 use FChubMultiCurrency\Domain\Enums\RoundingMode;
+use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Support\RateSchedule;
@@ -102,6 +103,19 @@ final class SettingsAdminController
 
         if (($provider->requiresApiKey() && $apiKey === '') || $providerChangedWithoutNewKey) {
             return self::validationError('An API key is required for the selected exchange-rate provider.');
+        }
+
+        $baseCurrency = (string) $optionStore->get('base_currency', 'USD');
+        $displayCurrencies = $sanitized['display_currencies']
+            ?? $optionStore->get('display_currencies', []);
+        $defaultDisplayCurrency = (string) ($sanitized['default_display_currency']
+            ?? $optionStore->get('default_display_currency', $baseCurrency));
+        $selectableCurrencies = SelectableCurrencyCodes::from(
+            $baseCurrency,
+            is_array($displayCurrencies) ? $displayCurrencies : [],
+        );
+        if (!$selectableCurrencies->contains($defaultDisplayCurrency)) {
+            $sanitized['default_display_currency'] = $baseCurrency;
         }
 
         $optionStore->save($sanitized);

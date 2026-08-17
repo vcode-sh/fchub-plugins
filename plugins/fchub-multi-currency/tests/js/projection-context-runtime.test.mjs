@@ -16,12 +16,16 @@ function deferred() {
 
 function runtime() {
 	const names = new Set();
+	const additions = [];
 	const timers = [];
 	const context = deferred();
 	const document = {
 		documentElement: {
 			classList: {
-				add: (name) => names.add(name),
+				add: (name) => {
+					additions.push(name);
+					names.add(name);
+				},
 				remove: (name) => names.delete(name),
 				contains: (name) => names.has(name),
 			},
@@ -45,20 +49,22 @@ function runtime() {
 		clearTimeout() {},
 	});
 
-	return { context, document, execution, timers };
+	return { additions, context, document, execution, timers };
 }
 
-it("shields stale prices immediately and releases them after two seconds", async () => {
+it("keeps current prices visible while cached context recovery is pending", async () => {
 	const state = runtime();
 
-	assert.equal(state.document.documentElement.classList.contains("fchub-mc-projecting"), true);
-	assert.equal(state.timers[0]?.delay, 2000);
-
-	state.timers[0].callback();
 	assert.equal(state.document.documentElement.classList.contains("fchub-mc-projecting"), false);
+	assert.equal(state.additions.length, 0);
+	assert.equal(state.timers.length, 0);
 
 	state.context.resolve();
 	await state.execution;
+
+	assert.deepEqual(state.additions, ["fchub-mc-projecting"]);
+	assert.equal(state.timers[0]?.delay, 2000);
+	assert.equal(state.document.documentElement.classList.contains("fchub-mc-projecting"), false);
 });
 
 it("releases the shield when recovered context needs no projection", async () => {

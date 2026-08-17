@@ -39,6 +39,14 @@
 
 	const FALLBACK_ERROR = "Currency preference could not be saved.";
 
+	function persistBrowserPreference(currencyCode) {
+		try {
+			window.fchubMcPersistBrowserPreference?.(currencyCode);
+		} catch {
+			// The context adapter already treats browser storage as optional.
+		}
+	}
+
 	function clearLoadingState(root) {
 		if (root) {
 			root.classList.remove("fchub-mc-switcher--loading");
@@ -133,17 +141,21 @@
 	}
 
 	/**
-	 * An explicit URL preference wins on arrival. Once the visitor actively
-	 * chooses another currency, remove only that configured key so it cannot
-	 * override the newly saved preference on the reload.
+	 * Guests reload through the explicit resolver because shared edge HTML does
+	 * not vary by cookie. Account preferences keep their normal URL-free path.
 	 */
-	function clearUrlPreference() {
-		if (config.urlParamEnabled !== true || !config.urlParamKey) return;
+	function buildReloadUrl(currencyCode) {
+		if (config.urlParamEnabled !== true || !config.urlParamKey) return "";
 
 		const url = new URL(window.location.href);
-		if (!url.searchParams.has(config.urlParamKey)) return;
-		url.searchParams.delete(config.urlParamKey);
-		window.history.replaceState(window.history.state, "", url.toString());
+		if (config.isLoggedIn === true) {
+			if (!url.searchParams.has(config.urlParamKey)) return "";
+			url.searchParams.delete(config.urlParamKey);
+		} else {
+			url.searchParams.set(config.urlParamKey, currencyCode);
+		}
+
+		return url.toString();
 	}
 
 	/**
@@ -187,7 +199,11 @@
 					return;
 				}
 
-				clearUrlPreference();
+				persistBrowserPreference(currencyCode);
+				const reloadUrl = buildReloadUrl(currencyCode);
+				if (reloadUrl) {
+					window.history.replaceState(window.history.state, "", reloadUrl);
+				}
 				window.dispatchEvent(
 					new CustomEvent("fchub_mc:context_changed", {
 						detail: { currency: currencyCode, response: payload },

@@ -27,13 +27,13 @@
 		}
 	}
 
-	document.documentElement.classList.add("fchub-mc-projecting");
-	projectionShieldTimeout = setTimeout(releaseProjectionShield, 2000);
-
 	const contextReady = window.fchubMcContextReady;
 	if (contextReady && typeof contextReady.then === "function") {
 		await contextReady;
 	}
+
+	document.documentElement.classList.add("fchub-mc-projecting");
+	projectionShieldTimeout = setTimeout(releaseProjectionShield, 2000);
 
 	const cfg = window.fchubMcConfig || {};
 	const rate = parseFloat(cfg.rate || "1");

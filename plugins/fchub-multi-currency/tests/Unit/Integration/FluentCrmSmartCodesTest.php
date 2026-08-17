@@ -7,6 +7,7 @@ namespace FChubMultiCurrency\Tests\Unit\Integration;
 use FChubMultiCurrency\Integration\FluentCrmSmartCodes;
 use FChubMultiCurrency\Tests\Support\TestCase;
 use FluentCart\App\Models\Order;
+use FluentCart\Api\CurrencySettings;
 use FluentCrm\App\Models\FunnelSubscriber;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -112,6 +113,37 @@ final class FluentCrmSmartCodesTest extends TestCase
     }
 
     #[Test]
+    public function testDisplayTotalUsesDisplayMetadataWhenTheStoreBaseHasNoDecimals(): void
+    {
+        CurrencySettings::setMock([
+            'currency' => 'JPY',
+            'is_zero_decimal' => true,
+        ]);
+        $this->setOption('fchub_mc_settings', [
+            'base_currency' => 'JPY',
+            'rounding_mode' => 'half_up',
+            'display_currencies' => [[
+                'code' => 'EUR',
+                'name' => 'Euro',
+                'symbol' => '€',
+                'decimals' => 2,
+                'position' => 'right_space',
+                'decimal_separator' => ',',
+                'thousand_separator' => '.',
+            ]],
+        ]);
+        $order = $this->makeOrder('JPY', 100000, 90000, [
+            '_fchub_mc_display_currency' => 'EUR',
+            '_fchub_mc_base_currency' => 'JPY',
+            '_fchub_mc_rate' => '0.00625',
+        ]);
+
+        $result = FluentCrmSmartCodes::resolveValue($order, 'display_total', 'N/A');
+
+        $this->assertSame('6,25 €', $result);
+    }
+
+    #[Test]
     public function testChargedNoticeFormatsCorrectly(): void
     {
         $order = $this->makeOrder('USD', 10000, 9000, [
@@ -202,7 +234,7 @@ final class FluentCrmSmartCodesTest extends TestCase
         // 10000 cents at 0.85 becomes 8500 cents → EUR 85.00.
         $result = fchub_mc_format_order_price(10000.0, 42);
 
-        $this->assertSame('EUR 85.00', $result);
+        $this->assertSame('€85.00', $result);
     }
 
     #[Test]
