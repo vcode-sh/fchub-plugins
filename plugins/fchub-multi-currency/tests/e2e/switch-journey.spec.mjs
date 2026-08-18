@@ -117,6 +117,45 @@ for (const { mode, note } of QUERY_MODES) {
 }
 
 /**
+ * A cached page must cost nothing before the visitor does anything.
+ *
+ * On 1.4.7 a document cached from somebody who had a currency cookie carried
+ * `resolverSource: "cookie"`, and every later guest fired a bare, cache-busted
+ * `GET /context` on load — then hid every price behind `fchub-mc-recovering`,
+ * which had no timeout, until it returned. The reporter's capture shows exactly
+ * that request arriving before any click, and an uncached REST round trip on that
+ * host measured about 9.7 seconds. So the symptom was never only about switching:
+ * every page view hid its prices for as long as the origin took to answer.
+ */
+test("a cached page load asks the server for nothing", async ({ page }, testInfo) => {
+	await using origin = await startHostileOrigin({
+		queryStringMode: "ignored",
+		deferScripts: true,
+		originLatencyMs: ORIGIN_LATENCY_MS,
+		restLatencyMs: REST_LATENCY_MS,
+	});
+
+	// Prime the cache, then arrive as a fresh guest at the copy it stored.
+	await page.goto(`${origin.url}/pricing`, { waitUntil: "load" });
+	await page.context().clearCookies();
+
+	const from = origin.requests.length;
+	await page.goto(`${origin.url}/pricing`, { waitUntil: "load" });
+	await expect(page.locator(".fct-item-price").first()).toBeVisible();
+
+	const arrival = origin.requests.slice(from);
+	const rest = arrival.filter((r) => r.path.startsWith("/wp-json"));
+
+	await report(testInfo, "cached-arrival", {
+		restRequests: rest.length,
+		requests: arrival.map((r) => ({ method: r.method, path: r.path, cache: r.cacheStatus })),
+	});
+
+	expect(rest, "Arriving at a cached page must not cost a REST round trip.").toHaveLength(0);
+	await expect(page.locator(".fct-item-price").first()).toHaveText(/\$/);
+});
+
+/**
  * Samples what the visitor can see, once per frame. A frame sampler rather than a
  * MutationObserver, because the failure under investigation is a stylesheet
  * arriving late: computed style changes with no DOM mutation to observe.
