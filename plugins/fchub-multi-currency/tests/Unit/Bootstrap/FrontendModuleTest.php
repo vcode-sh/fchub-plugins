@@ -12,13 +12,24 @@ use PHPUnit\Framework\Attributes\Test;
 
 final class FrontendModuleTest extends TestCase
 {
+    /**
+     * Only the bootstrap belongs in the head, and only because it decides the
+     * currency before anything paints. Everything else paints or converts, which
+     * cannot happen before the body exists, so it loads at the end where it costs
+     * no render-blocking request.
+     */
     #[Test]
-    public function testProjectionAndSwitcherLoadAfterTheSharedContextRecoveryRuntime(): void
+    public function testOnlyTheCurrencyDecisionLoadsInTheHead(): void
     {
         FrontendModule::registerAssets();
 
-        $this->assertArrayHasKey('fchub-mc-context', $GLOBALS['wp_registered_scripts']);
-        $this->assertFalse($GLOBALS['wp_registered_scripts']['fchub-mc-context']['in_footer']);
+        $this->assertFalse($GLOBALS['wp_registered_scripts']['fchub-mc-bootstrap']['in_footer']);
+        $this->assertFalse($GLOBALS['wp_registered_scripts']['fchub-mc-bootstrap']['src'], 'Inline, not a request.');
+        $this->assertTrue($GLOBALS['wp_registered_scripts']['fchub-mc-context']['in_footer']);
+        $this->assertSame(
+            ['fchub-mc-bootstrap'],
+            $GLOBALS['wp_registered_scripts']['fchub-mc-context']['deps'],
+        );
         $this->assertSame(
             ['fchub-mc-context'],
             $GLOBALS['wp_registered_scripts']['fchub-mc-projection']['deps'],
@@ -166,7 +177,7 @@ final class FrontendModuleTest extends TestCase
         );
 
         $inline = implode('', $GLOBALS['wp_inline_styles']['fchub-mc-critical'] ?? []);
-        $this->assertStringContainsString('.fchub-mc-switcher--loading', $inline);
+        $this->assertStringContainsString('.fchub-mc-pending', $inline);
         $this->assertStringContainsString('visibility: hidden', $inline);
     }
 
@@ -298,7 +309,7 @@ final class FrontendModuleTest extends TestCase
         FrontendModule::registerAssets();
         FrontendModule::ensureContextAssetEnqueued();
 
-        $inline = $GLOBALS['wp_inline_scripts']['fchub-mc-context']['before'][0] ?? '';
+        $inline = $GLOBALS['wp_inline_scripts']['fchub-mc-bootstrap']['after'][0] ?? '';
         self::assertMatchesRegularExpression('/^window\.fchubMcConfig = \{.*\};$/', $inline);
 
         $json = substr($inline, strlen('window.fchubMcConfig = '), -1);
@@ -309,6 +320,11 @@ final class FrontendModuleTest extends TestCase
         self::assertTrue($config['urlParamEnabled']);
         self::assertFalse($config['isLoggedIn']);
         self::assertArrayNotHasKey('fchubMcConfig', $GLOBALS['wp_localized_scripts']['fchub-mc-context'] ?? []);
+        self::assertStringContainsString(
+            'window.fchubMc =',
+            $GLOBALS['wp_inline_scripts']['fchub-mc-bootstrap']['after'][1] ?? '',
+            'The bootstrap source travels with the config it reads.',
+        );
     }
 
     #[Test]
@@ -328,6 +344,6 @@ final class FrontendModuleTest extends TestCase
         $this->assertStringContainsString('class="fchub-mc-switcher__code">EUR</span>', $html);
         $this->assertStringContainsString('data-value="EUR"', $html);
         $this->assertStringContainsString('data-value="USD"', $html);
-        $this->assertNotEmpty($GLOBALS['wp_inline_scripts']['fchub-mc-context']['before']);
+        $this->assertNotEmpty($GLOBALS['wp_inline_scripts']['fchub-mc-bootstrap']['after']);
     }
 }

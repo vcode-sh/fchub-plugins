@@ -1,0 +1,56 @@
+{
+    "displayCurrency": "EUR",
+    "baseCurrency": "USD",
+    "entry": {
+        "rate": 0.92,
+        "symbol": "€",
+        "displayCurrencyName": "Euro",
+        "flag": "<img src=\"http://localhost/wp-content/plugins/fchub-multi-currency/assets/flags/4x3/eu.svg\" alt=\"EUR\" class=\"fchub-mc-flag\" width=\"20\" height=\"15\" />",
+        "disclosureText": "Your payment will be processed in USD."
+    },
+    "templates": {
+        "rate": "1 %1$s = %2$s %3$s",
+        "rateSentence": "Current rate: 1 %1$s = %2$s %3$s",
+        "noticeCompact": "Viewing prices in %1$s. Checkout in %2$s.",
+        "noticeFull": "Prices shown in %1$s are approximate. Checkout is charged in %2$s.",
+        "switcherRateBase": "Base currency currently in use.",
+        "switcherContext": "Display prices only. Checkout is charged in %s.",
+        "switcherContextBase": "You are viewing the store base currency."
+    },
+    "current": {
+        "flag_code": "<span class=\"fchub-mc-inline-current\"><img src=\"http://localhost/wp-content/plugins/fchub-multi-currency/assets/flags/4x3/eu.svg\" alt=\"EUR\" class=\"fchub-mc-flag\" width=\"20\" height=\"15\" /><span class=\"fchub-mc-inline-current__text\">EUR</span></span>",
+        "code": "<span class=\"fchub-mc-inline-current\">EUR</span>",
+        "symbol": "<span class=\"fchub-mc-inline-current\">€</span>",
+        "name": "<span class=\"fchub-mc-inline-current\">Euro</span>",
+        "flag_name": "<span class=\"fchub-mc-inline-current\"><img src=\"http://localhost/wp-content/plugins/fchub-multi-currency/assets/flags/4x3/eu.svg\" alt=\"EUR\" class=\"fchub-mc-flag\" width=\"20\" height=\"15\" /><span class=\"fchub-mc-inline-current__text\">Euro</span></span>",
+        "symbol_code": "<span class=\"fchub-mc-inline-current\"><span class=\"fchub-mc-inline-current__text\">€</span><span class=\"fchub-mc-inline-current__text\">EUR</span></span>"
+    },
+    "rate": {
+        "compact": [
+            "<span class=\"fchub-mc-inline-rate\">1 USD = 1 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">1 USD = 0.9 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">1 USD = 0.92 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">1 USD = 0.920 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">1 USD = 0.9200 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">1 USD = 0.92000 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">1 USD = 0.920000 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">1 USD = 0.9200000 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">1 USD = 0.92000000 EUR</span>"
+        ],
+        "sentence": [
+            "<span class=\"fchub-mc-inline-rate\">Current rate: 1 USD = 1 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">Current rate: 1 USD = 0.9 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">Current rate: 1 USD = 0.92 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">Current rate: 1 USD = 0.920 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">Current rate: 1 USD = 0.9200 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">Current rate: 1 USD = 0.92000 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">Current rate: 1 USD = 0.920000 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">Current rate: 1 USD = 0.9200000 EUR</span>",
+            "<span class=\"fchub-mc-inline-rate\">Current rate: 1 USD = 0.92000000 EUR</span>"
+        ]
+    },
+    "notice": {
+        "compact": "<span class=\"fchub-mc-inline-notice\">Viewing prices in EUR. Checkout in USD.</span>",
+        "full": "<span class=\"fchub-mc-inline-notice\">Prices shown in EUR are approximate. Checkout is charged in USD.</span>"
+    }
+}

@@ -43,6 +43,7 @@
 		displayThousandSep = typeof cfg.displayThousandSep === "string" ? cfg.displayThousandSep : ",";
 		disclosureText = cfg.disclosureText || "";
 
+		buildPriceRegexes();
 		converting = Boolean(displayCode) && Boolean(baseCode) && displayCode !== baseCode
 			&& Number.isFinite(rate) && rate > 0 && rate !== 1;
 
@@ -104,21 +105,24 @@
 	// Selector for the price filter currency sign (shop sidebar)
 	const CURRENCY_SIGN_SELECTOR = ".fct-shop-currency-sign";
 
-	// Build regex to strip the base currency sign (escaped for regex)
-	const escSign = baseSign.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const escCode = baseCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const stripRegex = new RegExp(`(${escSign}|${escCode})`, "g");
+	// Derived from the base-currency settings, so they are rebuilt whenever those
+	// are re-read rather than captured once at load.
+	let stripRegex, basePriceRegex;
 
-	// Regex to match a formatted base-currency price within a larger string.
-	// Captures the full price token (sign/code + digits + separators + decimals)
-	// so we can replace just that portion while preserving surrounding text.
-	const escThousandSep = baseThousandSep
-		? baseThousandSep.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-		: "";
-	const escDecSep = baseDecSep.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const basePriceRegex = new RegExp(
-		`(?:${escSign}|${escCode})?\\s*\\d[\\d${escThousandSep}]*(?:${escDecSep}\\d+)?\\s*(?:${escSign}|${escCode})?`,
-	);
+	function buildPriceRegexes() {
+		const escape = (value) => String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+		const escSign = escape(baseSign);
+		const escCode = escape(baseCode);
+		const escThousandSep = baseThousandSep ? escape(baseThousandSep) : "";
+		const escDecSep = escape(baseDecSep);
+
+		stripRegex = new RegExp(`(${escSign}|${escCode})`, "g");
+		// Captures the full price token (sign/code + digits + separators + decimals)
+		// so we replace just that portion and preserve the surrounding text.
+		basePriceRegex = new RegExp(
+			`(?:${escSign}|${escCode})?\\s*\\d[\\d${escThousandSep}]*(?:${escDecSep}\\d+)?\\s*(?:${escSign}|${escCode})?`,
+		);
+	}
 
 	const ATTR_PROJECTED = "data-fchub-mc-projected";
 	const ATTR_BASE = "data-fchub-mc-base";

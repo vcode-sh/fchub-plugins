@@ -29,6 +29,7 @@ import { fileURLToPath } from "node:url";
 const PLUGIN_DIR = fileURLToPath(new URL("../../", import.meta.url));
 const ASSET_DIR = join(PLUGIN_DIR, "assets");
 const CRITICAL_CSS = readFileSync(join(ASSET_DIR, "css/currency-critical.css"), "utf8");
+const BOOTSTRAP_JS = readFileSync(join(ASSET_DIR, "js/currency-bootstrap.js"), "utf8");
 const FIXTURE_PATH = fileURLToPath(new URL("./.fixture/fixture.json", import.meta.url));
 
 const MIME = {
@@ -134,12 +135,13 @@ function renderPage({ fixture, currency, deferScripts, stripUnusedCss, disabledB
 <title>Pricing</title>
 <style id="theme-css">${themeStyles}</style>
 <style id="fchub-mc-critical-inline-css">${CRITICAL_CSS}</style>
-<script id="fchub-mc-config">window.fchubMcConfig = ${JSON.stringify(config)};</script>
-<script src="/assets/js/currency-context.js"${defer}></script>
+<script id="fchub-mc-bootstrap-js">window.fchubMcConfig = ${JSON.stringify(config)};
+${BOOTSTRAP_JS}</script>
 </head>
 <body>
 ${body}
 <link rel="stylesheet" href="/assets/css/currency-switcher.css${stripUnusedCss ? "?rucss=1" : ""}">
+<script src="/assets/js/currency-context.js"${defer}></script>
 <script src="/assets/js/currency-projection.js"${defer}></script>
 <script src="/assets/js/currency-switcher.js"${defer}></script>
 </body>

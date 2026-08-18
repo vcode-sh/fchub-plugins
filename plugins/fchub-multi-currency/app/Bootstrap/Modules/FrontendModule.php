@@ -8,6 +8,7 @@ use FChubMultiCurrency\Bootstrap\ModuleContract;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Frontend\CurrencyContextPayload;
+use FChubMultiCurrency\Frontend\CurrencyContextPresentation;
 use FChubMultiCurrency\Frontend\CurrencySwitcherRenderer;
 use FChubMultiCurrency\Frontend\CurrencyTablePayload;
 use FChubMultiCurrency\Integration\FluentCartCurrency;
@@ -34,13 +35,18 @@ final class FrontendModule implements ModuleContract
     {
         self::$contextAssetConfigured = false;
 
+        // Src-less on purpose: the bootstrap is printed inline in the head, because
+        // it must choose the visitor's currency before anything paints and an
+        // optimizer is free to defer or delay a file.
+        wp_register_script('fchub-mc-bootstrap', false, [], FCHUB_MC_VERSION, false);
+
         $contextPath = FCHUB_MC_PATH . 'assets/js/currency-context.js';
         wp_register_script(
             'fchub-mc-context',
             FCHUB_MC_URL . 'assets/js/currency-context.js',
-            [],
+            ['fchub-mc-bootstrap'],
             (string) (@filemtime($contextPath) ?: FCHUB_MC_VERSION),
-            false,
+            true,
         );
 
         $projectionPath = FCHUB_MC_PATH . 'assets/js/currency-projection.js';
@@ -81,7 +87,6 @@ final class FrontendModule implements ModuleContract
 
         self::ensureContextAssetEnqueued();
         wp_enqueue_script('fchub-mc-projection');
-        self::enqueueCriticalStyles();
     }
 
     /**
@@ -108,15 +113,23 @@ final class FrontendModule implements ModuleContract
     public static function ensureContextAssetEnqueued(): void
     {
         if (!self::$contextAssetConfigured) {
+            // Two calls rather than one concatenation: WordPress prints them in order
+            // into the same block, and keeping them apart lets the config be read
+            // back on its own.
             wp_add_inline_script(
-                'fchub-mc-context',
+                'fchub-mc-bootstrap',
                 'window.fchubMcConfig = ' . wp_json_encode(self::buildFrontendConfig()) . ';',
-                'before',
+            );
+            wp_add_inline_script(
+                'fchub-mc-bootstrap',
+                (string) @file_get_contents(FCHUB_MC_PATH . 'assets/js/currency-bootstrap.js'),
             );
             self::$contextAssetConfigured = true;
         }
 
+        wp_enqueue_script('fchub-mc-bootstrap');
         wp_enqueue_script('fchub-mc-context');
+        self::enqueueCriticalStyles();
     }
 
     /**
@@ -144,6 +157,7 @@ final class FrontendModule implements ModuleContract
 
         return array_merge(CurrencyContextPayload::build($context, $optionStore), [
             'currencyTable'         => CurrencyTablePayload::build($optionStore),
+            'presentationTemplates' => CurrencyContextPresentation::templates(),
             'baseCurrency'          => strtoupper((string) ($settings['base_currency'] ?? 'USD')),
             'defaultCurrency'       => strtoupper((string) ($settings['default_display_currency'] ?? '')),
             'accountCurrency'       => $userId > 0

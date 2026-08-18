@@ -6,6 +6,7 @@ namespace FChubMultiCurrency\Frontend;
 
 use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
+use FChubMultiCurrency\Http\Controllers\Admin\CurrencyCatalogueController;
 use FChubMultiCurrency\Storage\OptionStore;
 
 defined('ABSPATH') || exit;
@@ -34,6 +35,12 @@ final class CurrencyTablePayload
      *
      * `disclosureText` is absent from this list on purpose: its template accepts
      * `{display_currency}` and `{rate}`, so it genuinely differs per currency.
+     *
+     * Two rendered fragments are added back per entry: the flag image and the rate
+     * freshness badge. Both need server-side data the browser has no way to
+     * reproduce — a country mapping and a translated relative time — and together
+     * they cost about 270 bytes against the 3113 the old fragment set spent to
+     * pre-render every variant of every block.
      */
     private const PER_REQUEST_OR_DERIVABLE = [
         'displayCurrency',
@@ -60,7 +67,10 @@ final class CurrencyTablePayload
             $table[$code] = array_diff_key(
                 CurrencyContextPayload::build($context, $optionStore),
                 $drop,
-            );
+            ) + [
+                'flag' => CurrencyCatalogueController::codeToFlagImg($code),
+                'rateBadge' => CurrencyContextPresentation::renderRateBadge($context, $optionStore),
+            ];
         }
 
         return $table;

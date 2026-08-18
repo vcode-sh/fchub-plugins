@@ -15,6 +15,92 @@
 		return /^[A-Z]{3}$/.test(code) ? code : "";
 	}
 
+	const templates = config.presentationTemplates || {};
+
+	/** Matches esc_html(), so a JS-rendered surface is byte-identical to the PHP one. */
+	function escapeHtml(value) {
+		return String(value ?? "")
+			.replaceAll("&", "&amp;")
+			.replaceAll("<", "&lt;")
+			.replaceAll(">", "&gt;")
+			.replaceAll('"', "&quot;")
+			.replaceAll("'", "&#039;");
+	}
+
+	/** Fills the `%1$s`-style placeholders WordPress translators rely on. */
+	function fill(template, values) {
+		let index = 0;
+		return String(template || "").replace(/%(?:(\d+)\$)?s/g, (_match, position) =>
+			String(values[position ? Number(position) - 1 : index++] ?? ""),
+		);
+	}
+
+	function entryFor(code) {
+		return (config.currencyTable || {})[code] || {};
+	}
+
+	function renderCurrent(code, mode) {
+		const entry = entryFor(code);
+		const wrap = (inner) => `<span class="fchub-mc-inline-current">${inner}</span>`;
+		const text = (value) => `<span class="fchub-mc-inline-current__text">${escapeHtml(value)}</span>`;
+
+		switch (mode) {
+			case "code":
+				return wrap(escapeHtml(code));
+			case "symbol":
+				return wrap(escapeHtml(entry.symbol));
+			case "name":
+				return wrap(escapeHtml(entry.displayCurrencyName));
+			case "flag_name":
+				return wrap((entry.flag || "") + text(entry.displayCurrencyName));
+			case "symbol_code":
+				return wrap(text(entry.symbol) + text(code));
+			default:
+				return wrap((entry.flag || "") + text(code));
+		}
+	}
+
+	function renderRate(code, precision, format) {
+		const digits = Math.max(0, Math.min(8, Number(precision) || 0));
+		const rate = Number(entryFor(code).rate || 1).toFixed(digits);
+		const template = format === "sentence" ? templates.rateSentence : templates.rate;
+
+		return `<span class="fchub-mc-inline-rate">${escapeHtml(fill(template, [config.baseCurrency, rate, code]))}</span>`;
+	}
+
+	function renderNotice(code, mode) {
+		if (mode === "checkout") {
+			const disclosure = entryFor(code).disclosureText;
+			return disclosure ? `<span class="fchub-mc-inline-notice">${disclosure}</span>` : "";
+		}
+
+		const template = mode === "full" ? templates.noticeFull : templates.noticeCompact;
+		return `<span class="fchub-mc-inline-notice">${escapeHtml(fill(template, [code, config.baseCurrency]))}</span>`;
+	}
+
+	function switcherParts(code) {
+		const isBase = code === config.baseCurrency;
+		const context = (inner) => `<span class="fchub-mc-rate-context">${inner}</span>`;
+
+		return {
+			rateBadge: entryFor(code).rateBadge || "",
+			rateValue: context(
+				escapeHtml(
+					isBase
+						? templates.switcherRateBase
+						: fill(templates.rate, [config.baseCurrency, entryFor(code).rate, code]),
+				),
+			),
+			contextNote: context(
+				escapeHtml(
+					isBase
+						? templates.switcherContextBase
+						: fill(templates.switcherContext, [config.baseCurrency]),
+				),
+			),
+		};
+	}
+
 	function syncCheckoutCurrencyFields(root) {
 		if (!root || typeof root.querySelectorAll !== "function") return;
 
@@ -62,14 +148,10 @@
 		}
 
 		const flag = trigger.querySelector(".fchub-mc-switcher__flag");
-		const recoveredFlag = context.presentation?.flag;
-		if (flag && typeof recoveredFlag === "string") {
-			flag.innerHTML = recoveredFlag;
-			return;
-		}
+		if (!flag) return;
 
 		const selectedFlag = selected?.querySelector(".fchub-mc-switcher__flag");
-		if (flag && selectedFlag) flag.innerHTML = selectedFlag.innerHTML;
+		flag.innerHTML = entryFor(code).flag || selectedFlag?.innerHTML || "";
 	}
 
 	function syncSwitcherFooter(root, parts) {
@@ -92,46 +174,34 @@
 		}
 
 		syncTrigger(root.querySelector("[data-fchub-mc-trigger]"), context, selected);
-		syncSwitcherFooter(root, context.presentation?.switcher);
-	}
-
-	function syncCurrentBlocks(presentation) {
-		for (const root of document.querySelectorAll("[data-fchub-mc-context-current]")) {
-			const mode = root.getAttribute("data-fchub-mc-context-current") || "flag_code";
-			if (typeof presentation.current?.[mode] === "string") {
-				root.innerHTML = presentation.current[mode];
-			}
-		}
-	}
-
-	function syncRateBlocks(context, presentation) {
-		for (const root of document.querySelectorAll("[data-fchub-mc-context-rate]")) {
-			const hide = enabled(root, "data-fchub-mc-hide-when-base") && context.isBaseDisplay;
-			const format = root.getAttribute("data-fchub-mc-context-rate") || "compact";
-			const precision = root.getAttribute("data-fchub-mc-rate-precision") || "4";
-			const fragment = presentation.rate?.[format]?.[precision];
-			if (hide) root.innerHTML = "";
-			else if (typeof fragment === "string") root.innerHTML = fragment;
-		}
-	}
-
-	function syncNoticeBlocks(context, presentation) {
-		for (const root of document.querySelectorAll("[data-fchub-mc-context-notice]")) {
-			const hide = enabled(root, "data-fchub-mc-hide-when-base") && context.isBaseDisplay;
-			const mode = root.getAttribute("data-fchub-mc-context-notice") || "compact";
-			const fragment = presentation.notice?.[mode];
-			if (hide) root.innerHTML = "";
-			else if (typeof fragment === "string") root.innerHTML = fragment;
-		}
+		syncSwitcherFooter(root, switcherParts(context.displayCurrency));
 	}
 
 	function syncContextBlocks(context) {
-		const presentation = context.presentation;
-		if (!presentation) return;
+		const code = context.displayCurrency;
+		const isBase = code === config.baseCurrency;
 
-		syncCurrentBlocks(presentation);
-		syncRateBlocks(context, presentation);
-		syncNoticeBlocks(context, presentation);
+		for (const root of document.querySelectorAll("[data-fchub-mc-context-current]")) {
+			root.innerHTML = renderCurrent(code, root.getAttribute("data-fchub-mc-context-current") || "flag_code");
+		}
+
+		for (const root of document.querySelectorAll("[data-fchub-mc-context-rate]")) {
+			const hide = enabled(root, "data-fchub-mc-hide-when-base") && isBase;
+			root.innerHTML = hide
+				? ""
+				: renderRate(
+						code,
+						root.getAttribute("data-fchub-mc-rate-precision") || "4",
+						root.getAttribute("data-fchub-mc-context-rate") || "compact",
+					);
+		}
+
+		for (const root of document.querySelectorAll("[data-fchub-mc-context-notice]")) {
+			const hide = enabled(root, "data-fchub-mc-hide-when-base") && isBase;
+			root.innerHTML = hide
+				? ""
+				: renderNotice(code, root.getAttribute("data-fchub-mc-context-notice") || "compact");
+		}
 	}
 
 	function applyContext(context) {

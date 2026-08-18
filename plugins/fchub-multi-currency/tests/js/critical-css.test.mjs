@@ -27,7 +27,7 @@ it("shields every price surface the projection runtime rewrites", () => {
  * pass may drop it and a defer pass may delay it — both leave the lock invisible.
  */
 it("keeps runtime-state rules out of the linked stylesheet", () => {
-	for (const stateClass of ["fchub-mc-switcher--loading", "fchub-mc-selector-buttons--loading", "fchub-mc-recovering", "fchub-mc-projecting"]) {
+	for (const stateClass of ["fchub-mc-pending"]) {
 		assert.ok(!switcherCss.includes(stateClass), `${stateClass} is still linked, not inline.`);
 		assert.ok(criticalCss.includes(stateClass), `${stateClass} is missing from the critical styles.`);
 	}
