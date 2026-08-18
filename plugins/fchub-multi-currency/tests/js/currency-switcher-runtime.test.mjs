@@ -20,6 +20,7 @@ function runSwitch({ config = {}, applyResult = true, postStatus = 200, postThro
 	const warnings = [];
 	const navigations = [];
 	const errorsShown = [];
+	let announcer = null;
 
 	const sandbox = {
 		window: {
@@ -46,12 +47,19 @@ function runSwitch({ config = {}, applyResult = true, postStatus = 200, postThro
 			readyState: "complete",
 			addEventListener() {},
 			querySelectorAll: () => [],
-			createElement: () => ({
-				className: "",
-				textContent: "",
-				setAttribute() {},
-				appendChild() {},
-			}),
+			getElementById: (id) => (id === "fchub-mc-announcer" ? announcer : null),
+			body: { appendChild: (node) => { announcer = node; } },
+			createElement: () => {
+				const attributes = new Map();
+				return {
+					id: "",
+					className: "",
+					textContent: "",
+					setAttribute: (name, value) => attributes.set(name, value),
+					getAttribute: (name) => attributes.get(name) ?? null,
+					appendChild() {},
+				};
+			},
 		},
 		fetch: (url, options) => {
 			posts.push({ url, options });
@@ -86,6 +94,9 @@ function runSwitch({ config = {}, applyResult = true, postStatus = 200, postThro
 		posts,
 		warnings,
 		navigations,
+		get announcer() {
+			return announcer;
+		},
 		errorsShown: { get text() { return errorsShown.map((node) => node.textContent).join(" "); }, get length() { return errorsShown.length; } },
 		switch: (code) => sandbox.window.fchubMcSwitchCurrency(code, { root }),
 	};
@@ -157,6 +168,24 @@ describe("switching currency", () => {
 		await run.switch("JPY");
 
 		assert.match(run.errorsShown.text, /Diese Währung/);
+	});
+
+	/**
+	 * Switching no longer reloads, so nothing announces itself any more. Without a
+	 * live region a screen-reader user picks a currency, the dropdown closes, and
+	 * every price on the page changes in silence.
+	 */
+	it("announces the new currency to assistive technology", async () => {
+		const run = runSwitch({
+			config: {
+				presentationTemplates: { currencySwitched: "Prices are now shown in %s." },
+				currencyTable: { USD: {}, EUR: { displayCurrencyName: "Euro" } },
+			},
+		});
+		await run.switch("EUR");
+
+		assert.equal(run.announcer.getAttribute("aria-live"), "polite");
+		assert.equal(run.announcer.textContent, "Prices are now shown in Euro.");
 	});
 
 	it("sends the REST nonce only for a signed-in visitor", async () => {

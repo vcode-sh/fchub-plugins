@@ -44,6 +44,7 @@ final class CurrencyContextPresentation
                 'That currency is not available right now.',
                 'fchub-multi-currency',
             ),
+            'currencySwitched' => __('Prices are now shown in %s.', 'fchub-multi-currency'),
         ];
     }
 

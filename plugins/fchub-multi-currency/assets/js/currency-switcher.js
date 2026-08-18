@@ -83,6 +83,38 @@
 	const UNAVAILABLE_ERROR =
 		config.presentationTemplates?.currencyUnavailable || "That currency is not available.";
 
+	/**
+	 * Tells assistive technology that every price on the page just changed.
+	 *
+	 * A switch used to reload, and a screen reader announces a page load. It does
+	 * not any more: the dropdown closes, every amount silently becomes a different
+	 * number, and nothing says so. The region is created up front and written to
+	 * later, because a live region populated in the same tick it appears in is not
+	 * reliably announced.
+	 */
+	function announceCurrency(currencyCode) {
+		const template = config.presentationTemplates?.currencySwitched;
+		if (!template) return;
+
+		const region = document.getElementById("fchub-mc-announcer");
+		if (!region) return;
+
+		const name = config.currencyTable?.[currencyCode]?.displayCurrencyName || currencyCode;
+		region.textContent = template.replace("%s", name);
+	}
+
+	/** One polite region for the page, in place before anything needs to say something. */
+	function ensureAnnouncer() {
+		if (document.getElementById("fchub-mc-announcer")) return;
+
+		const region = document.createElement("div");
+		region.id = "fchub-mc-announcer";
+		region.className = "fchub-mc-announcer";
+		region.setAttribute("aria-live", "polite");
+		region.setAttribute("aria-atomic", "true");
+		document.body.appendChild(region);
+	}
+
 	function clearLoadingState(root) {
 		if (root) {
 			root.classList.remove("fchub-mc-switcher--loading");
@@ -162,6 +194,7 @@
 		}
 
 		window.fchubMc?.setCurrency(code);
+		announceCurrency(code);
 		clearLoadingState(root);
 		window.dispatchEvent(
 			new CustomEvent("fchub_mc:context_changed", { detail: { currency: code } }),
@@ -561,6 +594,7 @@
 	}
 
 	function initAll() {
+		ensureAnnouncer();
 		const widgets = document.querySelectorAll("[data-fchub-mc-switcher]");
 		for (const widget of widgets) {
 			initSwitcher(widget);
