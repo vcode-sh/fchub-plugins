@@ -1,0 +1,133 @@
+---
+title: Translations
+description: Ship the storefront and admin in any language. Copy one file, translate it, run one command. No build step, no drama.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Separator } from '@/components/ui/separator';
+
+Every string in the plugin — storefront, checkout notices, the admin settings
+panel, the block editor — reads through WordPress translations. The catalogue
+lives in `languages/fchub-multi-currency.pot` (380+ strings), and adding a
+language never touches code.
+
+<Callout type="info" title="Who sees which language">
+The storefront follows the **site language** (Settings → General). Admins see
+the settings panel in their own **profile language**. Both come from the same
+translation files.
+</Callout>
+
+<Separator className="my-8" />
+
+## Add a language
+
+You need [Poedit](https://poedit.net/) (or any PO editor) and
+[WP-CLI](https://wp-cli.org/) with the `i18n` command — bundled since WP-CLI 2.x.
+
+<Steps>
+<Step>
+
+### Copy the catalogue
+
+Inside the plugin's `languages/` directory, copy the POT to a `.po` named
+after the exact WordPress locale — `pl_PL`, `de_DE`, `fr_FR`:
+
+```bash
+cp fchub-multi-currency.pot fchub-multi-currency-pl_PL.po
+```
+
+</Step>
+<Step>
+
+### Set the plural rule
+
+In the PO header, set `Plural-Forms` for your language before translating.
+Poedit does this automatically when you pick the language. Polish, for the
+record:
+
+```text
+Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);
+```
+
+This header is load-bearing: the storefront ships your rule to the browser so
+live counts pick the right form — *1 godzina, 2 godziny, 5 godzin*. Full
+native plurals, every language, no exceptions.
+
+</Step>
+<Step>
+
+### Translate
+
+Fill in every `msgstr`, and every `msgstr[n]` form on plural entries (the six
+time units). The rules that keep translations working:
+
+- **Placeholders stay verbatim.** `%s`, `%1$s`, `%2$s` and the checkout
+  tokens `{base_currency}`, `{display_currency}`, `{rate}` are replaced at
+  runtime. Reorder them freely with the positional forms (`%1$s`, `%2$s`);
+  never translate or drop them.
+- **Brand names stay.** FluentCart, FluentCRM, FluentCommunity, and currency
+  codes (EUR, PLN) are not words.
+- **Prefer typographic quotes** („…", «…», '…') over the ASCII `"` — a few
+  admin strings land inside HTML attributes, and a raw double quote ends the
+  attribute early.
+- Sentences interpolate **currency codes**, not nouns, so grammatical case
+  belongs to your surrounding words: *w walucie %s*, not *w %s*.
+
+</Step>
+<Step>
+
+### Compile
+
+From the plugin directory:
+
+```bash
+composer i18n:build
+```
+
+That runs `wp i18n make-mo` (PHP strings) and `wp i18n make-json --no-purge`
+(admin and block-editor JS strings, as JED files). The generated
+`.mo` and `-{md5}.json` files sit next to your `.po` — never rename the JSON
+files, the hash is how WordPress finds them.
+
+</Step>
+<Step>
+
+### Verify
+
+Switch **Settings → General → Site Language**, then check the storefront:
+the switcher labels, the rates-updated badge (try a store with rates 2 and
+5 hours old — both plural forms should read natively), and the checkout
+notice. Set your **profile language** to check the admin panel.
+
+</Step>
+</Steps>
+
+<Separator className="my-8" />
+
+## Keeping translations current
+
+When plugin strings change, refresh the catalogue and merge:
+
+```bash
+composer i18n:pot
+```
+
+Then in Poedit: **Translation → Update from POT file**, translate the new
+entries, and run `composer i18n:build` again. Untranslated strings fall back
+to English — nothing breaks, it just reads bilingual.
+
+<Callout type="warn" title="Update-safe custom translations">
+Files inside the plugin's `languages/` directory are overwritten on plugin
+updates. For a site-specific translation you maintain yourself, place the
+compiled `.mo` (and JSON files) in `wp-content/languages/plugins/` instead —
+WordPress checks there first, and plugin updates never touch it.
+</Callout>
+
+## What translations do not cover
+
+- **Merchant-saved content.** A customised checkout disclosure text and the
+  currency names/symbols saved on the Currencies tab are your content, stored
+  as entered. Gettext only translates the shipped defaults.
+- **FluentCart's currency catalogue.** The full currency name list in the
+  admin picker comes from FluentCart and follows its translations, not the
+  plugin's.
