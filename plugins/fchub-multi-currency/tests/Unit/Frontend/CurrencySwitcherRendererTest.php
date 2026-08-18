@@ -15,7 +15,7 @@ final class CurrencySwitcherRendererTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->resetContextModuleCache();
+        $this->resetResolvedContext();
         CurrencySettings::setMock(['currency' => 'EUR']);
 
         $this->setOption('fchub_mc_settings', [
@@ -186,12 +186,5 @@ final class CurrencySwitcherRendererTest extends TestCase
 
         $this->assertStringContainsString('class="fchub-mc-switcher__symbol">$</span>', $html);
         $this->assertStringNotContainsString('class="fchub-mc-switcher__code">USD</span>', $html);
-    }
-
-    private function resetContextModuleCache(): void
-    {
-        $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
-        $prop = $ref->getProperty('cachedChain');
-        $prop->setValue(null, null);
     }
 }

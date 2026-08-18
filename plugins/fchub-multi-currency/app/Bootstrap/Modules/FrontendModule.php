@@ -9,6 +9,7 @@ use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Frontend\CurrencyContextPayload;
 use FChubMultiCurrency\Frontend\CurrencySwitcherRenderer;
+use FChubMultiCurrency\Frontend\CurrencyTablePayload;
 use FChubMultiCurrency\Integration\FluentCartCurrency;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Constants;
@@ -110,6 +111,15 @@ final class FrontendModule implements ModuleContract
     }
 
     /**
+     * The browser contract for a storefront page.
+     *
+     * Everything from `currencyTable` down is a store fact, identical for every
+     * visitor, and therefore safe inside a document a shared cache will hand to
+     * anyone. The resolved-context fields merged in at the top are not: they answer
+     * "which currency does *this* request want", which is the wrong question to bake
+     * into cached HTML. They remain only until the runtime that reads them is
+     * replaced, and the byte-identical guarantee lands with their removal.
+     *
      * @return array<string, mixed>
      */
     public static function buildFrontendConfig(): array
@@ -120,13 +130,25 @@ final class FrontendModule implements ModuleContract
 
         $fcSettings = CurrencySettings::get();
         $shopSeparators = FluentCartCurrency::separators();
+        $settings = $optionStore->all();
+        $userId = get_current_user_id();
 
         return array_merge(CurrencyContextPayload::build($context, $optionStore), [
+            'currencyTable'         => CurrencyTablePayload::build($optionStore),
+            'baseCurrency'          => strtoupper((string) ($settings['base_currency'] ?? 'USD')),
+            'defaultCurrency'       => strtoupper((string) ($settings['default_display_currency'] ?? '')),
+            'accountCurrency'       => $userId > 0
+                ? strtoupper((string) get_user_meta($userId, Constants::USER_META_KEY, true))
+                : '',
             'roundingMode'          => $optionStore->get('rounding_mode', 'half_up'),
             'restUrl'               => rest_url(Constants::REST_NAMESPACE),
-            'nonce'                 => wp_create_nonce('wp_rest'),
+            // A nonce is per visitor and per twelve hours, so a cached copy belongs to
+            // whoever warmed the cache. Guests never needed one: the context endpoint
+            // admits them without it. Signed-in visitors are not served from a shared
+            // cache, so theirs is still both correct and useful.
+            'nonce'                 => $userId > 0 ? wp_create_nonce('wp_rest') : '',
             'currencies'            => $optionStore->get('display_currencies', []),
-            'allowedCurrencyCodes'  => SelectableCurrencyCodes::fromSettings($optionStore->all())->all(),
+            'allowedCurrencyCodes'  => SelectableCurrencyCodes::fromSettings($settings)->all(),
             'cookieName'            => Constants::COOKIE_KEY,
             'cookiePersistenceEnabled' => $optionStore->get('cookie_enabled', 'yes') === 'yes',
             'cookieLifetimeDays'    => (int) $optionStore->get('cookie_lifetime_days', 90),

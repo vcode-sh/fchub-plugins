@@ -68,8 +68,9 @@ abstract class TestCase extends BaseTestCase
         $GLOBALS['wp_send_json_data'] = null;
         $GLOBALS['wp_send_json_status'] = null;
 
-        // Reset CurrencyContextService singleton
+        // Reset CurrencyContextService singleton and the memoised resolver chain
         \FChubMultiCurrency\Domain\Services\CurrencyContextService::reset();
+        \FChubMultiCurrency\Bootstrap\Modules\ContextModule::resetChain();
         \FluentCart\Api\CurrencySettings::resetMock();
 
         $_GET = [];
@@ -81,6 +82,22 @@ abstract class TestCase extends BaseTestCase
     protected function tearDown(): void
     {
         parent::tearDown();
+    }
+
+    /**
+     * Forces the next resolve to start from scratch.
+     *
+     * Two statics memoise currency resolution: the resolver chain on ContextModule
+     * and the resolved context on CurrencyContextService. Clearing only the first
+     * lets a test change a cookie, resolve again and silently receive the previous
+     * visitor's answer — which is the exact bug class this suite exists to catch.
+     * `setUp()` already does this; call it again mid-test after changing settings,
+     * cookies or the current user.
+     */
+    protected function resetResolvedContext(): void
+    {
+        \FChubMultiCurrency\Bootstrap\Modules\ContextModule::resetChain();
+        \FChubMultiCurrency\Domain\Services\CurrencyContextService::reset();
     }
 
     protected function setCurrentUserId(int $userId): void

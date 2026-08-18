@@ -15,7 +15,7 @@ final class BlocksModuleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->resetContextModuleCache();
+        $this->resetResolvedContext();
 
         $this->setOption('fchub_mc_settings', [
             'enabled'            => 'yes',
@@ -81,12 +81,5 @@ final class BlocksModuleTest extends TestCase
         $this->assertStringContainsString('fchub-mc-switcher--dropdown-auto', $html);
         $this->assertStringContainsString('fchub-mc-switcher--direction-auto', $html);
         $this->assertStringContainsString('class="fchub-mc-switcher__code">USD</span>', $html);
-    }
-
-    private function resetContextModuleCache(): void
-    {
-        $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
-        $prop = $ref->getProperty('cachedChain');
-        $prop->setValue(null, null);
     }
 }

@@ -18,7 +18,7 @@ final class CurrencyBlockFamilyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->resetContextModuleCache();
+        $this->resetResolvedContext();
         CurrencySettings::setMock(['currency' => 'EUR']);
 
         $this->setOption('fchub_mc_settings', [
@@ -86,12 +86,5 @@ final class CurrencyBlockFamilyTest extends TestCase
         $this->assertStringContainsString('data-fchub-mc-button-switcher', $html);
         $this->assertStringContainsString('GBP', $html);
         $this->assertStringContainsString('USD', $html);
-    }
-
-    private function resetContextModuleCache(): void
-    {
-        $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
-        $prop = $ref->getProperty('cachedChain');
-        $prop->setValue(null, null);
     }
 }

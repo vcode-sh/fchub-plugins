@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Tests\Unit\Bootstrap;
 
 use FChubMultiCurrency\Bootstrap\Modules\FrontendModule;
+use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Tests\Support\TestCase;
 use FluentCart\Api\CurrencySettings;
 use PHPUnit\Framework\Attributes\Test;
@@ -138,12 +139,113 @@ final class FrontendModuleTest extends TestCase
         $this->assertTrue($config['accountPersistenceEnabled']);
         $this->assertFalse($config['isLoggedIn']);
         $this->assertTrue($config['projectionEnabled']);
-        $this->assertSame('default', $config['resolverSource']);
         $this->assertSame(['EUR', 'USD'], $config['allowedCurrencyCodes']);
         $this->assertTrue($config['urlParamEnabled']);
         $this->assertSame('money', $config['urlParamKey']);
         $this->assertArrayNotHasKey('presentation', $config);
         $this->assertArrayNotHasKey('rateValue', $config);
+    }
+
+    /**
+     * The invariant this whole change rests on, asserted over the surface that can
+     * satisfy it today.
+     *
+     * Storefront HTML goes into a shared cache, so what the browser reads out of it
+     * must not describe whoever happened to warm that cache. The resolved-context
+     * fields still merged in above these cannot honour that yet — the current
+     * runtime consumes them — so this covers the cacheable surface and widens to the
+     * whole config in the change that removes their last reader.
+     */
+    #[Test]
+    public function testTheCacheableSurfaceIsByteIdenticalForGuestsWithDifferentCookies(): void
+    {
+        $this->setOption('fchub_mc_settings', $this->switcherSettings());
+        $this->setWpdbMockRow($this->rateRow());
+
+        $_COOKIE[Constants::COOKIE_KEY] = 'EUR';
+        $this->resetResolvedContext();
+        $first = $this->cacheableSurface(FrontendModule::buildFrontendConfig());
+
+        $_COOKIE[Constants::COOKIE_KEY] = 'USD';
+        $this->resetResolvedContext();
+        $second = $this->cacheableSurface(FrontendModule::buildFrontendConfig());
+
+        $this->assertSame($first, $second);
+    }
+
+    /**
+     * The keys a cached document may safely carry, encoded for byte comparison.
+     *
+     * @param array<string, mixed> $config
+     */
+    private function cacheableSurface(array $config): string
+    {
+        return (string) wp_json_encode(array_intersect_key($config, array_flip([
+            'currencyTable',
+            'baseCurrency',
+            'defaultCurrency',
+            'allowedCurrencyCodes',
+            'nonce',
+            'cookieName',
+            'cookiePersistenceEnabled',
+            'cookieLifetimeDays',
+            'accountPersistenceEnabled',
+            'urlParamEnabled',
+            'urlParamKey',
+            'roundingMode',
+            'restUrl',
+            'flagBaseUrl',
+        ])));
+    }
+
+    #[Test]
+    public function testFrontendConfigShipsTheWholeCurrencyTable(): void
+    {
+        $this->setOption('fchub_mc_settings', $this->switcherSettings());
+        $this->setWpdbMockRow($this->rateRow());
+        $this->resetResolvedContext();
+
+        $config = FrontendModule::buildFrontendConfig();
+
+        $this->assertSame(['EUR', 'USD'], array_keys($config['currencyTable']));
+        $this->assertSame('EUR', $config['baseCurrency']);
+        $this->assertSame('USD', $config['defaultCurrency']);
+        $this->assertSame(1.0, $config['currencyTable']['EUR']['rate'], 'Base converts at par.');
+        $this->assertSame(0.92, $config['currencyTable']['USD']['rate']);
+    }
+
+    /**
+     * `wp_create_nonce()` is per visitor and per twelve hours. Baking one into a
+     * cached page hands every later visitor a nonce that is not theirs, and guests
+     * never needed one: the context endpoint's permission callback lets them
+     * through. Signed-in visitors are not served from a shared cache, so they keep
+     * theirs.
+     */
+    #[Test]
+    public function testFrontendConfigWithholdsTheRestNonceFromGuests(): void
+    {
+        $this->setOption('fchub_mc_settings', $this->switcherSettings());
+        $this->setWpdbMockRow($this->rateRow());
+
+        $this->assertSame('', FrontendModule::buildFrontendConfig()['nonce']);
+
+        $this->setCurrentUserId(7);
+        $this->resetResolvedContext();
+        $this->assertNotSame('', FrontendModule::buildFrontendConfig()['nonce']);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function rateRow(): array
+    {
+        return [
+            'base_currency'  => 'USD',
+            'quote_currency' => 'EUR',
+            'rate'           => '0.92000000',
+            'provider'       => 'manual',
+            'fetched_at'     => current_time('mysql'),
+        ];
     }
 
     #[Test]

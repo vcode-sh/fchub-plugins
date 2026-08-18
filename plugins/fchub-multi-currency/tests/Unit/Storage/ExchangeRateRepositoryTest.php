@@ -101,4 +101,6 @@ final class ExchangeRateRepositoryTest extends TestCase
         $this->assertSame('GBP', $result[1]->quoteCurrency);
         $this->assertSame('0.79000000', $result[1]->rate);
     }
+
+
 }
