@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Tests\Unit\Bootstrap;
 
 use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
+use FChubMultiCurrency\Frontend\NoscriptCurrencyForm;
 use FChubMultiCurrency\Frontend\CurrencySwitcherRenderer;
 use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Tests\Support\TestCase;
@@ -38,7 +39,7 @@ final class ContextModuleNoscriptPersistenceTest extends TestCase
         ];
         $this->setCurrentUserId(42);
 
-        ContextModule::persistPostedCurrencyPreference();
+        NoscriptCurrencyForm::handle();
 
         $this->assertSame('USD', $_COOKIE[Constants::COOKIE_KEY] ?? '');
         $this->assertSame('USD', $GLOBALS['wp_mock_user_meta'][42][Constants::USER_META_KEY] ?? '');
@@ -55,7 +56,7 @@ final class ContextModuleNoscriptPersistenceTest extends TestCase
             CurrencySwitcherRenderer::NOSCRIPT_NONCE => '',
         ];
 
-        ContextModule::persistPostedCurrencyPreference();
+        NoscriptCurrencyForm::handle();
 
         $this->assertArrayNotHasKey(Constants::COOKIE_KEY, $_COOKIE);
         $this->assertHookNotFired('fchub_mc/context_switched');
@@ -70,7 +71,7 @@ final class ContextModuleNoscriptPersistenceTest extends TestCase
             CurrencySwitcherRenderer::NOSCRIPT_NONCE => 'valid',
         ];
 
-        ContextModule::persistPostedCurrencyPreference();
+        NoscriptCurrencyForm::handle();
 
         $this->assertArrayNotHasKey(Constants::COOKIE_KEY, $_COOKIE);
         $this->assertHookNotFired('fchub_mc/context_switched');
@@ -98,7 +99,7 @@ final class ContextModuleNoscriptPersistenceTest extends TestCase
             CurrencySwitcherRenderer::NOSCRIPT_NONCE => 'valid',
         ];
 
-        ContextModule::persistPostedCurrencyPreference();
+        NoscriptCurrencyForm::handle();
 
         $this->assertCount(0, $GLOBALS['fchub_mc_setcookie_calls']);
         $this->assertArrayNotHasKey(Constants::COOKIE_KEY, $_COOKIE);
@@ -123,7 +124,7 @@ final class ContextModuleNoscriptPersistenceTest extends TestCase
             CurrencySwitcherRenderer::NOSCRIPT_NONCE => 'valid',
         ];
 
-        ContextModule::persistPostedCurrencyPreference();
+        NoscriptCurrencyForm::handle();
 
         // No cookie faked for the current request, and no "switched" signal for listeners.
         $this->assertArrayNotHasKey(Constants::COOKIE_KEY, $_COOKIE);
@@ -150,7 +151,7 @@ final class ContextModuleNoscriptPersistenceTest extends TestCase
             CurrencySwitcherRenderer::NOSCRIPT_NONCE => 'valid',
         ];
 
-        ContextModule::persistPostedCurrencyPreference();
+        NoscriptCurrencyForm::handle();
 
         $this->assertSame('USD', $GLOBALS['wp_mock_user_meta'][42][Constants::USER_META_KEY] ?? '');
         $this->assertHookFired('fchub_mc/context_switched');
@@ -166,7 +167,7 @@ final class ContextModuleNoscriptPersistenceTest extends TestCase
             CurrencySwitcherRenderer::NOSCRIPT_NONCE => 'valid',
         ];
 
-        ContextModule::persistPostedCurrencyPreference();
+        NoscriptCurrencyForm::handle();
 
         $this->assertArrayNotHasKey(Constants::COOKIE_KEY, $_COOKIE);
         $this->assertHookNotFired('fchub_mc/context_switched');

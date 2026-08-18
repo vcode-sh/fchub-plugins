@@ -56,7 +56,7 @@ final class ContextModuleTest extends TestCase
             'display_currencies' => [],
         ]);
 
-        $context = ContextModule::resolveCookiePreference(new OptionStore(), 'USD');
+        $context = ContextModule::resolveExplicitPreference(new OptionStore(), 'USD');
 
         $this->assertSame('USD', $context->displayCurrency->code);
         $this->assertTrue($context->isBaseDisplay);

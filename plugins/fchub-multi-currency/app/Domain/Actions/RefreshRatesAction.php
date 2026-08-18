@@ -31,72 +31,106 @@ final class RefreshRatesAction
         $settings = $optionStore->all();
 
         if (!ProviderRegistry::usesRemoteProvider($optionStore)) {
-            EventLogger::log('rates_refresh_skipped_manual', get_current_user_id());
-            return false;
+            return $this->giveUp('rates_refresh_skipped_manual');
         }
 
         $baseCurrency = strtoupper((string) ($settings['base_currency'] ?? 'USD'));
         $quoteCodes = SelectableCurrencyCodes::fromSettings($settings)->quoteCurrencies();
         if ($quoteCodes === []) {
             Logger::error('Rate refresh has no configured quote currencies');
-            EventLogger::log('rates_refresh_failed', get_current_user_id(), [
-                'reason' => 'no_quotes',
-            ]);
-            return false;
+
+            return $this->giveUp('rates_refresh_failed', ['reason' => 'no_quotes']);
         }
 
         if (!$this->acquireLock()) {
-            EventLogger::log('rates_refresh_skipped_lock', get_current_user_id());
-            return false;
+            return $this->giveUp('rates_refresh_skipped_lock');
         }
 
         try {
-            $provider = ProviderRegistry::resolve($optionStore);
-            $rates = $this->fetchProviderRates($provider, $baseCurrency);
-            if ($rates === null) {
-                return false;
-            }
-
-            $snapshot = $this->buildSnapshot($rates, $quoteCodes, $baseCurrency, $provider);
-            if ($snapshot === null) {
-                EventLogger::log('rates_refresh_failed', get_current_user_id(), [
-                    'provider' => $provider->name(),
-                    'reason' => 'incomplete_snapshot',
-                ]);
-                return false;
-            }
-
-            if (!$this->repository->insertMany($snapshot)) {
-                Logger::error('Rate refresh snapshot could not be persisted', [
-                    'provider' => $provider->name(),
-                ]);
-                EventLogger::log('rates_refresh_failed', get_current_user_id(), [
-                    'provider' => $provider->name(),
-                    'reason' => 'persistence',
-                ]);
-                return false;
-            }
-
-            foreach ($snapshot as $rate) {
-                $this->cache->set($rate);
-            }
-
-            $persistedCount = count($snapshot);
-            do_action('fchub_mc/rates_refreshed', $baseCurrency, $persistedCount);
-            EventLogger::log('rates_refreshed', get_current_user_id(), [
-                'base_currency' => $baseCurrency,
-                'provider' => $provider->name(),
-                'count' => $persistedCount,
-            ]);
-            Logger::info('Rates refreshed successfully', [
-                'provider' => $provider->name(),
-                'count'    => $persistedCount,
-            ]);
-
-            return true;
+            return $this->refresh(ProviderRegistry::resolve($optionStore), $baseCurrency, $quoteCodes);
         } finally {
             $this->releaseLock();
         }
+    }
+
+    /**
+     * Fetch, verify, persist, publish — in that order, and all or nothing.
+     *
+     * Every exit before the last leaves the previous rates exactly as they were.
+     * A half-written snapshot would have a store quoting prices at a rate nobody
+     * ever fetched, which is worse than quoting yesterday's.
+     *
+     * @param string[] $quoteCodes
+     */
+    private function refresh(ProviderContract $provider, string $baseCurrency, array $quoteCodes): bool
+    {
+        $rates = $this->fetchProviderRates($provider, $baseCurrency);
+        if ($rates === null) {
+            return false;
+        }
+
+        $snapshot = $this->buildSnapshot($rates, $quoteCodes, $baseCurrency, $provider);
+        if ($snapshot === null) {
+            return $this->giveUp('rates_refresh_failed', [
+                'provider' => $provider->name(),
+                'reason' => 'incomplete_snapshot',
+            ]);
+        }
+
+        if (!$this->repository->insertMany($snapshot)) {
+            Logger::error('Rate refresh snapshot could not be persisted', [
+                'provider' => $provider->name(),
+            ]);
+
+            return $this->giveUp('rates_refresh_failed', [
+                'provider' => $provider->name(),
+                'reason' => 'persistence',
+            ]);
+        }
+
+        $this->publish($snapshot, $baseCurrency, $provider);
+
+        return true;
+    }
+
+    /**
+     * Only reached once the snapshot is safely stored, so the cache and the hook
+     * can never describe rates the database does not have.
+     *
+     * @param ExchangeRate[] $snapshot
+     */
+    private function publish(array $snapshot, string $baseCurrency, ProviderContract $provider): void
+    {
+        foreach ($snapshot as $rate) {
+            $this->cache->set($rate);
+        }
+
+        $count = count($snapshot);
+        do_action('fchub_mc/rates_refreshed', $baseCurrency, $count);
+        EventLogger::log('rates_refreshed', get_current_user_id(), [
+            'base_currency' => $baseCurrency,
+            'provider' => $provider->name(),
+            'count' => $count,
+        ]);
+        Logger::info('Rates refreshed successfully', [
+            'provider' => $provider->name(),
+            'count'    => $count,
+        ]);
+    }
+
+    /**
+     * Records why the refresh stopped and reports the failure to the caller.
+     *
+     * Five paths end here. Writing the event and returning false at each of them
+     * is how one of them ends up silent.
+     *
+     * @param array<string, mixed> $context
+     */
+    private function giveUp(string $event, array $context = []): bool
+    {
+        EventLogger::log($event, get_current_user_id(), $context === [] ? null : $context);
+
+        return false;
     }
 
     /**
@@ -111,10 +145,11 @@ final class RefreshRatesAction
                 'provider' => $provider->name(),
                 'error' => $exception->getMessage(),
             ]);
-            EventLogger::log('rates_refresh_failed', get_current_user_id(), [
+            $this->giveUp('rates_refresh_failed', [
                 'provider' => $provider->name(),
                 'reason' => 'exception',
             ]);
+
             return null;
         }
 
@@ -122,10 +157,11 @@ final class RefreshRatesAction
             Logger::error('Rate refresh returned empty rates', [
                 'provider' => $provider->name(),
             ]);
-            EventLogger::log('rates_refresh_failed', get_current_user_id(), [
+            $this->giveUp('rates_refresh_failed', [
                 'provider' => $provider->name(),
                 'reason' => 'empty',
             ]);
+
             return null;
         }
 

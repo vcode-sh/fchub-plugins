@@ -19,6 +19,7 @@ use FChubMultiCurrency\Domain\ValueObjects\Currency;
 use FChubMultiCurrency\Domain\ValueObjects\CurrencyContext;
 use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Frontend\CurrencySwitcherRenderer;
+use FChubMultiCurrency\Frontend\NoscriptCurrencyForm;
 use FChubMultiCurrency\Storage\ExchangeRateRepository;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Storage\PreferenceRepository;
@@ -38,84 +39,8 @@ final class ContextModule implements ModuleContract
 
     public function register(): void
     {
-        add_action('wp', [self::class, 'persistPostedCurrencyPreference'], 0);
+        add_action('wp', [NoscriptCurrencyForm::class, 'handle'], 0);
         add_action('wp_login', [self::class, 'mergeGuestPreference'], 10, 2);
-    }
-
-    public static function persistPostedCurrencyPreference(): void
-    {
-        if (!Hooks::isEnabled()) {
-            return;
-        }
-
-        $requestMethod = isset($_SERVER['REQUEST_METHOD'])
-            ? strtoupper(sanitize_text_field(wp_unslash((string) $_SERVER['REQUEST_METHOD'])))
-            : 'GET';
-        if ($requestMethod !== 'POST') {
-            return;
-        }
-
-        // phpcs:ignore WordPress.Security.NonceVerification.Missing
-        $submitted = isset($_POST[CurrencySwitcherRenderer::NOSCRIPT_FIELD])
-            ? sanitize_text_field(wp_unslash((string) $_POST[CurrencySwitcherRenderer::NOSCRIPT_FIELD]))
-            : '';
-
-        if ($submitted === '') {
-            return;
-        }
-
-        // phpcs:ignore WordPress.Security.NonceVerification.Missing
-        $nonce = isset($_POST[CurrencySwitcherRenderer::NOSCRIPT_NONCE])
-            ? sanitize_text_field(wp_unslash((string) $_POST[CurrencySwitcherRenderer::NOSCRIPT_NONCE]))
-            : '';
-
-        if ($nonce === '' || !wp_verify_nonce($nonce, CurrencySwitcherRenderer::NOSCRIPT_ACTION)) {
-            return;
-        }
-
-        $optionStore = new OptionStore();
-        $allowedCodes = SelectableCurrencyCodes::fromSettings($optionStore->all())->all();
-        $currencyCode = strtoupper($submitted);
-
-        if (!in_array($currencyCode, $allowedCodes, true)) {
-            return;
-        }
-
-        if (self::resolveSelectablePreference($optionStore, $currencyCode) === null) {
-            EventLogger::log('context_switch_rate_unavailable_noscript', get_current_user_id(), [
-                'currency' => $currencyCode,
-                'source' => 'noscript',
-            ]);
-
-            return;
-        }
-
-        $result = (new PersistContextAction(
-            new PreferenceRepository(),
-            $optionStore,
-        ))->execute($currencyCode);
-
-        // Nothing was stored — a logged-out visitor with cookie persistence disabled. Faking the
-        // cookie for this one request would only show the chosen currency until the next page load,
-        // so report the failure instead of pretending the switch worked.
-        if (!$result->persisted()) {
-            do_action('fchub_mc/context_switch_not_persisted', $currencyCode, get_current_user_id());
-            EventLogger::log('context_switch_not_persisted_noscript', get_current_user_id(), [
-                'currency' => $currencyCode,
-                'source' => 'noscript',
-            ]);
-
-            return;
-        }
-
-        $_COOKIE[Constants::COOKIE_KEY] = $currencyCode;
-        CurrencyContextService::reset();
-
-        do_action('fchub_mc/context_switched', $currencyCode, get_current_user_id());
-        EventLogger::log('context_switched_noscript', get_current_user_id(), [
-            'currency' => $currencyCode,
-            'source' => 'noscript',
-        ]);
     }
 
     public static function mergeGuestPreference(string $userLogin, $user): void
@@ -259,12 +184,6 @@ final class ContextModule implements ModuleContract
             $staleFallback,
             ResolverSource::Cookie,
         );
-    }
-
-    /** @deprecated 1.4.6 Use resolveExplicitPreference(). */
-    public static function resolveCookiePreference(OptionStore $optionStore, string $currencyCode): CurrencyContext
-    {
-        return self::resolveExplicitPreference($optionStore, $currencyCode);
     }
 
     /** Resolves a preference only when the selected currency has a usable server-side context. */

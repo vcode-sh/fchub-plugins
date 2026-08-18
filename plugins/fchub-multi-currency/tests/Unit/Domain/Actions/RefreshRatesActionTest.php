@@ -217,4 +217,61 @@ final class RefreshRatesActionTest extends TestCase
             static fn(string $query): bool => str_contains($query, 'INSERT INTO `wp_fchub_mc_rate_history`'),
         ));
     }
+
+    /**
+     * A provider that cannot be reached must leave the last good rates untouched.
+     *
+     * The alternative — a half-written snapshot, or a cache primed from nothing — is
+     * how a store starts quoting prices at a rate nobody ever fetched.
+     */
+    #[Test]
+    public function testAnUnreachableProviderChangesNothingAndSaysWhy(): void
+    {
+        $this->configureRemote(['EUR']);
+        $GLOBALS['wp_mock_remote_response'] = new \WP_Error('http_request_failed', 'Connection refused');
+        $cache = new RatesCacheStore();
+
+        $result = $this->action($cache)->execute();
+
+        $this->assertFalse($result);
+        $this->assertSame([], $this->rateInsertQueries(), 'Nothing may be written from a failed fetch.');
+        $this->assertNull($cache->get('USD', 'EUR'), 'Nothing may be cached from a failed fetch.');
+        $this->assertHookNotFired('fchub_mc/rates_refreshed');
+        $this->assertRefreshRecordedAFailure();
+    }
+
+    /**
+     * An empty response is a failure wearing a 200. Publishing it would replace every
+     * usable rate with nothing at all.
+     */
+    #[Test]
+    public function testAnEmptyProviderResponseIsTreatedAsAFailure(): void
+    {
+        $this->configureRemote(['EUR']);
+        $this->mockExchangeRateApi([]);
+        $cache = new RatesCacheStore();
+
+        $result = $this->action($cache)->execute();
+
+        $this->assertFalse($result);
+        $this->assertSame([], $this->rateInsertQueries());
+        $this->assertNull($cache->get('USD', 'EUR'));
+        $this->assertHookNotFired('fchub_mc/rates_refreshed');
+        $this->assertRefreshRecordedAFailure();
+    }
+
+    /**
+     * Whichever way the refresh gave up, it has to leave a reason behind in the event
+     * log. A silent refusal is indistinguishable from a refresh that never ran, and
+     * the event log is where a site owner goes to tell those apart.
+     */
+    private function assertRefreshRecordedAFailure(): void
+    {
+        $logged = array_values(array_filter(
+            $GLOBALS['wpdb']->queries,
+            static fn(string $query): bool => str_contains($query, 'event_log'),
+        ));
+
+        $this->assertNotEmpty($logged, 'Giving up must be recorded where a site owner can see it.');
+    }
 }
