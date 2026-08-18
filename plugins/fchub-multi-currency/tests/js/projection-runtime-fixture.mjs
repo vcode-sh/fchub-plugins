@@ -145,7 +145,21 @@ export async function runProjection({ config = {}, priceElements = [], selectors
 	};
 	const displayCurrency = settings.displayCurrency;
 	const window = {
-		fchubMc: { currentCurrency: () => displayCurrency },
+		fchubMc: {
+			currentCurrency: () => displayCurrency,
+			// The bootstrap owns writing a currency's facts into the live config; the
+			// projection runtime asks it rather than merging the table itself.
+			select: (code) => {
+				const entry = window.fchubMcConfig.currencyTable[code];
+				if (!entry) return false;
+
+				Object.assign(window.fchubMcConfig, entry, {
+					displayCurrency: code,
+					isBaseDisplay: code === window.fchubMcConfig.baseCurrency,
+				});
+				return true;
+			},
+		},
 		fchubMcConfig: {
 			...settings,
 			baseCurrency: settings.baseCurrency,

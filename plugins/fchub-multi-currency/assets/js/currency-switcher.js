@@ -84,6 +84,21 @@
 		config.presentationTemplates?.currencyUnavailable || "That currency is not available.";
 
 	/**
+	 * Applies the choice through whichever runtime this store loads.
+	 *
+	 * With client-side projection switched off there is no projection runtime and
+	 * no price to convert — but the labels still change and the preference is still
+	 * kept, so the switch must work rather than report the currency as unavailable.
+	 */
+	function applyChoice(code) {
+		if (window.fchubMcApplyCurrency) return window.fchubMcApplyCurrency(code);
+		if (window.fchubMc?.select(code) !== true) return false;
+
+		window.fchubMcSyncLabels?.(config);
+		return true;
+	}
+
+	/**
 	 * Tells assistive technology that every price on the page just changed.
 	 *
 	 * A switch used to reload, and a screen reader announces a page load. It does
@@ -188,7 +203,7 @@
 		const code = String(currencyCode || "")
 			.trim()
 			.toUpperCase();
-		if (window.fchubMcApplyCurrency?.(code) !== true) {
+		if (applyChoice(code) !== true) {
 			failSwitch(code, UNAVAILABLE_ERROR, settings, 0, "currency_unavailable");
 			return Promise.resolve();
 		}

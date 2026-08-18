@@ -139,6 +139,21 @@
 
 	window.fchubMc = {
 		currentCurrency: () => current,
+		/**
+		 * Writes a currency's facts into the live config and reports whether the
+		 * store offers it. The one place that merge happens, so a runtime that is
+		 * not loaded cannot take the answer with it.
+		 */
+		select: (value) => {
+			const code = normalizeCode(value);
+			if (!offered(code)) return false;
+
+			Object.assign(config, config.currencyTable[code], {
+				displayCurrency: code,
+				isBaseDisplay: code === normalizeCode(config.baseCurrency),
+			});
+			return true;
+		},
 		setCurrency: (value) => {
 			const code = normalizeCode(value);
 			if (!offered(code)) return false;

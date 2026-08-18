@@ -857,11 +857,9 @@
 	 * nothing else knows they are finally correct.
 	 */
 	function applyCurrency(code) {
-		const cfg = window.fchubMcConfig || {};
-		const entry = cfg.currencyTable?.[code];
-		if (!entry) return false;
+		if (window.fchubMc?.select(code) !== true) return false;
 
-		Object.assign(cfg, entry, { displayCurrency: code, isBaseDisplay: code === cfg.baseCurrency });
+		const cfg = window.fchubMcConfig || {};
 
 		try {
 			clearProjectionMarkers(document);

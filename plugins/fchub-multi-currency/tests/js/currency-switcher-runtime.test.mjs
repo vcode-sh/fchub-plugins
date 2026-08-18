@@ -12,7 +12,7 @@ const switcherSource = readFileSync(
  * Drives `fchubMcSwitchCurrency` against stand-ins for the two runtimes it calls,
  * so these tests describe the switch itself rather than price formatting.
  */
-function runSwitch({ config = {}, applyResult = true, postStatus = 200, postThrows = false } = {}) {
+function runSwitch({ config = {}, applyResult = true, postStatus = 200, postThrows = false, withoutProjectionRuntime = false } = {}) {
 	const applied = [];
 	const stored = [];
 	const events = [];
@@ -21,6 +21,7 @@ function runSwitch({ config = {}, applyResult = true, postStatus = 200, postThro
 	const navigations = [];
 	const errorsShown = [];
 	let announcer = null;
+	const labelsPainted = [];
 
 	const sandbox = {
 		window: {
@@ -31,11 +32,24 @@ function runSwitch({ config = {}, applyResult = true, postStatus = 200, postThro
 				currencyTable: { USD: {}, EUR: {} },
 				...config,
 			},
-			fchubMc: { setCurrency: (code) => stored.push(code) },
-			fchubMcApplyCurrency: (code) => {
-				applied.push(code);
-				return applyResult;
+			fchubMc: {
+				setCurrency: (code) => stored.push(code),
+				select: (code) => {
+					const table = sandbox.window.fchubMcConfig.currencyTable || {};
+					if (!Object.hasOwn(table, code)) return false;
+					sandbox.window.fchubMcConfig.displayCurrency = code;
+					return true;
+				},
 			},
+			fchubMcSyncLabels: (cfg) => labelsPainted.push(cfg.displayCurrency),
+			...(withoutProjectionRuntime
+				? {}
+				: {
+						fchubMcApplyCurrency: (code) => {
+							applied.push(code);
+							return applyResult;
+						},
+					}),
 			dispatchEvent: (event) => events.push(event),
 			addEventListener() {},
 			location: {
@@ -94,6 +108,7 @@ function runSwitch({ config = {}, applyResult = true, postStatus = 200, postThro
 		posts,
 		warnings,
 		navigations,
+		labelsPainted,
 		get announcer() {
 			return announcer;
 		},
@@ -186,6 +201,22 @@ describe("switching currency", () => {
 
 		assert.equal(run.announcer.getAttribute("aria-live"), "polite");
 		assert.equal(run.announcer.textContent, "Prices are now shown in Euro.");
+	});
+
+	/**
+	 * A store can switch client-side price projection off. Its prices then stay in
+	 * the base currency by design, but the switcher must still work: the labels
+	 * change and the preference is kept. Before this, the projection runtime was
+	 * the only thing that could apply a currency — and it is not even loaded on
+	 * such a store, so every switch reported the currency as unavailable.
+	 */
+	it("still switches on a store with price projection turned off", async () => {
+		const run = runSwitch({ withoutProjectionRuntime: true });
+		await run.switch("EUR");
+
+		assert.deepEqual(run.stored, ["EUR"]);
+		assert.equal(run.errorsShown.length, 0, "Nothing failed; there is simply nothing to convert.");
+		assert.deepEqual(run.labelsPainted, ["EUR"], "The switcher must still say which currency won.");
 	});
 
 	it("sends the REST nonce only for a signed-in visitor", async () => {
