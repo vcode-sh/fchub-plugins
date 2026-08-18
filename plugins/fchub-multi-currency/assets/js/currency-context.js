@@ -90,6 +90,20 @@
 	];
 
 	/**
+	 * Picks the plural form for a count from the shipped rule table: the site
+	 * locale's gettext rule precomputed as form indices for n = 0..200, where
+	 * counts past 200 repeat the 101..200 block. A config cached before the
+	 * table shipped falls back to the English two-form pick.
+	 */
+	function pluralFormIndex(count) {
+		const table = templates.timePluralRule;
+		if (!Array.isArray(table) || table.length !== 201) return count === 1 ? 0 : 1;
+
+		const index = count <= 100 ? table[count] : table[101 + ((count - 101) % 100)];
+		return Number.isInteger(index) && index >= 0 ? index : count === 1 ? 0 : 1;
+	}
+
+	/**
 	 * Rate freshness, computed when the visitor looks rather than when the
 	 * cache was warmed. The server-rendered string gates it — an empty badge
 	 * means the store disabled the surface — and also serves as the fallback
@@ -105,8 +119,9 @@
 		const age = Math.max(0, Math.round(Date.now() / 1000) - fetchedAt);
 		const [, divisor, unit] = TIME_TIERS.find(([limit]) => age < limit);
 		const count = Math.max(1, Math.round(age / divisor));
-		const pair = units[unit] || [];
-		const amount = fill(pair[count === 1 ? 0 : 1] || "%s", [String(count)]);
+		const forms = units[unit] || [];
+		const form = forms[pluralFormIndex(count)] ?? forms[forms.length - 1];
+		const amount = fill(form || "%s", [String(count)]);
 
 		const staleAfter = Number(entry.rateStaleAfterSeconds);
 		const stale = staleAfter > 0 && age > staleAfter;

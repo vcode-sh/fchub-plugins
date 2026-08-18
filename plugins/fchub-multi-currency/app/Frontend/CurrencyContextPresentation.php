@@ -25,30 +25,23 @@ final class CurrencyContextPresentation
      * every cached document instead would cost 3113 bytes per currency to deliver
      * the single variant a block asks for.
      *
-     * @return array<string, string|array<string, array<int, string>>>
+     * @return array<string, string|array<int, int>|array<string, array<int, string>>>
      */
     public static function templates(): array
     {
+        [$nplurals, $pluralRule] = self::pluralRule();
+
         return [
             // translators: %s is a human-readable time difference, e.g. "2 hours".
             'rateBadgeAgo' => __('Rates updated %s ago', 'fchub-multi-currency'),
-            // Singular/plural pairs the browser combines with a count, mirroring
-            // human_time_diff's units. The browser renders freshness at paint
-            // time because a cached document's pre-rendered age only grows.
-            'timeUnits' => [
-                // translators: %s is a number of minutes.
-                'min'   => [__('%s min', 'fchub-multi-currency'), __('%s mins', 'fchub-multi-currency')],
-                // translators: %s is a number of hours.
-                'hour'  => [__('%s hour', 'fchub-multi-currency'), __('%s hours', 'fchub-multi-currency')],
-                // translators: %s is a number of days.
-                'day'   => [__('%s day', 'fchub-multi-currency'), __('%s days', 'fchub-multi-currency')],
-                // translators: %s is a number of weeks.
-                'week'  => [__('%s week', 'fchub-multi-currency'), __('%s weeks', 'fchub-multi-currency')],
-                // translators: %s is a number of months.
-                'month' => [__('%s month', 'fchub-multi-currency'), __('%s months', 'fchub-multi-currency')],
-                // translators: %s is a number of years.
-                'year'  => [__('%s year', 'fchub-multi-currency'), __('%s years', 'fchub-multi-currency')],
-            ],
+            // Every plural form per unit, mirroring human_time_diff's units.
+            // The browser renders freshness at paint time because a cached
+            // document's pre-rendered age only grows.
+            'timeUnits' => self::timeUnitForms($nplurals, $pluralRule),
+            // Which form a count selects, precomputed for n = 0..200; counts
+            // past 200 repeat the 101..200 block. The site locale is a store
+            // fact, so the rule is safe in cached HTML.
+            'timePluralRule' => $pluralRule,
             // translators: %1$s is the base currency code, %2$s the exchange rate, %3$s the display currency code.
             'rate' => __('1 %1$s = %2$s %3$s', 'fchub-multi-currency'),
             // translators: %1$s is the base currency code, %2$s the exchange rate, %3$s the display currency code.
@@ -71,6 +64,97 @@ final class CurrencyContextPresentation
             // translators: %s is the display currency name.
             'currencySwitched' => __('Prices are now shown in %s.', 'fchub-multi-currency'),
         ];
+    }
+
+    /**
+     * The site locale's plural-form selector, precomputed as a lookup table
+     * because the browser must pick a form for a live count without
+     * evaluating gettext expressions. Rules depend only on n, n%10 and n%100
+     * with exact comparisons against small constants, so indices 0..100 plus
+     * one full 101..200 period cover every count.
+     *
+     * @return array{0: int, 1: array<int, int>}
+     */
+    private static function pluralRule(): array
+    {
+        $translations = get_translations_for_domain('fchub-multi-currency');
+        $header = is_callable([$translations, 'get_header'])
+            ? $translations->get_header('Plural-Forms')
+            : false;
+
+        if (
+            is_string($header)
+            && class_exists(\Plural_Forms::class)
+            && preg_match('/nplurals\s*=\s*(\d+)\s*;\s*plural\s*=\s*(.+?);?\s*$/', $header, $match)
+        ) {
+            try {
+                $parsed = new \Plural_Forms(rtrim($match[2], ';'));
+                $nplurals = max(1, (int) $match[1]);
+                $table = [];
+                for ($n = 0; $n <= 200; $n++) {
+                    $table[] = min(max(0, (int) $parsed->get($n)), $nplurals - 1);
+                }
+
+                return [$nplurals, $table];
+            } catch (\Throwable) {
+                // A malformed header falls through to the English rule.
+            }
+        }
+
+        $table = [];
+        for ($n = 0; $n <= 200; $n++) {
+            $table[] = $n !== 1 ? 1 : 0;
+        }
+
+        return [2, $table];
+    }
+
+    /**
+     * Every plural form of every time unit under the active locale, indexed
+     * the way the rule table selects them.
+     *
+     * @param array<int, int> $pluralRule
+     * @return array<string, array<int, string>>
+     */
+    private static function timeUnitForms(int $nplurals, array $pluralRule): array
+    {
+        $units = [
+            // translators: %s is a number of minutes.
+            'min'   => _n_noop('%s min', '%s mins', 'fchub-multi-currency'),
+            // translators: %s is a number of hours.
+            'hour'  => _n_noop('%s hour', '%s hours', 'fchub-multi-currency'),
+            // translators: %s is a number of days.
+            'day'   => _n_noop('%s day', '%s days', 'fchub-multi-currency'),
+            // translators: %s is a number of weeks.
+            'week'  => _n_noop('%s week', '%s weeks', 'fchub-multi-currency'),
+            // translators: %s is a number of months.
+            'month' => _n_noop('%s month', '%s months', 'fchub-multi-currency'),
+            // translators: %s is a number of years.
+            'year'  => _n_noop('%s year', '%s years', 'fchub-multi-currency'),
+        ];
+
+        // One representative count per form: translate_nooped_plural picks
+        // the form itself, so asking with each representative enumerates the
+        // whole set.
+        $representatives = [];
+        foreach ($pluralRule as $count => $form) {
+            $representatives[$form] ??= $count;
+        }
+
+        $forms = [];
+        foreach ($units as $key => $pair) {
+            $unitForms = [];
+            for ($form = 0; $form < $nplurals; $form++) {
+                $unitForms[] = translate_nooped_plural(
+                    $pair,
+                    $representatives[$form] ?? 1,
+                    'fchub-multi-currency',
+                );
+            }
+            $forms[$key] = $unitForms;
+        }
+
+        return $forms;
     }
 
     public static function renderCurrent(CurrencyContext $context, string $displayMode = 'flag_code'): string

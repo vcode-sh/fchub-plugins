@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-18T16:58:45+00:00\n"
+"POT-Creation-Date: 2026-08-18T19:36:27+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: fchub-multi-currency\n"
@@ -159,100 +159,19 @@ msgstr ""
 
 #. translators: %s is a human-readable time difference, e.g. "2 hours".
 #. translators: %s: human-readable time difference, e.g. "2 hours"
-#: app/Frontend/CurrencyContextPresentation.php:34
-#: app/Frontend/CurrencyContextPresentation.php:228
+#: app/Frontend/CurrencyContextPresentation.php:36
+#: app/Frontend/CurrencyContextPresentation.php:312
 #: admin/switcher-preview.js:163
 #, php-format,js-format
 msgid "Rates updated %s ago"
 msgstr ""
 
-#. translators: %s is a number of minutes.
-#: app/Frontend/CurrencyContextPresentation.php:40
-#, php-format
-msgid "%s min"
-msgstr ""
-
-#. translators: %s is a number of minutes.
-#: app/Frontend/CurrencyContextPresentation.php:40
-#, php-format
-msgid "%s mins"
-msgstr ""
-
-#. translators: %s is a number of hours.
-#: app/Frontend/CurrencyContextPresentation.php:42
-#: admin/switcher-preview.js:63
-#, php-format,js-format
-msgid "%s hour"
-msgid_plural "%s hours"
-msgstr[0] ""
-msgstr[1] ""
-
-#. translators: %s is a number of hours.
-#: app/Frontend/CurrencyContextPresentation.php:42
-#, php-format
-msgid "%s hours"
-msgstr ""
-
-#. translators: %s is a number of days.
-#: app/Frontend/CurrencyContextPresentation.php:44
-#: admin/switcher-preview.js:64
-#, php-format,js-format
-msgid "%s day"
-msgid_plural "%s days"
-msgstr[0] ""
-msgstr[1] ""
-
-#. translators: %s is a number of days.
-#: app/Frontend/CurrencyContextPresentation.php:44
-#, php-format
-msgid "%s days"
-msgstr ""
-
-#. translators: %s is a number of weeks.
-#: app/Frontend/CurrencyContextPresentation.php:46
-#: admin/switcher-preview.js:65
-#, php-format,js-format
-msgid "%s week"
-msgid_plural "%s weeks"
-msgstr[0] ""
-msgstr[1] ""
-
-#. translators: %s is a number of weeks.
-#: app/Frontend/CurrencyContextPresentation.php:46
-#, php-format
-msgid "%s weeks"
-msgstr ""
-
-#. translators: %s is a number of months.
-#: app/Frontend/CurrencyContextPresentation.php:48
-#, php-format
-msgid "%s month"
-msgstr ""
-
-#. translators: %s is a number of months.
-#: app/Frontend/CurrencyContextPresentation.php:48
-#, php-format
-msgid "%s months"
-msgstr ""
-
-#. translators: %s is a number of years.
-#: app/Frontend/CurrencyContextPresentation.php:50
-#, php-format
-msgid "%s year"
-msgstr ""
-
-#. translators: %s is a number of years.
-#: app/Frontend/CurrencyContextPresentation.php:50
-#, php-format
-msgid "%s years"
-msgstr ""
-
 #. translators: %1$s is the base currency code, %2$s the exchange rate, %3$s the display currency code.
 #. translators: 1: base currency code, 2: rate, 3: display currency code
 #. translators: 1: base currency code, 2: exchange rate, 3: display currency code
-#: app/Frontend/CurrencyContextPresentation.php:53
-#: app/Frontend/CurrencyContextPresentation.php:117
-#: app/Frontend/CurrencyContextPresentation.php:248
+#: app/Frontend/CurrencyContextPresentation.php:46
+#: app/Frontend/CurrencyContextPresentation.php:201
+#: app/Frontend/CurrencyContextPresentation.php:332
 #: admin/switcher-preview.js:169
 #, php-format,js-format
 msgid "1 %1$s = %2$s %3$s"
@@ -260,55 +179,106 @@ msgstr ""
 
 #. translators: %1$s is the base currency code, %2$s the exchange rate, %3$s the display currency code.
 #. translators: 1: base currency code, 2: rate, 3: display currency code
-#: app/Frontend/CurrencyContextPresentation.php:55
-#: app/Frontend/CurrencyContextPresentation.php:110
+#: app/Frontend/CurrencyContextPresentation.php:48
+#: app/Frontend/CurrencyContextPresentation.php:194
 #, php-format
 msgid "Current rate: 1 %1$s = %2$s %3$s"
 msgstr ""
 
 #. translators: %1$s is the display currency code, %2$s the base currency code.
 #. translators: 1: display currency code, 2: base currency code
-#: app/Frontend/CurrencyContextPresentation.php:57
-#: app/Frontend/CurrencyContextPresentation.php:149
+#: app/Frontend/CurrencyContextPresentation.php:50
+#: app/Frontend/CurrencyContextPresentation.php:233
 #, php-format
 msgid "Viewing prices in %1$s. Checkout in %2$s."
 msgstr ""
 
 #. translators: %1$s is the display currency code, %2$s the base currency code.
 #. translators: 1: display currency code, 2: base currency code
-#: app/Frontend/CurrencyContextPresentation.php:59
-#: app/Frontend/CurrencyContextPresentation.php:143
+#: app/Frontend/CurrencyContextPresentation.php:52
+#: app/Frontend/CurrencyContextPresentation.php:227
 #, php-format
 msgid "Prices shown in %1$s are approximate. Checkout is charged in %2$s."
 msgstr ""
 
-#: app/Frontend/CurrencyContextPresentation.php:63
-#: app/Frontend/CurrencyContextPresentation.php:242
+#: app/Frontend/CurrencyContextPresentation.php:56
+#: app/Frontend/CurrencyContextPresentation.php:326
 msgid "Base currency currently in use."
 msgstr ""
 
 #. translators: %s is the base currency code.
 #. translators: %s: base currency code
-#: app/Frontend/CurrencyContextPresentation.php:65
-#: app/Frontend/CurrencyContextPresentation.php:267
+#: app/Frontend/CurrencyContextPresentation.php:58
+#: app/Frontend/CurrencyContextPresentation.php:351
 #, php-format
 msgid "Display prices only. Checkout is charged in %s."
 msgstr ""
 
-#: app/Frontend/CurrencyContextPresentation.php:66
-#: app/Frontend/CurrencyContextPresentation.php:261
+#: app/Frontend/CurrencyContextPresentation.php:59
+#: app/Frontend/CurrencyContextPresentation.php:345
 msgid "You are viewing the store base currency."
 msgstr ""
 
-#: app/Frontend/CurrencyContextPresentation.php:67
+#: app/Frontend/CurrencyContextPresentation.php:60
 msgid "That currency is not available right now."
 msgstr ""
 
 #. translators: %s is the display currency name.
-#: app/Frontend/CurrencyContextPresentation.php:72
+#: app/Frontend/CurrencyContextPresentation.php:65
 #, php-format
 msgid "Prices are now shown in %s."
 msgstr ""
+
+#. translators: %s is a number of minutes.
+#: app/Frontend/CurrencyContextPresentation.php:123
+#, php-format
+msgid "%s min"
+msgid_plural "%s mins"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s is a number of hours.
+#: app/Frontend/CurrencyContextPresentation.php:125
+#: admin/switcher-preview.js:63
+#, php-format,js-format
+msgid "%s hour"
+msgid_plural "%s hours"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s is a number of days.
+#: app/Frontend/CurrencyContextPresentation.php:127
+#: admin/switcher-preview.js:64
+#, php-format,js-format
+msgid "%s day"
+msgid_plural "%s days"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s is a number of weeks.
+#: app/Frontend/CurrencyContextPresentation.php:129
+#: admin/switcher-preview.js:65
+#, php-format,js-format
+msgid "%s week"
+msgid_plural "%s weeks"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s is a number of months.
+#: app/Frontend/CurrencyContextPresentation.php:131
+#, php-format
+msgid "%s month"
+msgid_plural "%s months"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s is a number of years.
+#: app/Frontend/CurrencyContextPresentation.php:133
+#, php-format
+msgid "%s year"
+msgid_plural "%s years"
+msgstr[0] ""
+msgstr[1] ""
 
 #: app/Frontend/CurrencySwitcherRenderer.php:310
 #: admin/switcher-preview.js:222

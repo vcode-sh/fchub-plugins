@@ -379,6 +379,95 @@ if (!function_exists('esc_html')) {
     }
 }
 
+if (!function_exists('_n')) {
+    function _n($single, $plural, $number, $domain = 'default')
+    {
+        $translations = get_translations_for_domain($domain);
+        if (method_exists($translations, 'translate_plural')) {
+            $translated = $translations->translate_plural($single, $plural, (int) $number);
+            if (is_string($translated) && $translated !== '') {
+                return $translated;
+            }
+        }
+
+        return ((int) $number === 1) ? $single : $plural;
+    }
+}
+
+if (!function_exists('_n_noop')) {
+    function _n_noop($singular, $plural, $domain = null)
+    {
+        return [
+            0          => $singular,
+            1          => $plural,
+            'singular' => $singular,
+            'plural'   => $plural,
+            'context'  => null,
+            'domain'   => $domain,
+        ];
+    }
+}
+
+if (!function_exists('translate_nooped_plural')) {
+    function translate_nooped_plural($nooped_plural, $count, $domain = 'default')
+    {
+        if (!empty($nooped_plural['domain'])) {
+            $domain = $nooped_plural['domain'];
+        }
+
+        return _n($nooped_plural['singular'], $nooped_plural['plural'], $count, $domain);
+    }
+}
+
+if (!function_exists('get_translations_for_domain')) {
+    // Tests plant a mock at $GLOBALS['wp_domain_translations'][$domain] to
+    // simulate a loaded textdomain; the default mirrors NOOP_Translations.
+    function get_translations_for_domain($domain)
+    {
+        return $GLOBALS['wp_domain_translations'][$domain] ?? new class {
+            public function get_header($header)
+            {
+                return false;
+            }
+
+            public function translate_plural($single, $plural, $count)
+            {
+                return null;
+            }
+        };
+    }
+}
+
+if (!class_exists('Plural_Forms')) {
+    /**
+     * Test double for core's gettext plural-expression evaluator. It knows
+     * only the expressions the tests exercise and throws on anything else,
+     * mirroring the real parser's failure mode on malformed input.
+     */
+    class Plural_Forms
+    {
+        private Closure $selector;
+
+        public function __construct(string $expression)
+        {
+            $this->selector = match (preg_replace('/\s+/', '', $expression)) {
+                'n!=1', '(n!=1)' => static fn(int $n): int => $n !== 1 ? 1 : 0,
+                'n==1?0:n%10>=2&&n%10<=4&&(n%100<10||n%100>=20)?1:2',
+                '(n==1?0:n%10>=2&&n%10<=4&&(n%100<10||n%100>=20)?1:2)' =>
+                    static fn(int $n): int => $n === 1
+                        ? 0
+                        : ($n % 10 >= 2 && $n % 10 <= 4 && ($n % 100 < 10 || $n % 100 >= 20) ? 1 : 2),
+                default => throw new RuntimeException('Unknown plural expression in test stub: ' . $expression),
+            };
+        }
+
+        public function get(int $n): int
+        {
+            return ($this->selector)($n);
+        }
+    }
+}
+
 if (!function_exists('esc_attr')) {
     function esc_attr($text)
     {

@@ -36,7 +36,7 @@ function element({ attributes = {} } = {}) {
 	};
 }
 
-function renderFooter(entry) {
+function renderFooter(entry, templateOverrides = {}) {
 	const footer = element();
 	const root = {
 		getAttribute: (name) =>
@@ -65,6 +65,7 @@ function renderFooter(entry) {
 				month: ["%s month", "%s months"],
 				year: ["%s year", "%s years"],
 			},
+			...templateOverrides,
 		},
 	};
 
@@ -142,5 +143,67 @@ describe("rate freshness badge rendered by the browser", () => {
 		});
 
 		assert.doesNotMatch(html, /fchub-mc-rate-badge/);
+	});
+});
+
+/**
+ * Languages with more than two plural forms pick the right one through the
+ * shipped rule table: form indices for n = 0..200, with counts past 200
+ * repeating the 101..200 block. Polish is the acid test — three forms whose
+ * selection depends on n%10 and n%100, not just n===1.
+ */
+describe("native plural forms through the shipped rule table", () => {
+	const polishIndex = (n) =>
+		n === 1 ? 0 : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 1 : 2;
+	const polishTemplates = {
+		rateBadgeAgo: "Kursy zaktualizowane %s temu",
+		timeUnits: {
+			min: ["%s minuta", "%s minuty", "%s minut"],
+			hour: ["%s godzina", "%s godziny", "%s godzin"],
+			day: ["%s dzień", "%s dni", "%s dni"],
+			week: ["%s tydzień", "%s tygodnie", "%s tygodni"],
+			month: ["%s miesiąc", "%s miesiące", "%s miesięcy"],
+			year: ["%s rok", "%s lata", "%s lat"],
+		},
+		timePluralRule: Array.from({ length: 201 }, (_, n) => polishIndex(n)),
+	};
+
+	const badgeFor = (ageSeconds) =>
+		renderFooter(
+			{
+				rate: "0.92",
+				rateFetchedAt: NOW_SECONDS - ageSeconds,
+				rateStaleAfterSeconds: 400 * 24 * 3600 * 300,
+				rateBadge: '<span class="fchub-mc-rate-badge">x</span>',
+			},
+			polishTemplates,
+		);
+
+	it("selects each of the three Polish forms by count", () => {
+		assert.match(badgeFor(3600), /Kursy zaktualizowane 1 godzina temu/);
+		assert.match(badgeFor(2 * 3600), /Kursy zaktualizowane 2 godziny temu/);
+		assert.match(badgeFor(5 * 3600), /Kursy zaktualizowane 5 godzin temu/);
+		assert.match(badgeFor(12 * 3600), /Kursy zaktualizowane 12 godzin temu/, "teens take the many form");
+		assert.match(badgeFor(22 * 3600), /Kursy zaktualizowane 22 godziny temu/, "few returns past the teens");
+	});
+
+	it("repeats the periodic block for counts past the table", () => {
+		assert.match(badgeFor(250 * 31536000), /Kursy zaktualizowane 250 lat temu/);
+		assert.match(badgeFor(222 * 31536000), /Kursy zaktualizowane 222 lata temu/);
+	});
+
+	it("falls back to the two-form pick for configs cached before the table shipped", () => {
+		const { timePluralRule, ...withoutRule } = polishTemplates;
+		const html = renderFooter(
+			{
+				rate: "0.92",
+				rateFetchedAt: NOW_SECONDS - 5 * 3600,
+				rateStaleAfterSeconds: 24 * 3600,
+				rateBadge: '<span class="fchub-mc-rate-badge">x</span>',
+			},
+			withoutRule,
+		);
+
+		assert.match(html, /5 godziny temu/, "the legacy pick: imperfect grammar, never a crash");
 	});
 });
