@@ -49,3 +49,4 @@ voice-tone.md
 # Anchored: fluentcart-mcp/openai-plugin/.mcp.json is a shipped, tracked file.
 /.mcp.json
 CLAUDE.md
+/docs/superpowers/
