@@ -6,6 +6,7 @@ namespace FChubMultiCurrency\Tests\Unit\Frontend;
 
 use FChubMultiCurrency\Bootstrap\Modules\FrontendModule;
 use FChubMultiCurrency\Frontend\CurrencySwitcherRenderer;
+use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Tests\Support\TestCase;
 use FluentCart\Api\CurrencySettings;
 use PHPUnit\Framework\Attributes\Test;
@@ -47,6 +48,32 @@ final class CurrencySwitcherRendererTest extends TestCase
         FrontendModule::registerAssets();
     }
 
+    /**
+     * The switcher markup goes into cached documents too, so it must name nobody.
+     *
+     * The noscript nonce is excluded and only that: it is per visitor by design, it
+     * is consumed solely by the no-JavaScript form, and `wp_verify_nonce` fails
+     * closed when a cached one is replayed.
+     */
+    #[Test]
+    public function testSwitcherMarkupIsIdenticalForGuestsWithDifferentCookies(): void
+    {
+        $_COOKIE[Constants::COOKIE_KEY] = 'USD';
+        $this->resetResolvedContext();
+        $first = self::withoutNonce(FrontendModule::renderSwitcher([]));
+
+        $_COOKIE[Constants::COOKIE_KEY] = 'GBP';
+        $this->resetResolvedContext();
+        $second = self::withoutNonce(FrontendModule::renderSwitcher([]));
+
+        $this->assertSame($first, $second);
+    }
+
+    private static function withoutNonce(string $html): string
+    {
+        return (string) preg_replace('/value="[^"]*nonce[^"]*"/', 'value="NONCE"', $html);
+    }
+
     #[Test]
     public function testRenderShortcodeEnqueuesAssetsAndIncludesNoscriptFallback(): void
     {
@@ -80,7 +107,7 @@ final class CurrencySwitcherRendererTest extends TestCase
             'show_symbol' => 'no',
         ]);
 
-        $this->assertStringContainsString('class="fchub-mc-switcher__code">USD</span>', $html);
+        $this->assertStringContainsString('class="fchub-mc-switcher__code">EUR</span>', $html);
     }
 
     #[Test]
@@ -91,7 +118,7 @@ final class CurrencySwitcherRendererTest extends TestCase
             'show_name' => 'yes',
         ]);
 
-        $this->assertStringContainsString('class="fchub-mc-switcher__name">US Dollar</span>', $html);
+        $this->assertStringContainsString('class="fchub-mc-switcher__name">Euro</span>', $html);
         $this->assertStringNotContainsString('class="fchub-mc-switcher__code">USD</span>', $html);
     }
 
@@ -132,7 +159,7 @@ final class CurrencySwitcherRendererTest extends TestCase
             'dropdown_direction' => 'up',
         ]);
 
-        $this->assertStringContainsString('class="fchub-mc-switcher__symbol">$</span>', $html);
+        $this->assertStringContainsString('class="fchub-mc-switcher__symbol">€</span>', $html);
         $this->assertStringContainsString('fchub-mc-switcher--direction-up', $html);
     }
 
@@ -160,8 +187,8 @@ final class CurrencySwitcherRendererTest extends TestCase
             'show_context_note' => 'yes',
         ]);
 
-        $this->assertStringContainsString('1 EUR = 1.10000000 USD', $html);
-        $this->assertStringContainsString('Display prices only. Checkout is charged in EUR.', $html);
+        $this->assertStringContainsString('Base currency currently in use.', $html);
+        $this->assertStringContainsString('You are viewing the store base currency.', $html);
         $this->assertStringContainsString('data-fchub-mc-show-rate-badge="1"', $html);
         $this->assertStringContainsString('data-fchub-mc-show-rate-value="1"', $html);
         $this->assertStringContainsString('data-fchub-mc-show-context-note="1"', $html);
@@ -184,7 +211,7 @@ final class CurrencySwitcherRendererTest extends TestCase
     {
         $html = FrontendModule::renderSwitcher([]);
 
-        $this->assertStringContainsString('class="fchub-mc-switcher__symbol">$</span>', $html);
+        $this->assertStringContainsString('class="fchub-mc-switcher__symbol">€</span>', $html);
         $this->assertStringNotContainsString('class="fchub-mc-switcher__code">USD</span>', $html);
     }
 }

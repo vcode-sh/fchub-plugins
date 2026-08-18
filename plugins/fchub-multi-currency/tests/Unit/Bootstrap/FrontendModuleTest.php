@@ -150,7 +150,9 @@ final class FrontendModuleTest extends TestCase
         $this->assertTrue($config['accountPersistenceEnabled']);
         $this->assertFalse($config['isLoggedIn']);
         $this->assertTrue($config['projectionEnabled']);
-        $this->assertSame(['EUR', 'USD'], $config['allowedCurrencyCodes']);
+        // No rate row in this fixture, so USD is not selectable. `allowedCurrencyCodes`
+        // used to list it anyway; the table only offers what a visitor can actually get.
+        $this->assertSame(['EUR'], array_keys($config['currencyTable']));
         $this->assertTrue($config['urlParamEnabled']);
         $this->assertSame('money', $config['urlParamKey']);
         $this->assertArrayNotHasKey('presentation', $config);
@@ -182,55 +184,60 @@ final class FrontendModuleTest extends TestCase
     }
 
     /**
-     * The invariant this whole change rests on, asserted over the surface that can
-     * satisfy it today.
+     * The invariant the whole change rests on, now assertable over the whole config.
      *
-     * Storefront HTML goes into a shared cache, so what the browser reads out of it
-     * must not describe whoever happened to warm that cache. The resolved-context
-     * fields still merged in above these cannot honour that yet — the current
-     * runtime consumes them — so this covers the cacheable surface and widens to the
-     * whole config in the change that removes their last reader.
+     * Storefront HTML goes into a shared cache, so nothing the browser reads out of
+     * it may describe whoever warmed that cache. There is no allow-list here any
+     * more: every byte must match.
      */
     #[Test]
-    public function testTheCacheableSurfaceIsByteIdenticalForGuestsWithDifferentCookies(): void
+    public function testTheWholeConfigIsByteIdenticalForGuestsWithDifferentCookies(): void
     {
         $this->setOption('fchub_mc_settings', $this->switcherSettings());
         $this->setWpdbMockRow($this->rateRow());
 
         $_COOKIE[Constants::COOKIE_KEY] = 'EUR';
         $this->resetResolvedContext();
-        $first = $this->cacheableSurface(FrontendModule::buildFrontendConfig());
+        $first = wp_json_encode(FrontendModule::buildFrontendConfig());
 
         $_COOKIE[Constants::COOKIE_KEY] = 'USD';
         $this->resetResolvedContext();
-        $second = $this->cacheableSurface(FrontendModule::buildFrontendConfig());
+        $second = wp_json_encode(FrontendModule::buildFrontendConfig());
 
         $this->assertSame($first, $second);
     }
 
     /**
-     * The keys a cached document may safely carry, encoded for byte comparison.
-     *
-     * @param array<string, mixed> $config
+     * The other half: a resolved display currency in a cached document is somebody
+     * else's answer, so none of these may be baked in at all.
      */
-    private function cacheableSurface(array $config): string
+    #[Test]
+    public function testConfigCarriesNoResolvedDisplayCurrency(): void
     {
-        return (string) wp_json_encode(array_intersect_key($config, array_flip([
-            'currencyTable',
-            'baseCurrency',
-            'defaultCurrency',
+        $this->setOption('fchub_mc_settings', $this->switcherSettings());
+        $this->setWpdbMockRow($this->rateRow());
+        $_COOKIE[Constants::COOKIE_KEY] = 'EUR';
+        $this->resetResolvedContext();
+
+        $config = FrontendModule::buildFrontendConfig();
+
+        foreach ([
+            'rate',
+            'displayCurrency',
+            'displayCurrencyName',
+            'symbol',
+            'position',
+            'decimals',
+            'isBaseDisplay',
+            'resolverSource',
+            'displayDecSep',
+            'displayThousandSep',
+            'disclosureEnabled',
+            'disclosureText',
             'allowedCurrencyCodes',
-            'nonce',
-            'cookieName',
-            'cookiePersistenceEnabled',
-            'cookieLifetimeDays',
-            'accountPersistenceEnabled',
-            'urlParamEnabled',
-            'urlParamKey',
-            'roundingMode',
-            'restUrl',
-            'flagBaseUrl',
-        ])));
+        ] as $key) {
+            $this->assertArrayNotHasKey($key, $config, "Leaked visitor state: {$key}");
+        }
     }
 
     #[Test]

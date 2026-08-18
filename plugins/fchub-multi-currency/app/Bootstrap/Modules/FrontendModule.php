@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Bootstrap\Modules;
 
 use FChubMultiCurrency\Bootstrap\ModuleContract;
-use FChubMultiCurrency\Domain\Services\CurrencyContextService;
-use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
-use FChubMultiCurrency\Frontend\CurrencyContextPayload;
 use FChubMultiCurrency\Frontend\CurrencyContextPresentation;
 use FChubMultiCurrency\Frontend\CurrencySwitcherRenderer;
 use FChubMultiCurrency\Frontend\CurrencyTablePayload;
@@ -135,27 +132,22 @@ final class FrontendModule implements ModuleContract
     /**
      * The browser contract for a storefront page.
      *
-     * Everything from `currencyTable` down is a store fact, identical for every
-     * visitor, and therefore safe inside a document a shared cache will hand to
-     * anyone. The resolved-context fields merged in at the top are not: they answer
-     * "which currency does *this* request want", which is the wrong question to bake
-     * into cached HTML. They remain only until the runtime that reads them is
-     * replaced, and the byte-identical guarantee lands with their removal.
+     * Every value here is a store fact, identical for every visitor, and therefore
+     * safe inside a document a shared cache will hand to anyone. Nothing answers
+     * "which currency does *this* request want" — the browser answers that from
+     * the table, because only the browser can.
      *
      * @return array<string, mixed>
      */
     public static function buildFrontendConfig(): array
     {
         $optionStore = new OptionStore();
-        $contextService = new CurrencyContextService(ContextModule::buildResolverChain($optionStore), $optionStore);
-        $context = $contextService->resolve();
-
         $fcSettings = CurrencySettings::get();
         $shopSeparators = FluentCartCurrency::separators();
         $settings = $optionStore->all();
         $userId = get_current_user_id();
 
-        return array_merge(CurrencyContextPayload::build($context, $optionStore), [
+        return [
             'currencyTable'         => CurrencyTablePayload::build($optionStore),
             'presentationTemplates' => CurrencyContextPresentation::templates(),
             'baseCurrency'          => strtoupper((string) ($settings['base_currency'] ?? 'USD')),
@@ -171,7 +163,6 @@ final class FrontendModule implements ModuleContract
             // cache, so theirs is still both correct and useful.
             'nonce'                 => $userId > 0 ? wp_create_nonce('wp_rest') : '',
             'currencies'            => $optionStore->get('display_currencies', []),
-            'allowedCurrencyCodes'  => SelectableCurrencyCodes::fromSettings($settings)->all(),
             'cookieName'            => Constants::COOKIE_KEY,
             'cookiePersistenceEnabled' => $optionStore->get('cookie_enabled', 'yes') === 'yes',
             'cookieLifetimeDays'    => (int) $optionStore->get('cookie_lifetime_days', 90),
@@ -187,7 +178,7 @@ final class FrontendModule implements ModuleContract
             'baseDecimalSep'        => $shopSeparators['decimal'],
             'baseThousandSep'       => $shopSeparators['thousand'],
             'baseDecimals'          => ($fcSettings['is_zero_decimal'] ?? false) ? 0 : 2,
-        ]);
+        ];
     }
 
     /**

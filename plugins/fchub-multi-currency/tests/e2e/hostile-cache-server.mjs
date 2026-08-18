@@ -105,8 +105,8 @@ function stripRulesUnusedInHtml(css, html) {
  * runtime in the head, switcher stylesheet printed late by `print_late_styles()`,
  * then the footer scripts.
  */
-function renderPage({ fixture, currency, deferScripts, stripUnusedCss, disabledBackground }) {
-	const variant = fixture.variants[currency];
+function renderPage({ fixture, deferScripts, stripUnusedCss, disabledBackground }) {
+	const variant = fixture.page;
 	const defer = deferScripts ? " defer" : "";
 	const switcher = variant.switcherHtml.replaceAll(
 		"http://localhost/wp-content/plugins/fchub-multi-currency/assets/",
@@ -275,10 +275,8 @@ export async function startHostileOrigin({
 			// Only a miss costs an origin render; that asymmetry is why the switch
 			// navigating to a never-before-seen URL is expensive.
 			await sleep(originLatencyMs);
-			const currency = resolveRequestCurrency(fixture, url, req.headers.cookie);
 			const html = renderPage({
 				fixture,
-				currency,
 				deferScripts,
 				stripUnusedCss,
 				disabledBackground: themeDisabledBackground,
@@ -309,13 +307,7 @@ export async function startHostileOrigin({
 		// Someone else visited first and their copy is what the cache now holds.
 		pageCache.set(
 			"/pricing",
-			renderPage({
-				fixture,
-				currency: primeCurrency,
-				deferScripts,
-				stripUnusedCss,
-				disabledBackground: themeDisabledBackground,
-			}),
+			renderPage({ fixture, deferScripts, stripUnusedCss, disabledBackground: themeDisabledBackground }),
 		);
 	}
 

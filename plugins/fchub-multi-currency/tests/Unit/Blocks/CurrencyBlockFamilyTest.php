@@ -49,8 +49,8 @@ final class CurrencyBlockFamilyTest extends TestCase
     {
         $html = CurrencyCurrentBlock::render(['displayMode' => 'symbol_code']);
 
-        $this->assertStringContainsString('$', $html);
-        $this->assertStringContainsString('USD', $html);
+        $this->assertStringContainsString('EUR', $html, 'The first frame names the store base.');
+        $this->assertStringNotContainsString('USD', $html, 'A cached block must not name one visitor.');
         $this->assertStringContainsString('data-fchub-mc-context-current="symbol_code"', $html);
     }
 
@@ -59,7 +59,7 @@ final class CurrencyBlockFamilyTest extends TestCase
     {
         $html = ExchangeRateBlock::render(['precision' => 4, 'format' => 'compact']);
 
-        $this->assertStringContainsString('1 EUR = 1.1000 USD', $html);
+        $this->assertStringContainsString('1 EUR = 1.0000 EUR', $html, 'Base converts at par.');
         $this->assertStringContainsString('data-fchub-mc-context-rate="compact"', $html);
         $this->assertStringContainsString('data-fchub-mc-rate-precision="4"', $html);
         $this->assertStringContainsString('data-fchub-mc-hide-when-base="0"', $html);
@@ -70,7 +70,11 @@ final class CurrencyBlockFamilyTest extends TestCase
     {
         $html = CurrencyContextNoticeBlock::render(['mode' => 'compact']);
 
-        $this->assertStringContainsString('Viewing prices in USD. Checkout in EUR.', $html);
+        $this->assertStringNotContainsString(
+            'Viewing prices in',
+            $html,
+            'hide-when-base is on and the first frame is the base, so there is nothing to disclose yet.',
+        );
         $this->assertStringContainsString('data-fchub-mc-context-notice="compact"', $html);
         $this->assertStringContainsString('data-fchub-mc-hide-when-base="1"', $html);
     }

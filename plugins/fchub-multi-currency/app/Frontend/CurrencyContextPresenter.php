@@ -11,17 +11,27 @@ use FChubMultiCurrency\Storage\OptionStore;
 
 defined('ABSPATH') || exit;
 
+/**
+ * Renders the first frame of a currency surface, in the store's base currency.
+ *
+ * Deliberately not the visitor's currency: these surfaces go into documents a
+ * shared cache hands to everyone, so a resolved answer here would be whoever
+ * warmed the cache. The browser repaints each surface from the currency table
+ * before it can matter, and a visitor without JavaScript sees the currency they
+ * are actually charged in.
+ */
 final class CurrencyContextPresenter
 {
-    public static function resolveContext(): \FChubMultiCurrency\Domain\ValueObjects\CurrencyContext
+    public static function baseContext(): \FChubMultiCurrency\Domain\ValueObjects\CurrencyContext
     {
         $optionStore = new OptionStore();
-        $service = new CurrencyContextService(
-            ContextModule::buildResolverChain($optionStore),
-            $optionStore,
-        );
 
-        return $service->resolve();
+        return CurrencyContextService::applyContextFilter(
+            ContextModule::resolveExplicitPreference(
+                $optionStore,
+                (string) ($optionStore->all()['base_currency'] ?? 'USD'),
+            ),
+        );
     }
 
     /**
@@ -29,7 +39,7 @@ final class CurrencyContextPresenter
      */
     public static function currentCurrencyParts(): array
     {
-        $context = self::resolveContext();
+        $context = self::baseContext();
 
         return [
             'code' => $context->displayCurrency->code,
@@ -42,12 +52,12 @@ final class CurrencyContextPresenter
 
     public static function renderCurrentCurrency(string $displayMode = 'flag_code'): string
     {
-        return CurrencyContextPresentation::renderCurrent(self::resolveContext(), $displayMode);
+        return CurrencyContextPresentation::renderCurrent(self::baseContext(), $displayMode);
     }
 
     public static function renderRateValue(int $precision = 4, string $format = 'compact', bool $hideWhenBase = false): string
     {
-        $context = self::resolveContext();
+        $context = self::baseContext();
 
         if ($hideWhenBase && $context->isBaseDisplay) {
             return '';
@@ -58,7 +68,7 @@ final class CurrencyContextPresenter
 
     public static function renderNotice(string $mode = 'compact', bool $hideWhenBase = true): string
     {
-        $context = self::resolveContext();
+        $context = self::baseContext();
         if ($hideWhenBase && $context->isBaseDisplay) {
             return '';
         }

@@ -248,8 +248,9 @@ final class CurrencySwitcherRenderer
             (bool) $atts['showFavoritesFirst'],
         );
 
-        $contextService = new CurrencyContextService(ContextModule::buildResolverChain($optionStore), $optionStore);
-        $contextState = $contextService->resolve();
+        // The base currency, not this visitor's: the markup is cached and served to
+        // everyone, and the browser renames the trigger before the first paint.
+        $contextState = CurrencyContextPresenter::baseContext();
         $currentCode = $contextState->displayCurrency->code;
         $currentName = self::findCurrencyName($currencies, $currentCode);
         $currentSymbol = self::findCurrencySymbol($currencies, $currentCode);

@@ -9,10 +9,9 @@
  * of the same classes WordPress calls; only the WordPress and FluentCart
  * surfaces underneath are mocked, by the existing PHPUnit bootstrap.
  *
- * One variant is produced per selectable currency, because on 1.4.7 the resolved
- * display currency is baked into both the markup and the config. That is exactly
- * the per-visitor state a shared cache is free to hand to the wrong visitor, and
- * having it visible in the fixture keeps the problem honest.
+ * There is one page, not one per currency. The renderer names nobody, so a shared
+ * cache has nothing to hand to the wrong visitor — and the generator fails loudly
+ * if a resolved currency ever creeps back into the config.
  *
  * Usage: php tests/e2e/generate-fixture.php
  */
@@ -100,32 +99,22 @@ function resetStore(): void
 }
 
 /**
- * Renders the page state a cache would store for a visitor resolved to $currency.
+ * The single page every visitor is served.
+ *
+ * There is one, not one per currency: the renderer names nobody now, which is the
+ * whole property the lane exists to check.
  *
  * @return array{switcherHtml: string, config: array<string, mixed>}
  */
-function renderVariant(string $currency): array
+function renderPage(): array
 {
     resetStore();
-
-    // The cookie is how a real request reaches a non-default currency, and it is
-    // precisely what the edge later refuses to forward.
-    if ($currency !== BASE_CURRENCY) {
-        $_COOKIE[Constants::COOKIE_KEY] = $currency;
-    }
-
-    ContextModule::resetChain();
-    CurrencyContextService::reset();
 
     $switcherHtml = FrontendModule::renderSwitcher(['label' => 'Currency']);
     $config = FrontendModule::buildFrontendConfig();
 
-    if (($config['displayCurrency'] ?? '') !== $currency) {
-        fwrite(STDERR, sprintf(
-            "Fixture generation failed: asked for %s, renderer resolved %s.\n",
-            $currency,
-            (string) ($config['displayCurrency'] ?? 'nothing'),
-        ));
+    if (isset($config['displayCurrency'])) {
+        fwrite(STDERR, "Fixture generation failed: the page config still names a visitor's currency.\n");
         exit(1);
     }
 
@@ -162,12 +151,11 @@ $fixture = [
     'generatedFrom' => FCHUB_MC_VERSION,
     'baseCurrency'  => BASE_CURRENCY,
     'currencies'    => $currencies,
-    'variants'      => [],
+    'page'          => renderPage(),
     'restContext'   => [],
 ];
 
 foreach ($currencies as $currency) {
-    $fixture['variants'][$currency] = renderVariant($currency);
     $fixture['restContext'][$currency] = restContext($currency);
 }
 
@@ -181,7 +169,7 @@ $path = $outputDir . '/fixture.json';
 file_put_contents($path, json_encode($fixture, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 
 printf(
-    "Wrote %s (%d bytes) for plugin %s — variants: %s\n",
+    "Wrote %s (%d bytes) for plugin %s — one page, currencies: %s\n",
     $path,
     (int) filesize($path),
     FCHUB_MC_VERSION,
