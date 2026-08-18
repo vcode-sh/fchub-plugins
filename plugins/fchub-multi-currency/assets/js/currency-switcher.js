@@ -78,8 +78,10 @@
 
 	let idCounter = 0;
 
-	const _FALLBACK_ERROR = "Currency preference could not be saved.";
-	const UNAVAILABLE_ERROR = "That currency is not available right now.";
+	// Translated server-side and shipped with the other rendered sentences; a
+	// literal here would be the one English string in a translated plugin.
+	const UNAVAILABLE_ERROR =
+		config.presentationTemplates?.currencyUnavailable || "That currency is not available.";
 
 	function clearLoadingState(root) {
 		if (root) {

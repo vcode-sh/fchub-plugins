@@ -162,7 +162,6 @@ final class FrontendModule implements ModuleContract
             // admits them without it. Signed-in visitors are not served from a shared
             // cache, so theirs is still both correct and useful.
             'nonce'                 => $userId > 0 ? wp_create_nonce('wp_rest') : '',
-            'currencies'            => $optionStore->get('display_currencies', []),
             'cookieName'            => Constants::COOKIE_KEY,
             'cookiePersistenceEnabled' => $optionStore->get('cookie_enabled', 'yes') === 'yes',
             'cookieLifetimeDays'    => (int) $optionStore->get('cookie_lifetime_days', 90),

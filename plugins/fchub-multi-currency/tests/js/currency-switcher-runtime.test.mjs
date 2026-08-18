@@ -144,6 +144,21 @@ describe("switching currency", () => {
 		assert.match(run.errorsShown.text, /not available/);
 	});
 
+	/**
+	 * The only message a visitor can ever see from this file. It used to be an
+	 * English literal in a plugin whose every other string goes through `__()`,
+	 * which meant a German store showed one English sentence at the worst moment.
+	 */
+	it("shows the store's own translation when a currency cannot be applied", async () => {
+		const run = runSwitch({
+			applyResult: false,
+			config: { presentationTemplates: { currencyUnavailable: "Diese Währung ist nicht verfügbar." } },
+		});
+		await run.switch("JPY");
+
+		assert.match(run.errorsShown.text, /Diese Währung/);
+	});
+
 	it("sends the REST nonce only for a signed-in visitor", async () => {
 		const guest = runSwitch();
 		await guest.switch("EUR");

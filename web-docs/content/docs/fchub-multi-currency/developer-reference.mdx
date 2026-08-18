@@ -339,14 +339,13 @@ and is available globally:
 | Key | Type | Description |
 |---|---|---|
 | `currencyTable` | object | Every selectable currency, keyed by code. Each entry carries `rate`, `symbol`, `displayCurrencyName`, `decimals`, `position`, `displayDecSep`, `displayThousandSep`, `disclosureText`, `flag` and `rateBadge`. Currencies without a usable rate are absent |
-| `presentationTemplates` | object | The translated sentences the browser fills to render a currency surface |
+| `presentationTemplates` | object | The translated sentences the browser fills to render a currency surface, including the one error a visitor can see |
 | `baseCurrency` | string | Base currency code. A table key equal to this needs no conversion |
 | `defaultCurrency` | string | Configured default display currency, if any |
 | `accountCurrency` | string | The signed-in visitor's saved preference. Empty for guests, and only trustworthy when `isLoggedIn` is true |
 | `roundingMode` | string | Rounding mode slug |
 | `restUrl` | string | REST API base URL |
 | `nonce` | string | WP REST nonce. Empty for guests: a nonce is per visitor, and a cached page would hand one visitor's to everybody after them |
-| `currencies` | array | All display currencies with flags |
 | `cookieName` | string | Cookie and local-storage key, currently `fchub_mc_currency` |
 | `cookiePersistenceEnabled` | bool | Whether guest browser persistence is enabled |
 | `cookieLifetimeDays` | int | Shared cookie and local-storage lifetime |

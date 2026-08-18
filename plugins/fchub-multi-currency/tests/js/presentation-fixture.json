@@ -15,7 +15,8 @@
         "noticeFull": "Prices shown in %1$s are approximate. Checkout is charged in %2$s.",
         "switcherRateBase": "Base currency currently in use.",
         "switcherContext": "Display prices only. Checkout is charged in %s.",
-        "switcherContextBase": "You are viewing the store base currency."
+        "switcherContextBase": "You are viewing the store base currency.",
+        "currencyUnavailable": "That currency is not available right now."
     },
     "current": {
         "flag_code": "<span class=\"fchub-mc-inline-current\"><img src=\"http://localhost/wp-content/plugins/fchub-multi-currency/assets/flags/4x3/eu.svg\" alt=\"EUR\" class=\"fchub-mc-flag\" width=\"20\" height=\"15\" /><span class=\"fchub-mc-inline-current__text\">EUR</span></span>",

@@ -40,6 +40,10 @@ final class CurrencyContextPresentation
             'switcherRateBase' => __('Base currency currently in use.', 'fchub-multi-currency'),
             'switcherContext' => __('Display prices only. Checkout is charged in %s.', 'fchub-multi-currency'),
             'switcherContextBase' => __('You are viewing the store base currency.', 'fchub-multi-currency'),
+            'currencyUnavailable' => __(
+                'That currency is not available right now.',
+                'fchub-multi-currency',
+            ),
         ];
     }
 
