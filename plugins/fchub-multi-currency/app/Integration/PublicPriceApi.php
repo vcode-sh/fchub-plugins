@@ -13,7 +13,16 @@ use FluentCart\App\Models\Order;
 
 defined('ABSPATH') || exit;
 
-/** Implements the public price helpers against FluentCart's cent-based money contract. */
+/**
+ * Implements the public price helpers against FluentCart's cent-based money contract.
+ *
+ * These are the one place the plugin still renders a converted price on the server,
+ * and they resolve the caller's own request. Output must therefore never reach a
+ * shared full-page cache: the first visitor's currency would be served to everyone
+ * after them. Everything the storefront renders is base-currency markup the browser
+ * converts, precisely so a cached document names nobody; a theme calling these into
+ * a cacheable template opts back out of that.
+ */
 final class PublicPriceApi
 {
     public static function formatPrice(float $basePrice): string

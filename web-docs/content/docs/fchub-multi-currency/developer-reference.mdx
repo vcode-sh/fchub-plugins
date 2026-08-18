@@ -257,7 +257,17 @@ to FluentCart's base formatter when the order has no display-currency snapshot.
 ### JavaScript Globals
 
 ```javascript
-// Switch currency programmatically (REST call + page reload)
+// Which currency this visitor is seeing
+window.fchubMc.currentCurrency(); // 'EUR'
+
+// Record a preference without touching the page
+window.fchubMc.setCurrency('EUR'); // false if the store does not offer it
+
+// Show a currency now: re-projects prices and repaints every currency surface.
+// No request; the page already carries every rate it offers.
+window.fchubMcApplyCurrency('EUR'); // false if the store does not offer it
+
+// Apply a currency and tell the server, so the choice outlives this page
 window.fchubMcSwitchCurrency('EUR');
 
 // Re-initialise all switcher widgets after dynamic content load
@@ -267,11 +277,15 @@ window.fchubMcInitSwitchers();
 window.fchubMcProjectPrices(document.getElementById('my-container'));
 ```
 
+`fchubMcApplyCurrency` is the whole switch. `fchubMcSwitchCurrency` adds one
+fire-and-forget `POST /context` so the preference reaches the places the browser
+cannot — order metadata, emails, CRM. Nothing waits on it.
+
 ### JavaScript Events
 
 | Event | Target | Description |
 |---|---|---|
-| `fchub_mc:context_changed` | `window` | Fired before page reload after a confirmed currency switch |
+| `fchub_mc:context_changed` | `window` | Fired once the new currency is on screen. Carries `currency`; there is no reload to fire before |
 | `fchub_mc:context_switch_failed` | `window` | Fired when the preference was not confirmed; includes `currency`, `message`, HTTP `status` and stable `code` |
 | `fchub_mc:prices_projected` | `document` | Fired after each projection pass |
 
@@ -354,31 +368,36 @@ and is available globally:
 | `disclosureEnabled` | bool | Whether checkout disclosure is active |
 | `disclosureText` | string\|null | Rendered disclosure text with tokens replaced |
 
-### Cached Guest Recovery
+### Currency on Cached Pages
 
-Some edge hosts serve the same anonymous HTML whether the request carries no
-currency cookie, `EUR` or `USD`. The browser contract therefore treats the cookie
-and local-storage record as two transports for one confirmed guest preference:
+Every storefront document this plugin renders is byte-identical for every visitor.
+Prices are base-currency markup, the switcher names the store base, and the
+configuration carries the whole currency table rather than one resolved choice. A
+shared cache can therefore serve the same bytes to anyone, and there is nothing
+per-visitor in them to be wrong.
 
-1. `POST /context` must return `persisted: true` before the browser mirror is written.
-2. A guest reloads through the configured currency URL parameter, so the first
-   returned document resolves correctly without the cookie.
-3. The explicit currency is revalidated through `GET /context?currency=<code>` with
-   a one-use `_fchub_mc` cache-buster. A confirmed switch parameter is removed only
-   after that succeeds; unrelated query values, fragments and genuine direct links
-   remain.
-4. On later shared-cache hits, `currency-context.js` compares the valid, unexpired
-   browser mirror with the rendered context and requests
-   `GET /context?currency=<code>` with a one-use `_fchub_mc` cache-buster when
-   they differ.
-5. An explicit URL preference or signed-in `user_meta` context wins over the browser
-   mirror. A cookie or mirror changed during recovery also wins over the older
-   response.
+The visitor's currency is decided in their own browser, by an inline block in the
+document head, before anything paints:
 
-The local-storage record contains the currency code and expiry timestamp. Legacy
+1. `?currency=<code>`, for the page it was followed to only. A shared link shows the
+   recipient that currency without overwriting the preference they already had.
+2. The local-storage record.
+3. The signed-in account preference, believed only on a page that cannot have been
+   cached for somebody else.
+4. The `fchub_mc_currency` cookie.
+5. The configured default, then the store base.
+
+Switching applies the choice immediately and posts it afterwards. A failed post
+means the preference will not outlive the session; it does not mean the visitor is
+looking at the wrong prices, so nothing is rolled back.
+
+The local-storage record contains the currency code and an expiry timestamp. Legacy
 plain-code values are migrated, while expired, malformed and no-longer-configured
-currencies are removed. Disabling cookie persistence removes the mirror as well;
-it is not a back door around the setting.
+currencies are removed. Disabling cookie persistence removes the record as well; it
+is not a back door around the setting.
+
+Currencies without a usable exchange rate are absent from the table, so the switcher
+cannot offer a currency it would then fail to show.
 
 <Separator className="my-8" />
 

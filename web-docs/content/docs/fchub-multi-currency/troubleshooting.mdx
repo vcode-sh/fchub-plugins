@@ -104,11 +104,14 @@ import { Separator } from '@/components/ui/separator';
     3. Try calling `window.fchubMcInitSwitchers()` from the console to manually trigger initialisation
   </Accordion>
   <Accordion title="Currency switch doesn't stick">
-    After selecting a currency, the page reloads but the old currency appears.
+    Prices change when you select a currency, but the old one is back on the next page.
 
-    1. **Browser persistence blocked** — check that the `fchub_mc_currency` cookie or local-storage mirror is being written. Some privacy plugins or browser settings may block both
-    2. **REST API error** — `POST /context` must return `persisted: true`. The switcher deliberately stays put when the server could not save anything.
-    3. **Recovery API unavailable** — an edge-cached page may initially contain another currency, but `GET /context?currency=...` should correct it without relying on the cookie. A firewall rule blocking WordPress REST requests rather spoils that plan.
+    The switch itself needs nothing from the server, so this is always about where the
+    preference is kept rather than whether it was applied.
+
+    1. **Browser persistence blocked** — the choice is stored in local storage and mirrored to the `fchub_mc_currency` cookie. Some privacy plugins and browser settings block both, which leaves nothing to remember it by
+    2. **Cookie persistence disabled** — check **Settings → Cookie Persistence**. With it off, a logged-out visitor's choice deliberately lasts only for the page they are on
+    3. **`POST /context` failing** — the preference reaches emails, order metadata and CRM through this request. A firewall rule blocking WordPress REST requests leaves the visitor with correct prices and a preference that does not outlive the session; the browser console says so when it happens
     4. **Account request rejected** — signed-in visitors use the current WordPress REST nonce. Reload a genuinely old account page if its nonce has expired; guest requests intentionally send no nonce.
   </Accordion>
   <Accordion title="No-JS fallback works, but does not remember the selection">
@@ -168,14 +171,55 @@ import { Separator } from '@/components/ui/separator';
 
 <Separator className="my-8" />
 
+## Caching and Optimisation
+
+<Accordions>
+  <Accordion title="Do I need to exclude anything from my page cache?">
+    No. Every storefront page this plugin touches is byte-identical for every visitor,
+    including the switcher markup and the configuration the browser reads. There is
+    nothing per-visitor in a cached document to get wrong, so:
+
+    - no cookie exclusions,
+    - no per-page exclusions for pages carrying a switcher,
+    - no query-string cache rules for `?currency=`.
+
+    The visitor's currency lives in their own browser and is applied before the first
+    paint. A shared cache can serve the same bytes to everyone, which is what it is for.
+  </Accordion>
+  <Accordion title="My optimisation plugin defers or removes unused CSS and JavaScript">
+    The one piece that must not be deferred is the inline block in the document head —
+    it carries the currency table and decides which currency to show before anything
+    paints. It is inline rather than a file for exactly that reason, so most tools leave
+    it alone. If yours does not:
+
+    - **WP Rocket** — add `fchub-mc-bootstrap` to *Delay JavaScript execution* exclusions.
+    - **LiteSpeed Cache** — add it to *JS Excludes*.
+    - **Perfmatters** — add it to the *Delay JavaScript* exclusions list.
+
+    You should not need a CSS safelist. The rules that govern the moment before prices
+    appear are inline in the head with the script, not in a stylesheet an unused-CSS pass
+    can reach.
+  </Accordion>
+  <Accordion title="Prices show the store's base currency and never change">
+    That is the plugin's failure mode when its JavaScript never runs, and it is
+    deliberate: the amount you see is the amount you are charged. Check the browser
+    console for errors, then check whether an optimisation plugin is delaying the inline
+    head block above.
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
 ## Performance Issues
 
 <Accordions>
   <Accordion title="Pages loading slowly">
-    The plugin's frontend impact is minimal — two small JS files and one CSS file. If you notice slowness:
+    The plugin's frontend impact is minimal, and switching currency makes no request at
+    all — the browser already holds every rate the page offers. If you notice slowness:
 
     1. **Rate cache miss** — without persistent object cache (Redis/Memcached), every page load queries the database for rates. Install a persistent cache for sub-millisecond lookups
     2. **MutationObserver thrashing** — if your page has extremely frequent DOM mutations, the 50ms debounce may still cause excessive projection runs. This is very rare in practice
+    3. **A very large currency list** — the page carries every selectable currency. Fifty currencies is about half a kilobyte compressed, so this is rarely the cause, but a store offering all of them pays a little more per page than one offering five
   </Accordion>
   <Accordion title="Rate history table growing large">
     The cron job prunes rows older than 90 days. If the table is still large, you have many currency pairs being tracked.

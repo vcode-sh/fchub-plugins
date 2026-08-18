@@ -63,11 +63,11 @@ yourstore.com/shop?currency=GBP
 
 Handy for email campaigns or regional ads. The "URL Parameter Key" field lets you change `currency` to something else if it conflicts with another plugin (unlikely, but possible).
 
-For logged-out visitors, a successful switch also reloads once through this
-parameter. That lets the server render the selected currency before a shared edge
-cache gets a chance to ignore the preference cookie. The browser verifies that
-currency through a uniquely cache-busted request, then removes only the one-shot
-parameter. Campaign links stay in the address bar unless they match an already
+A `?currency=` link shows the recipient that currency for the page they land on,
+without overwriting a preference they had already set — a shared link should not
+quietly rewrite somebody else's choice. Switching does not add the parameter: the
+browser applies the currency in place, so there is nothing to clean out of the
+address bar afterwards. Campaign links stay in the address bar unless they match an already
 confirmed browser choice.
 
 ### Cookie Persistence
