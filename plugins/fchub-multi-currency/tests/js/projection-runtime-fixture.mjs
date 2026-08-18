@@ -47,12 +47,26 @@ export function projectionElement({
 	value = "",
 } = {}) {
 	const storedAttributes = new Map(Object.entries(attributes));
+	let markup = innerHTML ?? text;
+	let content = text;
 
 	return {
 		classList: new FakeClassList(classes),
 		childNodes,
-		innerHTML: innerHTML ?? text,
-		textContent: text,
+		get innerHTML() {
+			return markup;
+		},
+		set innerHTML(value) {
+			markup = value;
+			content = value;
+		},
+		get textContent() {
+			return content;
+		},
+		set textContent(value) {
+			content = value;
+			markup = value;
+		},
 		value,
 		getAttribute(name) {
 			return storedAttributes.get(name) ?? null;
@@ -102,6 +116,9 @@ export async function runProjection({ config = {}, priceElements = [], selectors
 		querySelectorAll(selector) {
 			if (selector.includes(".fct-item-price") && selector.includes("[data-fchub-mc-base]")) {
 				return priceElements;
+			}
+			if (selector === "[data-fchub-mc-projected]") {
+				return priceElements.filter((el) => el.getAttribute("data-fchub-mc-projected"));
 			}
 			return selectors[selector] ?? [];
 		},
