@@ -1,0 +1,306 @@
+/**
+ * FCHub Multi-Currency — Admin settings page styles.
+ *
+ * Owned by the settings SPA views in admin/components/. Colours lean on the
+ * Element Plus custom properties FluentCart ships, so dark mode follows the
+ * admin shell automatically.
+ */
+
+.fchub-mc-page .form-section {
+	padding: 0;
+}
+
+.fchub-mc-row {
+	display: grid;
+	gap: 0.5rem;
+	grid-template-columns: 1fr;
+	padding: 4px 0;
+}
+
+@media (min-width: 1024px) {
+	.fchub-mc-row {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
+	.fchub-mc-row .setting-fields-inner {
+		grid-column: span 2 / span 2;
+	}
+}
+
+.fchub-mc-page .cmd {
+	display: inline-block;
+	font-size: 11px;
+	margin-right: 4px;
+	padding: 1px 5px;
+	border: 1px solid rgba(255, 255, 255, 0.3);
+	border-radius: 3px;
+	line-height: 1;
+}
+
+/* Tab strip — plugin-owned so the underline is the active item itself,
+   never a separately measured bar that can lag behind the content. */
+.fchub-mc-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 24px;
+	margin-bottom: 15px;
+	border-bottom: 1px solid var(--el-border-color-light, #e4e7ed);
+}
+
+.fchub-mc-tabs__item {
+	appearance: none;
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -1px;
+	padding: 0 0 10px;
+	font-size: 14px;
+	font-weight: 500;
+	line-height: 1.5;
+	color: var(--el-text-color-primary, #303133);
+	cursor: pointer;
+	transition: color 0.2s;
+}
+
+.fchub-mc-tabs__item:hover {
+	color: var(--el-color-primary, #409eff);
+}
+
+.fchub-mc-tabs__item.is-active {
+	color: var(--el-color-primary, #409eff);
+	border-bottom-color: var(--el-color-primary, #409eff);
+}
+
+.fchub-mc-tabs__item:focus-visible {
+	outline: 2px solid var(--el-color-primary, #409eff);
+	outline-offset: 2px;
+	border-radius: 2px;
+}
+
+/* Read-only value, e.g. the FluentCart-owned base currency */
+.fchub-mc-value {
+	display: inline-block;
+	font-size: 15px;
+	font-weight: 600;
+	letter-spacing: 0.03em;
+	color: var(--el-text-color-primary, #303133);
+}
+
+/* Status pill for diagnostics and rate rows */
+.fchub-mc-pill {
+	display: inline-flex;
+	align-items: center;
+	height: 22px;
+	padding: 0 8px;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	font-size: 12px;
+	line-height: 1;
+	white-space: nowrap;
+}
+
+.fchub-mc-pill--success {
+	color: var(--el-color-success, #67c23a);
+	background: var(--el-color-success-light-9, rgba(103, 194, 58, 0.1));
+	border-color: var(--el-color-success-light-8, rgba(103, 194, 58, 0.2));
+}
+
+.fchub-mc-pill--danger {
+	color: var(--el-color-danger, #f56c6c);
+	background: var(--el-color-danger-light-9, rgba(245, 108, 108, 0.1));
+	border-color: var(--el-color-danger-light-8, rgba(245, 108, 108, 0.2));
+}
+
+.fchub-mc-pill--info {
+	color: var(--el-text-color-secondary, #909399);
+	background: var(--el-fill-color-light, #f5f7fa);
+	border-color: var(--el-border-color-lighter, #ebeef5);
+}
+
+.fchub-mc-diag-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: 16px;
+}
+
+.fchub-mc-diag-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 6px 0;
+	border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+	font-size: 13px;
+}
+
+.fchub-mc-diag-row:last-child {
+	border-bottom: none;
+}
+
+.fchub-mc-flag {
+	font-size: 1.2em;
+	margin-right: 6px;
+	vertical-align: middle;
+}
+
+.fchub-mc-manual-rate-row {
+	display: grid;
+	grid-template-columns: max-content minmax(140px, 240px) max-content;
+	gap: 10px;
+	align-items: center;
+	margin-bottom: 10px;
+}
+
+/* Currency list — header and rows share one grid contract, so columns can
+   never collide or collapse; narrow cards scroll the list instead. */
+.fchub-mc-currency-list {
+	border: 1px solid var(--el-border-color-lighter, #ebeef5);
+	border-radius: 6px;
+	overflow-x: auto;
+}
+
+.fchub-mc-currency-header,
+.fchub-mc-currency-row {
+	display: grid;
+	grid-template-columns: 40px minmax(160px, 1fr) 110px 120px 110px 120px 150px 44px;
+	column-gap: 8px;
+	align-items: center;
+	padding: 0 12px;
+	font-size: 13px;
+}
+
+.fchub-mc-currency-header {
+	background: var(--el-fill-color-light, #f5f7fa);
+	font-weight: 600;
+	color: var(--el-text-color-secondary, #909399);
+	height: 40px;
+	border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+}
+
+.fchub-mc-currency-row {
+	min-height: 48px;
+	border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+	background: var(--el-bg-color, #ffffff);
+	transition: background 0.15s;
+}
+
+.fchub-mc-currency-row:last-child {
+	border-bottom: none;
+}
+
+.fchub-mc-currency-row:nth-child(even) {
+	background: var(--el-fill-color-blank, #ffffff);
+}
+
+.fchub-mc-currency-row:hover {
+	background: var(--el-fill-color, #f0f2f5);
+}
+
+.fchub-mc-col-handle,
+.fchub-mc-col-action {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.fchub-mc-col-currency {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+}
+
+.fchub-mc-currency-name {
+	color: var(--el-text-color-secondary, #909399);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.fchub-mc-currency-row .el-input,
+.fchub-mc-currency-row .el-input-number,
+.fchub-mc-currency-row .el-select {
+	width: 100%;
+}
+
+/* Switcher tab grids — auto-fill keeps track counts identical across rows,
+   nowrap keeps toggle captions on one line. */
+.fchub-mc-switcher-toggle-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+	gap: 12px 18px;
+	align-items: center;
+	justify-items: start;
+}
+
+.fchub-mc-switcher-toggle-grid .el-switch,
+.fchub-mc-switcher-toggle-grid .el-switch__label {
+	white-space: nowrap;
+}
+
+.fchub-mc-switcher-select-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: 12px;
+}
+
+.fchub-mc-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.fchub-mc-field__label {
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--el-text-color-secondary, #909399);
+}
+
+.fchub-mc-field .el-select {
+	width: 100%;
+}
+
+.fchub-mc-drag-handle {
+	cursor: grab;
+	color: var(--el-text-color-placeholder, #a8abb2);
+	display: inline-flex;
+	padding: 4px;
+	border-radius: 4px;
+	transition: color 0.15s, background 0.15s;
+}
+
+.fchub-mc-drag-handle:hover {
+	color: var(--el-text-color-regular, #606266);
+	background: var(--el-fill-color, #f0f2f5);
+}
+
+.fchub-mc-ghost {
+	opacity: 0.4;
+	border: 2px dashed var(--el-color-primary, #409eff);
+	border-radius: 4px;
+}
+
+.fchub-mc-chosen {
+	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Coming Soon */
+.fchub-mc-coming-soon-row {
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+.fchub-mc-badge-soon {
+	display: inline-block;
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	padding: 2px 7px;
+	margin-left: 8px;
+	border-radius: 4px;
+	background: var(--el-color-info-light-7, #e6e8eb);
+	color: var(--el-text-color-secondary, #909399);
+	vertical-align: middle;
+	line-height: 1.4;
+}

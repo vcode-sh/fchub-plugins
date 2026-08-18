@@ -11,6 +11,50 @@ use PHPUnit\Framework\Attributes\Test;
 
 final class OptionStoreTest extends TestCase
 {
+    /**
+     * all() merges defaults, normalizes every configured currency and asks
+     * FluentCart for the base code. A storefront render asks for settings
+     * dozens of times, so the merge must happen once per request, not once
+     * per question.
+     */
+    #[Test]
+    public function testRepeatedReadsMergeTheSettingsOnce(): void
+    {
+        $this->setOption('fchub_mc_settings', ['rounding_mode' => 'ceil']);
+        $store = new OptionStore();
+
+        $store->all();
+        $store->all();
+        $store->get('rounding_mode');
+        $store->get('base_currency');
+        (new OptionStore())->all();
+
+        $this->assertSame(1, CurrencySettings::$reads, 'One merge per request, however many readers ask.');
+    }
+
+    #[Test]
+    public function testSaveInvalidatesTheMemoizedSettings(): void
+    {
+        $store = new OptionStore();
+        $this->assertSame('half_up', $store->get('rounding_mode'));
+
+        $store->save(['rounding_mode' => 'floor']);
+
+        $this->assertSame('floor', $store->get('rounding_mode'));
+    }
+
+    #[Test]
+    public function testEnsureExplicitRateProviderInvalidatesTheMemoizedSettings(): void
+    {
+        $store = new OptionStore();
+        $this->assertNull($store->get('rate_provider_explicitly_missing'));
+        $before = $store->get('rate_provider');
+
+        $store->ensureExplicitRateProvider();
+
+        $this->assertSame('manual', $store->get('rate_provider'));
+    }
+
     #[Test]
     public function testSwitcherDefaultsAreDeepMerged(): void
     {

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Http\Controllers\Pub;
 
-use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Actions\PersistContextAction;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
+use FChubMultiCurrency\Domain\Services\CurrencyResolution;
 use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Frontend\CurrencyContextPayload;
 use FChubMultiCurrency\Storage\OptionStore;
@@ -49,14 +49,10 @@ final class ContextController
             }
 
             $context = CurrencyContextService::applyContextFilter(
-                ContextModule::resolveExplicitPreference($optionStore, $currencyCode),
+                CurrencyResolution::explicitPreference($optionStore, $currencyCode),
             );
         } else {
-            $contextService = new CurrencyContextService(
-                ContextModule::buildResolverChain($optionStore),
-                $optionStore,
-            );
-            $context = $contextService->resolve();
+            $context = CurrencyContextService::forVisitor($optionStore)->resolve();
         }
 
         return self::response([
@@ -81,18 +77,31 @@ final class ContextController
             );
         }
 
-        // Rate limit: 30 requests per minute per IP
+        // Rate limit: 30 requests per minute per resolved client IP, plus a
+        // coarser ceiling on the socket address. The first is fair; the second
+        // survives a client rotating forwarding headers to mint fresh buckets.
         $ip = IpResolver::resolve();
         $rateLimitKey = 'fchub_mc_rl_' . substr(md5($ip), 0, 12);
         $hits = (int) get_transient($rateLimitKey);
 
-        if ($hits >= 30) {
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- Hashed immediately; never echoed or stored raw.
+        $socketAddress = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+        $backstopKey = 'fchub_mc_rlb_' . substr(md5($socketAddress), 0, 12);
+        $backstopHits = (int) get_transient($backstopKey);
+
+        if ($hits >= 30 || $backstopHits >= 120) {
             return self::failure(
                 self::CODE_RATE_LIMITED,
                 __('Too many requests. Please try again later.', 'fchub-multi-currency'),
                 429,
             );
         }
+
+        // Every attempt spends budget, not just the ones that persist. The
+        // rate_unavailable branch below writes an event-log row, and a client
+        // whose failures never counted could write those rows without limit.
+        set_transient($rateLimitKey, $hits + 1, MINUTE_IN_SECONDS);
+        set_transient($backstopKey, $backstopHits + 1, MINUTE_IN_SECONDS);
 
         $params = $request->get_json_params();
         if (!is_array($params)) {
@@ -124,7 +133,7 @@ final class ContextController
             );
         }
 
-        if (ContextModule::resolveSelectablePreference($optionStore, $currencyCode) === null) {
+        if (CurrencyResolution::selectablePreference($optionStore, $currencyCode) === null) {
             EventLogger::log('context_switch_rate_unavailable', get_current_user_id(), [
                 'currency' => $currencyCode,
                 'source' => 'rest',
@@ -143,9 +152,6 @@ final class ContextController
                 ],
             );
         }
-
-        // Increment rate limit only after validation passes
-        set_transient($rateLimitKey, $hits + 1, MINUTE_IN_SECONDS);
 
         $action = new PersistContextAction(new PreferenceRepository(), $optionStore);
         $result = $action->execute($currencyCode);

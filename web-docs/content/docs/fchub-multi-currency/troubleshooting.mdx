@@ -119,7 +119,8 @@ import { Separator } from '@/components/ui/separator';
 
     1. **Cookies disabled for guests** — if guest cookies are disabled in plugin settings, a guest visitor has nowhere to store the preference after the request completes
     2. **Form blocked by aggressive HTML filtering** — some builders or security plugins strip `<noscript>` or form markup
-    3. **Nonce caching issue** — if your cache serves stale HTML for too long, the fallback nonce can go stale too. Purge cache and reload
+
+    A stale cached nonce no longer blocks guests: their submission writes only their own cookie, so the form accepts it however old the cached page is. Signed-in submissions still require a fresh nonce, and signed-in pages are rendered fresh.
   </Accordion>
   <Accordion title="Rate badge shows wrong time">
     The badge uses WordPress's `human_time_diff()` with the site's configured timezone. If the time seems off:

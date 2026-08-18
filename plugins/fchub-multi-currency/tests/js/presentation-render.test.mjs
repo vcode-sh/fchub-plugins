@@ -56,6 +56,10 @@ function runContext(selectors) {
 
 	vm.runInNewContext(readFileSync(scriptPath, "utf8"), sandbox, { filename: scriptPath.pathname });
 
+	// The subject is the rendered output, not load ordering: paint the fixture
+	// context through the exported API, the way the projection runtime does.
+	sandbox.window.fchubMcSyncLabels(sandbox.window.fchubMcConfig);
+
 	return sandbox;
 }
 

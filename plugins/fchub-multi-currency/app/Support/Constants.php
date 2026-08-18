@@ -57,7 +57,9 @@ final class Constants
         'enabled'                     => 'yes',
         'base_currency'               => 'USD',
         'display_currencies'          => [],
-        'default_display_currency'    => 'USD',
+        // Empty means "same as the store's base currency" — the correct answer
+        // for every store until the merchant deliberately picks otherwise.
+        'default_display_currency'    => '',
         'url_param_enabled'           => 'yes',
         'url_param_key'               => 'currency',
         'cookie_enabled'              => 'yes',

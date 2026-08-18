@@ -79,12 +79,52 @@
 		return `<span class="fchub-mc-inline-notice">${escapeHtml(fill(template, [code, config.baseCurrency]))}</span>`;
 	}
 
+	// Mirrors human_time_diff's tiers: [upper bound, divisor, unit key].
+	const TIME_TIERS = [
+		[3600, 60, "min"],
+		[86400, 3600, "hour"],
+		[604800, 86400, "day"],
+		[2592000, 604800, "week"],
+		[31536000, 2592000, "month"],
+		[Infinity, 31536000, "year"],
+	];
+
+	/**
+	 * Rate freshness, computed when the visitor looks rather than when the
+	 * cache was warmed. The server-rendered string gates it — an empty badge
+	 * means the store disabled the surface — and also serves as the fallback
+	 * for a cached config that predates the epoch fields.
+	 */
+	function renderRateBadge(entry) {
+		if (!entry.rateBadge) return "";
+
+		const fetchedAt = Number(entry.rateFetchedAt);
+		const units = templates.timeUnits;
+		if (!fetchedAt || !units || !templates.rateBadgeAgo) return entry.rateBadge;
+
+		const age = Math.max(0, Math.round(Date.now() / 1000) - fetchedAt);
+		const [, divisor, unit] = TIME_TIERS.find(([limit]) => age < limit);
+		const count = Math.max(1, Math.round(age / divisor));
+		const pair = units[unit] || [];
+		const amount = fill(pair[count === 1 ? 0 : 1] || "%s", [String(count)]);
+
+		const staleAfter = Number(entry.rateStaleAfterSeconds);
+		const stale = staleAfter > 0 && age > staleAfter;
+		const className = `fchub-mc-rate-badge${stale ? " fchub-mc-rate-badge--stale" : ""}`;
+
+		return (
+			`<span class="${className}">` +
+			'<span class="fchub-mc-rate-badge__dot" aria-hidden="true"></span>' +
+			`${escapeHtml(fill(templates.rateBadgeAgo, [amount]))}</span>`
+		);
+	}
+
 	function switcherParts(code) {
 		const isBase = code === config.baseCurrency;
 		const context = (inner) => `<span class="fchub-mc-rate-context">${inner}</span>`;
 
 		return {
-			rateBadge: entryFor(code).rateBadge || "",
+			rateBadge: renderRateBadge(entryFor(code)),
 			rateValue: context(
 				escapeHtml(
 					isBase
@@ -210,6 +250,10 @@
 
 	function applyContext(context) {
 		if (!context || typeof context !== "object") return;
+		// No selected currency means nothing to say: the server-rendered surfaces
+		// already show the store's default, and painting an unresolved context
+		// would write "undefined" over them.
+		if (!Object.hasOwn(config.currencyTable || {}, normalizeCode(context.displayCurrency))) return;
 
 		for (const root of document.querySelectorAll("[data-fchub-mc-switcher]")) {
 			syncSwitcher(root, context);
@@ -230,9 +274,22 @@
 	document.addEventListener("submit", (event) => syncCheckoutCurrencyFields(event.target), true);
 	window.fchubMcSyncLabels = applyContext;
 
+	/**
+	 * Paints the currency the bootstrap resolved. On a store with projection
+	 * enabled the projection runtime repeats this a moment later in the same
+	 * task; on a store without it, this is the only place a stored preference
+	 * reaches the switcher after a reload.
+	 */
+	function paintResolved() {
+		const resolved = window.fchubMc?.currentCurrency?.() || "";
+		if (resolved !== "" && window.fchubMc.select(resolved) === true) {
+			applyContext(config);
+		}
+	}
+
 	if (document.readyState === "loading") {
-		document.addEventListener("DOMContentLoaded", () => applyContext(config), { once: true });
+		document.addEventListener("DOMContentLoaded", paintResolved, { once: true });
 	} else {
-		applyContext(config);
+		paintResolved();
 	}
 })();

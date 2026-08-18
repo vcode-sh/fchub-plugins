@@ -23,7 +23,7 @@ converted the same way.
 This works across your entire FluentCart storefront:
 
 - **Product pages** — individual prices, variant prices, compare/strikethrough prices
-- **Shop page** — all product cards, price range filters
+- **Shop page** — all product cards
 - **Cart** — item prices, line totals, cart total
 - **Checkout** — order summary, subtotal, estimated total
 - **Pricing tables** — variant prices and compare prices
@@ -32,6 +32,7 @@ This works across your entire FluentCart storefront:
 
 | Scenario | What Happens |
 |---|---|
+| **Shop price filter** | Deliberately stays in the base currency, sign included. FluentCart's filter slider and server both speak base-currency amounts through the very same inputs, so converting them corrupted every filtered query — the honest base filter is the one that returns correct results |
 | **Price ranges** | Both sides convert independently — `$11.00 – $12.30` becomes `€10.14 – €11.34` |
 | **"From" prices** | The prefix stays, the number converts — `From $9.99` becomes `From €9.21` |
 | **Strikethrough prices** | The old price stays crossed out, both old and new amounts convert |
@@ -136,9 +137,9 @@ attribute and the existing storefront runtime does the work.
   <Accordion title="For developers: projection targets, DOM observation, and data fragments">
     The projection engine targets all standard FluentCart price elements via CSS classes (`.fct-item-price`, `.fct-compare-price`, `.fct-cart-item-price`, `.fct_summary_value`, etc.) and data attributes (`[data-fluent-cart-cart-list-item-price]`, `[data-fluent-cart-cart-total-price]`, etc.).
 
-    A 50ms-debounced `MutationObserver` watches for DOM changes, plus the engine listens to FluentCart events: `fluentCartFragmentsReplaced`, `fluentCartNotifySummaryViewUpdated`, `fluentCartNotifyCartDrawerItemChanged`.
+    A 50ms-debounced `MutationObserver` watches price surfaces for DOM changes, plus the engine listens to FluentCart events: `fluentCartFragmentsReplaced`, `fluentCartNotifySummaryViewUpdated`, `fluentCartNotifyCartDrawerItemChanged`. The observer only attaches while a conversion is active, and mutations that touch no price surface are ignored.
 
-    The disclosure is also injected via FluentCart's checkout fragment system (`fluent_cart/checkout/after_patch_checkout_data_fragments`), making it available to the Vue checkout component.
+    The disclosure is injected client-side only. The plugin deliberately does not touch FluentCart's checkout patch fragments: that array is a sequential list the checkout JS iterates with `forEach`, and any string-keyed addition turns it into an object and breaks checkout updates.
 
     The regular and modal forms carry only `_fchub_mc_display_currency`. The server
     validates it during `fluent_cart/checkout/prepare_other_data`, computes the

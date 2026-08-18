@@ -207,7 +207,6 @@ Also includes event counts and the most-switched currencies when event logging h
 | Hook | Type | Description |
 |---|---|---|
 | `fluent_cart/integration/addons` | filter | Registers the plugin as a FluentCart addon |
-| `fluent_cart/checkout/after_patch_checkout_data_fragments` | filter | Injects disclosure text into checkout fragments |
 | `fluent_cart/before_payment_methods` | action | Adds the validated display-currency field inside regular and modal checkout forms |
 | `fluent_cart/checkout/prepare_other_data` | action | Captures that checkout field before the order is finalised |
 | `fluent_cart/order_paid_done` | action | Triggers order snapshot and FluentCRM sync |
@@ -434,7 +433,9 @@ Written by `SaveOrderSnapshotAction` on `fluent_cart/order_paid_done`. Only writ
 
 **Indexes:** `base_quote_fetched (base_currency, quote_currency, fetched_at)`, `fetched_at`
 
-Pruned automatically: rows older than 90 days are deleted by the cron job.
+Pruned automatically: rows older than 90 days are deleted by the daily
+maintenance cron (`fchub_mc_daily_maintenance`), which runs on every store —
+the refresh cron only exists when a remote rate provider is configured.
 
 ### fchub\_mc\_event\_log
 
@@ -447,9 +448,10 @@ Pruned automatically: rows older than 90 days are deleted by the cron job.
 | `payload` | `LONGTEXT NULL` | JSON payload |
 | `created_at` | `DATETIME` | Timestamp |
 
-**Indexes:** `event_created (event, created_at)`, `user_id`
+**Indexes:** `event_created (event, created_at)`, `created_at`, `user_id`
 
-Used by the GDPR personal data exporter/eraser.
+Used by the GDPR personal data exporter/eraser. Pruned automatically: rows older
+than 90 days are deleted by the daily maintenance cron.
 
 <Separator className="my-8" />
 

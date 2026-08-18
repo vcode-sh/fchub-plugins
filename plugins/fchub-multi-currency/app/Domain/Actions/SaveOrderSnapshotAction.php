@@ -4,22 +4,15 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Domain\Actions;
 
-use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Domain\ValueObjects\CurrencyContext;
 
 defined('ABSPATH') || exit;
 
+/** Writes the display-currency snapshot onto an order; the caller resolves the context. */
 final class SaveOrderSnapshotAction
 {
-    public function __construct(
-        private CurrencyContextService $contextService,
-    ) {
-    }
-
-    public function execute(object $order, ?CurrencyContext $context = null): void
+    public function execute(object $order, CurrencyContext $context): void
     {
-        $context = $context ?? $this->contextService->resolve();
-
         if ($context->isBaseDisplay) {
             return;
         }

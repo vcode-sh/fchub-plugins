@@ -6,12 +6,12 @@
  * instantly to setting changes — no save-and-reload cycle needed.
  *
  * Reads flag assets and display currencies from the fchubMcAdmin config
- * object and exposes itself as window.FchubMcSwitcherPreview.
+ * object; the footer (freshness badge, rate value, checkout note) is derived
+ * from the rates the settings page already loaded, so the preview reports
+ * real state instead of sample copy. Exposes window.FchubMcSwitcherPreview.
  */
 
 (() => {
-	"use strict";
-
 	var config = window.fchubMcAdmin || {};
 	var flagBaseUrl = config.flag_base_url || "";
 	var flagMap = config.flag_map || {};
@@ -20,9 +20,9 @@
 	var PREVIEW_MAX = 4;
 
 	var FALLBACK_CURRENCIES = [
-		{ code: "USD", name: "US Dollar", symbol: "$", flagUrl: flagBaseUrl + "us.svg" },
-		{ code: "EUR", name: "Euro", symbol: "\u20ac", flagUrl: flagBaseUrl + "eu.svg" },
-		{ code: "GBP", name: "British Pound", symbol: "\u00a3", flagUrl: flagBaseUrl + "gb.svg" },
+		{ code: "USD", name: "US Dollar", symbol: "$", flagUrl: `${flagBaseUrl}us.svg` },
+		{ code: "EUR", name: "Euro", symbol: "€", flagUrl: `${flagBaseUrl}eu.svg` },
+		{ code: "GBP", name: "British Pound", symbol: "£", flagUrl: `${flagBaseUrl}gb.svg` },
 	];
 
 	function mapCurrency(c) {
@@ -31,40 +31,58 @@
 			code: c.code,
 			name: c.name,
 			symbol: c.symbol,
-			flagUrl: countryCode ? flagBaseUrl + countryCode + ".svg" : "",
+			flagUrl: countryCode ? `${flagBaseUrl + countryCode}.svg` : "",
 		};
+	}
+
+	// The rates REST payload timestamps rows as UTC "YYYY-MM-DD HH:MM:SS".
+	function parseFetchedAt(row) {
+		var ts = Date.parse(`${String(row?.fetched_at || "").replace(" ", "T")}Z`);
+		return Number.isNaN(ts) ? null : ts;
+	}
+
+	// Mirrors human_time_diff: one-minute floor, largest sensible unit.
+	var TIME_TIERS = [
+		[3600, 60, "minute"],
+		[86400, 3600, "hour"],
+		[604800, 86400, "day"],
+		[Infinity, 604800, "week"],
+	];
+
+	function timeAgo(ageSeconds) {
+		var tier = TIME_TIERS.find(([limit]) => ageSeconds < limit);
+		var count = Math.max(1, Math.round(ageSeconds / tier[1]));
+		return `${count} ${tier[2]}${count === 1 ? "" : "s"}`;
 	}
 
 	window.FchubMcSwitcherPreview = {
 		name: "SwitcherPreview",
 		props: {
 			settings: { type: Object, required: true },
-			currencies: { type: Array, default: function () { return initialDisplayCurrencies; } },
+			currencies: { type: Array, default: () => initialDisplayCurrencies },
+			rates: { type: Array, default: () => [] },
 		},
 		computed: {
 			s: function () {
 				return this.settings;
 			},
 			previewCurrencies: function () {
-				var src = this.currencies && this.currencies.length
-					? this.currencies
-					: initialDisplayCurrencies;
-				if (!src || !src.length) return FALLBACK_CURRENCIES;
+				var src = this.currencies?.length ? this.currencies : initialDisplayCurrencies;
+				if (!src?.length) return FALLBACK_CURRENCIES;
 				return src.map(mapCurrency);
 			},
 			currentCurrency: function () {
 				return this.previewCurrencies[0] || FALLBACK_CURRENCIES[0];
 			},
 			sortedCurrencies: function () {
-				var all = this.previewCurrencies.slice();
-				var favs = this.s.favorite_currencies || [];
+				let all = this.previewCurrencies.slice();
+				const favs = this.s.favorite_currencies || [];
 				if (this.s.show_favorites_first === "yes" && favs.length) {
-					var favSet = {};
-					favs.forEach(function (f) { favSet[f] = true; });
-					var top = [];
-					var rest = [];
-					all.forEach(function (c) {
-						if (favSet[c.code]) top.push(c);
+					const favSet = new Set(favs);
+					const top = [];
+					const rest = [];
+					all.forEach((c) => {
+						if (favSet.has(c.code)) top.push(c);
 						else rest.push(c);
 					});
 					all = top.concat(rest);
@@ -72,10 +90,8 @@
 				return all.slice(0, PREVIEW_MAX);
 			},
 			totalCurrencyCount: function () {
-				var src = this.currencies && this.currencies.length
-					? this.currencies
-					: initialDisplayCurrencies;
-				return (src && src.length) ? src.length : FALLBACK_CURRENCIES.length;
+				var src = this.currencies?.length ? this.currencies : initialDisplayCurrencies;
+				return src?.length ? src.length : FALLBACK_CURRENCIES.length;
 			},
 			isTruncated: function () {
 				return this.totalCurrencyCount > PREVIEW_MAX;
@@ -83,11 +99,11 @@
 			widgetClass: function () {
 				var cls = "fchub-mc-switcher fchub-mc-switcher--preview-open";
 				var preset = this.s.preset || "default";
-				if (preset !== "default") cls += " fchub-mc-switcher--preset-" + preset;
-				cls += " fchub-mc-switcher--size-" + (this.s.size || "md");
+				if (preset !== "default") cls += ` fchub-mc-switcher--preset-${preset}`;
+				cls += ` fchub-mc-switcher--size-${this.s.size || "md"}`;
 				if (this.s.width_mode === "full") cls += " fchub-mc-switcher--width-full";
 				var pos = this.s.dropdown_position || "auto";
-				if (pos !== "auto") cls += " fchub-mc-switcher--dropdown-" + pos;
+				if (pos !== "auto") cls += ` fchub-mc-switcher--dropdown-${pos}`;
 				if (this.s.dropdown_direction === "up") cls += " fchub-mc-switcher--direction-up";
 				return cls;
 			},
@@ -95,28 +111,51 @@
 				var cls = "fchub-mc-admin-preview__stage fchub-mc-switcher-stage";
 				cls += " fchub-mc-switcher-stage--center";
 				var lp = this.s.label_position || "before";
-				cls += " fchub-mc-switcher-stage--label-" + lp;
+				cls += ` fchub-mc-switcher-stage--label-${lp}`;
 				return cls;
 			},
-			label: function () {
-				return "";
-			},
+			label: () => "",
 			labelFirst: function () {
 				var lp = this.s.label_position || "before";
 				return lp === "before" || lp === "above";
 			},
 			hasSep: function () {
-				return (this.s.show_option_codes === "yes" || this.s.show_option_symbols === "yes")
-					&& this.s.show_option_names === "yes";
+				return (
+					(this.s.show_option_codes === "yes" || this.s.show_option_symbols === "yes") &&
+					this.s.show_option_names === "yes"
+				);
+			},
+			rateAgeText: function () {
+				var newest = null;
+				(this.rates || []).forEach((row) => {
+					var ts = parseFetchedAt(row);
+					if (ts !== null && (newest === null || ts > newest)) newest = ts;
+				});
+				if (newest === null) return null;
+				var age = Math.max(0, Math.round((Date.now() - newest) / 1000));
+				return `Rates updated ${timeAgo(age)} ago`;
+			},
+			rateLine: function () {
+				var row = (this.rates || [])[0];
+				if (!row?.base_currency || !row.rate || !row.quote_currency) return null;
+				return `1 ${row.base_currency} = ${row.rate} ${row.quote_currency}`;
+			},
+			contextNote: function () {
+				var base = (this.rates || [])[0]?.base_currency;
+				return base
+					? `Display prices only. Checkout charged in ${base}.`
+					: "Display prices only. Checkout is charged in the store currency.";
 			},
 			hasFooter: function () {
-				return this.s.show_rate_badge === "yes"
-					|| this.s.show_rate_value === "yes"
-					|| this.s.show_context_note === "yes";
+				return (
+					(this.s.show_rate_badge === "yes" && this.rateAgeText !== null) ||
+					(this.s.show_rate_value === "yes" && this.rateLine !== null) ||
+					this.s.show_context_note === "yes"
+				);
 			},
 		},
 		methods: {
-			optionClass: function (c, i) {
+			optionClass: (_c, i) => {
 				var cls = "fchub-mc-switcher__option";
 				if (i === 0) cls += " fchub-mc-switcher__option--active";
 				return cls;
@@ -135,7 +174,7 @@
 				<span v-if="s.show_code===\'yes\'" class="fchub-mc-switcher__code">{{ currentCurrency.code }}</span>\
 				<span v-if="s.show_symbol===\'yes\'" class="fchub-mc-switcher__symbol">{{ currentCurrency.symbol }}</span>\
 				<span v-if="s.show_name===\'yes\'" class="fchub-mc-switcher__name">{{ currentCurrency.name }}</span>\
-				<span class="fchub-mc-switcher__caret">\u25bc</span>\
+				<span class="fchub-mc-switcher__caret">▼</span>\
 			</button>\
 			<span class="fchub-mc-switcher__dropdown">\
 				<span v-if="s.search_mode===\'inline\'" class="fchub-mc-switcher__search-wrap">\
@@ -146,17 +185,17 @@
 						<span v-if="s.show_option_flags===\'yes\' && c.flagUrl" class="fchub-mc-switcher__flag"><img :src="c.flagUrl" class="fchub-mc-flag" :alt="c.code" width="20" height="15" /></span>\
 						<span v-if="s.show_option_codes===\'yes\'" class="fchub-mc-switcher__option-code">{{ c.code }}</span>\
 						<span v-if="s.show_option_symbols===\'yes\'" class="fchub-mc-switcher__option-symbol">{{ c.symbol }}</span>\
-						<span v-if="hasSep" class="fchub-mc-switcher__option-sep">\u2014</span>\
+						<span v-if="hasSep" class="fchub-mc-switcher__option-sep">—</span>\
 						<span v-if="s.show_option_names===\'yes\'" class="fchub-mc-switcher__option-name">{{ c.name }}</span>\
-						<span v-if="s.show_active_indicator===\'yes\'" class="fchub-mc-switcher__option-check">{{ i === 0 ? \'\u2713\' : \'\' }}</span>\
+						<span v-if="s.show_active_indicator===\'yes\'" class="fchub-mc-switcher__option-check">{{ i === 0 ? \'✓\' : \'\' }}</span>\
 					</span>\
 				</span>\
 				<span v-if="hasFooter" class="fchub-mc-switcher__footer">\
-					<span v-if="s.show_rate_badge===\'yes\'" class="fchub-mc-rate-badge">\
-						<span class="fchub-mc-rate-badge__dot"></span> Rates updated 2 hours ago\
+					<span v-if="s.show_rate_badge===\'yes\' && rateAgeText" class="fchub-mc-rate-badge">\
+						<span class="fchub-mc-rate-badge__dot"></span> {{ rateAgeText }}\
 					</span>\
-					<span v-if="s.show_rate_value===\'yes\'" class="fchub-mc-rate-context">1 PLN = 0.2350 EUR</span>\
-					<span v-if="s.show_context_note===\'yes\'" class="fchub-mc-rate-context">Display prices only. Checkout charged in PLN.</span>\
+					<span v-if="s.show_rate_value===\'yes\' && rateLine" class="fchub-mc-rate-context">{{ rateLine }}</span>\
+					<span v-if="s.show_context_note===\'yes\'" class="fchub-mc-rate-context">{{ contextNote }}</span>\
 				</span>\
 			</span>\
 		</span>\

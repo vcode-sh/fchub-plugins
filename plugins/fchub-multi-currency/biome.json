@@ -6,7 +6,7 @@
     "useIgnoreFile": false
   },
   "files": {
-    "includes": ["assets/**/*.js", "admin/**/*.js"],
+    "includes": ["assets/**/*.js", "admin/**/*.js", "!admin/lib/**"],
     "ignoreUnknown": true
   },
   "formatter": {

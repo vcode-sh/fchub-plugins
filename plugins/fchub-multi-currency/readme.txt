@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, currency, exchange-rates, ecommerce
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.4.7
+Stable tag: 1.4.8
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -65,7 +65,7 @@ Privacy: https://openexchangerates.org/privacy
 
 The selected currency preference can be stored locally in a browser cookie and a matching local-storage fallback for the configured lifetime, which defaults to 90 days. The fallback lets a cached storefront recover the same choice when an edge host does not vary pages by cookie. The cookie contains the three-letter currency code; the local-storage record contains the same code and its expiry time. When account persistence is enabled, the preference is also stored in WordPress user metadata until the user changes it, uses the WordPress Privacy Tools eraser, or the site owner removes plugin data.
 
-The plugin stores rate history in a custom database table. Automated refreshes prune rate history older than 90 days. The event log records currency and rate activity; user-linked entries can be exported and erased through WordPress Privacy Tools. Operational event entries otherwise remain until the site owner removes plugin data.
+The plugin stores rate history in a custom database table. A daily maintenance schedule prunes rate history and event-log entries older than 90 days on every store. The event log records currency and rate activity; user-linked entries can be exported and erased through WordPress Privacy Tools at any time.
 
 Orders retain the display currency, exchange rate and checkout disclosure metadata with the FluentCart order for the order's normal retention period. FCHub Multi-Currency preserves its tables and settings on uninstall by default. If the site owner enables "Remove data on uninstall", uninstall removes plugin settings, rate history, the event log, scheduled refreshes and stored user currency preferences.
 
@@ -91,6 +91,18 @@ The failed response is not persisted. Customer prices continue to use the last g
 
 == Changelog ==
 
+= 1.4.8 =
+
+* Fixed the shop price filter after a currency switch. FluentCart's filter speaks base currency end to end, so the filter block now stays in base — and actually filters — instead of corrupting queries with converted values.
+* Stopped touching FluentCart's checkout patch fragments; the old disclosure entry broke checkout updates for visitors browsing a converted currency. The disclosure ships client-side.
+* Read the order's WordPress user through FluentCart's customer relation, so the FluentCRM order sync and manual-order snapshot fallback actually run.
+* Stopped the selector-buttons block baking one visitor's currency into cacheable HTML, gave the switcher full keyboard navigation, and painted the resolved currency on stores without price projection.
+* Rendered the rate-freshness badge in the browser from a shipped timestamp, so cached pages stop repeating their age; mirrored FluentCart's ISO and symbol price positions.
+* Counted every REST attempt against the rate limiter with an unforgeable per-socket ceiling, validated forwarded IP headers, and survived rogue context filters with a logged fallback.
+* Let guests submit the no-JS form however old the cached nonce; added a daily schedule pruning the event log and rate history on every store.
+* Rebuilt the admin page into per-tab components with a working currency grid, value-stating diagnostics, a one-click FluentCRM field creator, and a default display currency that follows the store base.
+* Thanks to @ManniGH for the live 1.4.7 measurements in #72 that set this release's direction.
+
 = 1.4.7 =
 
 * Kept guest switchers locked from the confirmed choice through context recovery and completed price projection. The visitor's code appears immediately; stale cached prices do not.
@@ -99,44 +111,4 @@ The failed response is not persisted. Customer prices continue to use the last g
 * Added adversarial runtime coverage and a real 4.5-second delayed-browser measurement.
 * Thanks to @ManniGH for catching the remaining production-only reconciliation window in #72 and mapping the useful evidence from PR #149.
 
-= 1.4.6 =
-
-* Fixed guest switching on Rocket.net and other edge-cached storefronts. Confirmed choices use browser storage, a one-shot currency URL and unique no-store recovery requests. The URL is removed only after verification, so shared HTML cannot reset the selector.
-* Matched the mirror to the cookie lifetime, migrated existing preferences, rejected invalid data and kept explicit links and signed-in accounts in charge.
-* Kept prices visible while a slow recovery request is pending, then projected the resolved currency as one update.
-* Passed the validated display code through both FluentCart checkout forms, so order metadata records what the customer saw despite a stale cookie. Payment remains in the base currency.
-* Formatted PHP helper and FluentCRM prices with the display currency's own decimals, separators, symbol and position, including zero-decimal bases and three-or-four-decimal display currencies.
-* Returned the default display currency to FluentCart's base when its configured currency is removed.
-* Rejected a non-base currency before saving it when no usable exchange rate exists, instead of accepting the click and quietly showing the base currency.
-* Added runtime and PHP tests for cache, storage, expiry, failed persistence, races, checkout hand-off and number-format boundaries.
-* Thanks to @ManniGH for reproducing the real Rocket.net cache boundary, testing it in production and contributing PR #149. The first fix did not go wide enough; this one follows the evidence.
-
-= 1.4.5 =
-
-* Reconciled edge-cached pages with the guest cookie and kept prices, selectors and context blocks on one recovered currency.
-* Rejected stale nonces, failed persistence and decorative `2xx` responses instead of reporting a saved choice.
-* Saved manual and remote rates as complete snapshots, with FluentCart owning the base currency, number format and cent helpers.
-* Captured the display context at checkout and added shipped-JavaScript behaviour tests to CI.
-* Thanks to @ManniGH for the production report, Rocket.net investigation and PR #149 that drove the cached-page work in #72.
-
-= 1.4.4 =
-
-* Fixed converted prices reading 100x too high in stores whose FluentCart number format uses a comma decimal separator. The frontend was told the decimal separator by the wrong setting, so a base price of "20,00" was parsed as 2000 before conversion. Thanks to @zellfusion for tracing the mismatch and supplying the exact reproduction in #142.
-
-= 1.4.3 =
-
-* Restored GitHub release updates. WordPress.org listing is still pending, so without this the plugin had no update channel at all.
-
-= 1.4.2 =
-
-* Fixed the FluentCRM automation email editor failing to load whenever Multi-Currency was active.
-* Registered the funnel smart-code group against the real FluentCart trigger names.
-* Reported honestly when a currency preference cannot be stored, instead of claiming it was saved.
-* Stopped the switcher reloading the page after a switch the server rejected.
-* Added stable outcome codes to the public context endpoint so clients no longer match on message text.
-* Stated in settings that disabling cookie persistence prevents logged-out visitors keeping a currency.
-
-= 1.4.1 =
-
-* Make Manual the no-network default and require explicit remote-provider configuration.
-* Bound remote rate requests and reject malformed or oversized responses without replacing valid rates.
+Earlier releases are documented in full at https://fchub.co/docs/fchub-multi-currency/changelog

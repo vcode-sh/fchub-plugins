@@ -107,8 +107,12 @@
 		"[data-fluent-cart-checkout-estimated-total]",
 	].join(",");
 
-	// Selector for the price filter currency sign (shop sidebar)
-	const CURRENCY_SIGN_SELECTOR = ".fct-shop-currency-sign";
+	// The shop price filter (.fc_price_range_input and its .fct-shop-currency-sign)
+	// is deliberately never projected: FluentCart submits those input values
+	// verbatim as base-currency bounds (FormData → filters[price_range_*] →
+	// Helper::toCent → min_price BETWEEN), and its noUiSlider writes base values
+	// into the same inputs on every drag. The filter block stays base end to end;
+	// converting it corrupts every filtered query for non-base visitors.
 
 	// Derived from the base-currency settings, so they are rebuilt whenever those
 	// are re-read rather than captured once at load.
@@ -619,18 +623,6 @@
 	}
 
 	/**
-	 * Project currency signs in the shop price filter sidebar.
-	 */
-	function projectCurrencySigns(root) {
-		for (const sign of root.querySelectorAll(CURRENCY_SIGN_SELECTOR)) {
-			if (sign.getAttribute(ATTR_PROJECTED)) continue;
-			sign.setAttribute(ATTR_ORIGINAL, sign.textContent);
-			sign.textContent = symbol;
-			sign.setAttribute(ATTR_PROJECTED, "1");
-		}
-	}
-
-	/**
 	 * Project variant button labels from FluentCart's base-price attributes.
 	 */
 	function projectVariantButtons(root) {
@@ -657,24 +649,6 @@
 			}
 
 			btn.setAttribute(ATTR_PROJECTED, "1");
-		}
-	}
-
-	/**
-	 * Project price filter input values in the shop sidebar.
-	 */
-	function projectPriceFilterInputs(root) {
-		for (const input of root.querySelectorAll(".fc_price_range_input")) {
-			// Store original base-currency value on first encounter
-			if (!input.getAttribute(ATTR_BASE)) {
-				input.setAttribute(ATTR_BASE, input.value);
-			}
-
-			const baseVal = parseFloat(input.getAttribute(ATTR_BASE));
-			if (Number.isNaN(baseVal)) continue;
-
-			const converted = applyRounding(baseVal * rate);
-			input.value = formatNumber(converted);
 		}
 	}
 
@@ -727,9 +701,7 @@
 			}
 		}
 
-		projectCurrencySigns(root);
 		projectVariantButtons(root);
-		projectPriceFilterInputs(root);
 		projectPricingTablePaymentTypes(root);
 
 		if (projected > 0) {
@@ -764,17 +736,57 @@
 		}
 	}
 
+	// Everything a projection pass rewrites, not just the price text: the
+	// observer must also wake for re-rendered variant buttons and
+	// pricing-table labels.
+	const RELEVANT_SELECTORS = [
+		PRICE_SELECTORS,
+		"[data-fluent-cart-product-variant][data-item-price]",
+		".fluent-cart-pricing-table-variant-payment-type",
+	].join(",");
+
 	/**
-	 * Set up a MutationObserver to re-project when FluentCart
-	 * dynamically updates price elements (cart drawer, AJAX, etc.).
+	 * Whether a mutation could change what a projection pass would produce.
+	 *
+	 * Storefront pages mutate constantly — countdown timers, carousels, lazy
+	 * images — and re-projecting the whole document for each of those turns the
+	 * safety net into a treadmill. Only text inside a price surface, or new
+	 * nodes that are or contain one, earn a re-projection.
 	 */
-	function observeDynamicUpdates() {
-		if (typeof MutationObserver === "undefined") return;
+	function mutationTouchesPriceSurface(mutation) {
+		if (mutation.type === "characterData") {
+			return Boolean(mutation.target?.parentElement?.closest?.(RELEVANT_SELECTORS));
+		}
+
+		if (mutation.target?.closest?.(RELEVANT_SELECTORS)) return true;
+
+		for (const node of mutation.addedNodes) {
+			if (node.nodeType !== 1) continue;
+			if (node.matches?.(RELEVANT_SELECTORS) || node.querySelector?.(RELEVANT_SELECTORS)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// Attached the first time a conversion is active, never for a visitor
+	// browsing the base currency — they have nothing to re-project.
+	let observing = false;
+
+	/**
+	 * Watches for DOM changes nothing announced — FluentCart's own updates all
+	 * fire events, so this net exists for themes and plugins that re-render
+	 * price markup silently.
+	 */
+	function ensureDynamicUpdatesObserved() {
+		if (observing || typeof MutationObserver === "undefined") return;
+		observing = true;
 
 		let debounceTimer;
 
 		const observer = new MutationObserver((mutations) => {
-			if (projecting) return;
+			if (projecting || !converting) return;
 
 			let needsReproject = false;
 
@@ -786,7 +798,10 @@
 				) {
 					continue;
 				}
-				if (m.addedNodes.length > 0 || m.type === "characterData") {
+				if (
+					(m.addedNodes.length > 0 || m.type === "characterData") &&
+					mutationTouchesPriceSurface(m)
+				) {
 					needsReproject = true;
 					break;
 				}
@@ -864,6 +879,7 @@
 		try {
 			clearProjectionMarkers(document);
 			readConfig();
+			if (converting) ensureDynamicUpdatesObserved();
 			projectPrices(document);
 			window.fchubMcSyncLabels?.(cfg);
 		} catch (error) {
@@ -877,7 +893,6 @@
 
 	function init() {
 		applyCurrency(window.fchubMc?.currentCurrency() || "");
-		observeDynamicUpdates();
 		listenForFluentCartEvents();
 	}
 

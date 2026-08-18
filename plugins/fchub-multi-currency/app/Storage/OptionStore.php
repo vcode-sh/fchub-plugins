@@ -12,6 +12,21 @@ defined('ABSPATH') || exit;
 final class OptionStore
 {
     /**
+     * The merged settings for this request. Merging normalizes every configured
+     * currency and asks FluentCart for the base code, and a storefront render
+     * asks for settings dozens of times — so it happens once, here. Every write
+     * in this class clears it; nothing else writes the option.
+     *
+     * @var array<string, mixed>|null
+     */
+    private static ?array $memo = null;
+
+    public static function resetMemo(): void
+    {
+        self::$memo = null;
+    }
+
+    /**
      * @param array<int, mixed> $currencies
      * @return array<int, array<string, mixed>>
      */
@@ -67,12 +82,16 @@ final class OptionStore
      */
     public function all(): array
     {
-        $saved = get_option(Constants::OPTION_SETTINGS, []);
+        if (self::$memo === null) {
+            $saved = get_option(Constants::OPTION_SETTINGS, []);
 
-        return self::mergeSettings(
-            Constants::DEFAULT_SETTINGS,
-            is_array($saved) ? $saved : [],
-        );
+            self::$memo = self::mergeSettings(
+                Constants::DEFAULT_SETTINGS,
+                is_array($saved) ? $saved : [],
+            );
+        }
+
+        return self::$memo;
     }
 
     public function get(string $key, mixed $default = null): mixed
@@ -93,6 +112,7 @@ final class OptionStore
 
         $saved['rate_provider'] = 'manual';
         update_option(Constants::OPTION_SETTINGS, $saved);
+        self::resetMemo();
     }
 
     /**
@@ -104,5 +124,6 @@ final class OptionStore
         $merged = self::mergeSettings($current, $values);
 
         update_option(Constants::OPTION_SETTINGS, $merged);
+        self::resetMemo();
     }
 }

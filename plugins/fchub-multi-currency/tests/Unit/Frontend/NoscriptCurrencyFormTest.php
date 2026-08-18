@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace FChubMultiCurrency\Tests\Unit\Bootstrap;
+namespace FChubMultiCurrency\Tests\Unit\Frontend;
 
-use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Frontend\NoscriptCurrencyForm;
 use FChubMultiCurrency\Frontend\CurrencySwitcherRenderer;
 use FChubMultiCurrency\Support\Constants;
@@ -12,7 +11,7 @@ use FChubMultiCurrency\Tests\Support\TestCase;
 use FluentCart\Api\CurrencySettings;
 use PHPUnit\Framework\Attributes\Test;
 
-final class ContextModuleNoscriptPersistenceTest extends TestCase
+final class NoscriptCurrencyFormTest extends TestCase
 {
     protected function setUp(): void
     {
@@ -47,18 +46,48 @@ final class ContextModuleNoscriptPersistenceTest extends TestCase
         $this->assertStringContainsString('wp_fchub_mc_event_log', implode(' ', $GLOBALS['wpdb']->queries));
     }
 
+    /**
+     * The nonce baked into a cached page outlives its tick: a guest reading a
+     * document the edge cached yesterday submits a nonce WordPress no longer
+     * accepts. Their switch writes only their own cookie — the same operation
+     * the REST endpoint and the URL parameter already allow without a nonce —
+     * so an expired nonce must not silently swallow it.
+     */
     #[Test]
-    public function testInvalidNonceIsRejectedAsSecurityGuard(): void
+    public function testGuestPostSurvivesAnExpiredNonceFromACachedPage(): void
     {
+        $GLOBALS['wp_mock_verify_nonce'] = false;
         $_SERVER['REQUEST_METHOD'] = 'POST';
         $_POST = [
             CurrencySwitcherRenderer::NOSCRIPT_FIELD => 'USD',
-            CurrencySwitcherRenderer::NOSCRIPT_NONCE => '',
+            CurrencySwitcherRenderer::NOSCRIPT_NONCE => 'expired-by-cache-age',
         ];
 
         NoscriptCurrencyForm::handle();
 
-        $this->assertArrayNotHasKey(Constants::COOKIE_KEY, $_COOKIE);
+        $this->assertSame('USD', $_COOKIE[Constants::COOKIE_KEY] ?? '');
+        $this->assertHookFired('fchub_mc/context_switched');
+    }
+
+    /**
+     * The account write is the one target worth forging a request for, so the
+     * logged-in path keeps demanding a fresh nonce — and logged-in pages are
+     * not served from shared caches, so theirs is always fresh.
+     */
+    #[Test]
+    public function testLoggedInPostStillRequiresAValidNonce(): void
+    {
+        $GLOBALS['wp_mock_verify_nonce'] = false;
+        $this->setCurrentUserId(42);
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_POST = [
+            CurrencySwitcherRenderer::NOSCRIPT_FIELD => 'USD',
+            CurrencySwitcherRenderer::NOSCRIPT_NONCE => 'forged',
+        ];
+
+        NoscriptCurrencyForm::handle();
+
+        $this->assertArrayNotHasKey(Constants::USER_META_KEY, $GLOBALS['wp_mock_user_meta'][42] ?? []);
         $this->assertHookNotFired('fchub_mc/context_switched');
     }
 

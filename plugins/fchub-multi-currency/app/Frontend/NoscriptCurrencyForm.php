@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Frontend;
 
-use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Actions\PersistContextAction;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
+use FChubMultiCurrency\Domain\Services\CurrencyResolution;
 use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Storage\PreferenceRepository;
@@ -52,8 +52,16 @@ final class NoscriptCurrencyForm
         $nonce = isset($_POST[CurrencySwitcherRenderer::NOSCRIPT_NONCE])
             ? sanitize_text_field(wp_unslash((string) $_POST[CurrencySwitcherRenderer::NOSCRIPT_NONCE]))
             : '';
+        $nonceVerified = $nonce !== '' && wp_verify_nonce($nonce, CurrencySwitcherRenderer::NOSCRIPT_ACTION);
 
-        if ($nonce === '' || !wp_verify_nonce($nonce, CurrencySwitcherRenderer::NOSCRIPT_ACTION)) {
+        // The nonce protects the logged-in account write, so there it stays
+        // mandatory — and logged-in pages are rendered fresh, so it is valid.
+        // A guest's nonce came baked into a page an edge may have cached past
+        // the nonce tick, and their switch writes only their own cookie — an
+        // operation the REST endpoint and the URL parameter already allow
+        // without one. Rejecting the stale nonce would silently break the
+        // no-JS form on exactly the cached pages this plugin exists to serve.
+        if (!$nonceVerified && get_current_user_id() > 0) {
             return;
         }
 
@@ -65,7 +73,7 @@ final class NoscriptCurrencyForm
             return;
         }
 
-        if (ContextModule::resolveSelectablePreference($optionStore, $currencyCode) === null) {
+        if (CurrencyResolution::selectablePreference($optionStore, $currencyCode) === null) {
             EventLogger::log('context_switch_rate_unavailable_noscript', get_current_user_id(), [
                 'currency' => $currencyCode,
                 'source' => 'noscript',

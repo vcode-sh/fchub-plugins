@@ -1,3 +1,57 @@
+### v1.4.8
+
+*Released 18 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.8)
+
+A deep audit of the whole plugin, verified against FluentCart 1.6.1's actual
+source rather than against our own assumptions about it. Two of those
+assumptions turned out to be quietly wrong for a long time.
+
+#### The shop price filter works again after a currency switch
+
+FluentCart's price filter speaks base currency end to end — its slider writes
+base values into the inputs, and the server compares base cents. Converting
+those inputs corrupted every filtered query, and the thousands separator alone
+was enough to make the server drop the filter entirely. The filter block now
+stays honestly in the base currency, sign included, and simply works: correct
+bounds in, correct products out, prices displayed in the visitor's currency.
+
+#### Two FluentCart integrations were dead on arrival
+
+The checkout disclosure fragment turned FluentCart's fragments list into a JSON
+object, which crashed its `forEach` and stopped checkout updates for anyone
+browsing a converted currency. The fragment is gone; nothing ever read it, and
+the disclosure ships client-side. Separately, orders have no `user_id` column —
+the WordPress user lives on the customer relation — so the FluentCRM order sync
+and the manual-order snapshot fallback had never fired. Both now do, and the
+test doubles are shaped like FluentCart actually ships, so this class of bug
+cannot pass green again.
+
+#### Honest surfaces, hardened edges
+
+The selector-buttons block no longer bakes one visitor's currency into cached
+HTML. The switcher gained real keyboard navigation. The freshness badge is
+rendered by the browser from a shipped timestamp, so a cached page stops
+insisting the rates were updated "2 hours ago" forever. The REST endpoint
+counts every attempt, keeps an unforgeable per-socket ceiling and validates
+forwarded IP headers; a rogue `fchub_mc/context` filter now degrades with a log
+line instead of a white screen; guests can use the no-JS form however stale the
+cached nonce. A daily maintenance schedule prunes the event log and rate
+history on every store — the old pruning rode a cron that manual-rate stores
+never had.
+
+#### The settings page grew up
+
+The admin monolith became per-tab components with a stylesheet instead of a
+JavaScript string. The currency grid renders its columns, the tab underline
+keeps up with the tabs, diagnostics states every value — including a one-click
+action that creates the missing FluentCRM custom fields — and the default
+display currency now follows the store base unless you deliberately pick
+otherwise, which is what it should have done from the start.
+
+Thanks to [@ManniGH](https://github.com/ManniGH) for the live 1.4.7
+measurements on [#72](https://github.com/vcode-sh/fchub-plugins/issues/72) that
+set this release's direction.
+
 ### v1.4.7
 
 *Released 17 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.7)

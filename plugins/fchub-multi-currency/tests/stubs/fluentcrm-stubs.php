@@ -110,6 +110,16 @@ if (!class_exists('FluentCrm\App\Models\CustomContactField')) {
                 'fields' => $GLOBALS['fluentcrm_mock_custom_fields'] ?? [],
             ];
         }
+
+        /**
+         * Mirrors FluentCRM's saveGlobalFields: replaces the whole list.
+         *
+         * @param array<int, array<string, mixed>> $fields
+         */
+        public function saveGlobalFields(array $fields): void
+        {
+            $GLOBALS['fluentcrm_mock_custom_fields'] = $fields;
+        }
     }
 
     class_alias('FluentCrm_App_Models_CustomContactField', 'FluentCrm\App\Models\CustomContactField');

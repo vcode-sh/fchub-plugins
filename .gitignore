@@ -54,3 +54,6 @@ voice-tone.md
 /.mcp.json
 CLAUDE.md
 /docs/superpowers/
+
+# Playwright run artifact at the root; wporg/ evidence stays tracked.
+/test-results/.last-run.json

@@ -15,9 +15,7 @@ final class MergeGuestPreferenceCookieTest extends TestCase
         parent::setUp();
 
         // Reset cached resolver chain
-        $ref = new \ReflectionClass(ContextModule::class);
-        $prop = $ref->getProperty('cachedChain');
-        $prop->setValue(null, null);
+        \FChubMultiCurrency\Domain\Services\CurrencyResolution::resetChain();
     }
 
     #[Test]

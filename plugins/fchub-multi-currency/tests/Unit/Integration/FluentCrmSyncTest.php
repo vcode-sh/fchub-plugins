@@ -90,9 +90,12 @@ final class FluentCrmSyncTest extends TestCase
     {
         $GLOBALS['fluentcrm_mock_contact'] = new \FluentCrm_Mock_Contact();
 
+        // Shaped like a FluentCart 1.6.1 order: no user_id column — the WP user
+        // hangs off the customer relation.
         $order = new class {
-            public int $user_id = 1;
+            public ?object $customer;
             private array $meta = ['_fchub_mc_display_currency' => 'EUR', '_fchub_mc_rate' => '0.92'];
+            public function __construct() { $this->customer = (object) ['user_id' => 1]; }
             public function getMeta(string $key) { return $this->meta[$key] ?? null; }
         };
 
@@ -111,9 +114,12 @@ final class FluentCrmSyncTest extends TestCase
     {
         $GLOBALS['fluentcrm_mock_contact'] = new \FluentCrm_Mock_Contact();
 
+        // Shaped like a FluentCart 1.6.1 order: no user_id column — the WP user
+        // hangs off the customer relation.
         $order = new class {
-            public int $user_id = 1;
+            public ?object $customer;
             private array $meta = ['_fchub_mc_display_currency' => 'EUR', '_fchub_mc_rate' => '0.92'];
+            public function __construct() { $this->customer = (object) ['user_id' => 1]; }
             public function getMeta(string $key) { return $this->meta[$key] ?? null; }
         };
 
@@ -135,7 +141,8 @@ final class FluentCrmSyncTest extends TestCase
         $GLOBALS['fluentcrm_mock_contact'] = new \FluentCrm_Mock_Contact();
 
         $order = new class {
-            public int $user_id = 0;
+            public ?object $customer;
+            public function __construct() { $this->customer = (object) ['user_id' => 0]; }
             public function getMeta(string $key) { return null; }
         };
 
@@ -169,11 +176,12 @@ final class FluentCrmSyncTest extends TestCase
         ]);
 
         $order = new class {
-            public int $user_id = 1;
+            public ?object $customer;
             private array $meta = [
                 '_fchub_mc_display_currency' => 'EUR',
                 '_fchub_mc_rate'             => '0.92',
             ];
+            public function __construct() { $this->customer = (object) ['user_id' => 1]; }
             public function getMeta(string $key) { return $this->meta[$key] ?? null; }
         };
 

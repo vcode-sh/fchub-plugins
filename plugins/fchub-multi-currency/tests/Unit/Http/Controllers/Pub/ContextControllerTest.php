@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Tests\Unit\Http\Controllers\Pub;
 
-use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
+use FChubMultiCurrency\Domain\Services\CurrencyResolution;
 use FChubMultiCurrency\Domain\ValueObjects\Currency;
 use FChubMultiCurrency\Domain\ValueObjects\CurrencyContext;
 use FChubMultiCurrency\Http\Controllers\Pub\ContextController;
@@ -26,7 +26,7 @@ final class ContextControllerTest extends TestCase
     {
         parent::setUp();
 
-        ContextModule::resetChain();
+        CurrencyResolution::resetChain();
     }
 
     #[Test]

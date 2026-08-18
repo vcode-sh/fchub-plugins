@@ -14,9 +14,7 @@ final class RoundingModeNoneTest extends TestCase
         parent::setUp();
 
         // Reset cached resolver chain
-        $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
-        $prop = $ref->getProperty('cachedChain');
-        $prop->setValue(null, null);
+        \FChubMultiCurrency\Domain\Services\CurrencyResolution::resetChain();
 
         \FChubMultiCurrency\Domain\Services\CurrencyContextService::reset();
 
@@ -48,7 +46,7 @@ final class RoundingModeNoneTest extends TestCase
         $_COOKIE['fchub_mc_currency'] = 'PLN';
 
         $optionStore = new \FChubMultiCurrency\Storage\OptionStore();
-        $chain = \FChubMultiCurrency\Bootstrap\Modules\ContextModule::buildResolverChain($optionStore);
+        $chain = \FChubMultiCurrency\Domain\Services\CurrencyResolution::chain($optionStore);
         $service = new \FChubMultiCurrency\Domain\Services\CurrencyContextService($chain, $optionStore);
         $service->resolve();
 
@@ -82,7 +80,7 @@ final class RoundingModeNoneTest extends TestCase
         $_COOKIE['fchub_mc_currency'] = 'EUR';
 
         $optionStore = new \FChubMultiCurrency\Storage\OptionStore();
-        $chain = \FChubMultiCurrency\Bootstrap\Modules\ContextModule::buildResolverChain($optionStore);
+        $chain = \FChubMultiCurrency\Domain\Services\CurrencyResolution::chain($optionStore);
         $service = new \FChubMultiCurrency\Domain\Services\CurrencyContextService($chain, $optionStore);
         $service->resolve();
 
@@ -115,7 +113,7 @@ final class RoundingModeNoneTest extends TestCase
         $_COOKIE['fchub_mc_currency'] = 'JPY';
 
         $optionStore = new \FChubMultiCurrency\Storage\OptionStore();
-        $chain = \FChubMultiCurrency\Bootstrap\Modules\ContextModule::buildResolverChain($optionStore);
+        $chain = \FChubMultiCurrency\Domain\Services\CurrencyResolution::chain($optionStore);
         $service = new \FChubMultiCurrency\Domain\Services\CurrencyContextService($chain, $optionStore);
         $service->resolve();
 
@@ -149,7 +147,7 @@ final class RoundingModeNoneTest extends TestCase
         $_COOKIE['fchub_mc_currency'] = 'EUR';
 
         $optionStore = new \FChubMultiCurrency\Storage\OptionStore();
-        $chain = \FChubMultiCurrency\Bootstrap\Modules\ContextModule::buildResolverChain($optionStore);
+        $chain = \FChubMultiCurrency\Domain\Services\CurrencyResolution::chain($optionStore);
         $service = new \FChubMultiCurrency\Domain\Services\CurrencyContextService($chain, $optionStore);
         $service->resolve();
 

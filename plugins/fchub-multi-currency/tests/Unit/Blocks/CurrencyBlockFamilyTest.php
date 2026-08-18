@@ -91,4 +91,20 @@ final class CurrencyBlockFamilyTest extends TestCase
         $this->assertStringContainsString('GBP', $html);
         $this->assertStringContainsString('USD', $html);
     }
+
+    /**
+     * The rendered block is cacheable HTML served to everyone. Whichever
+     * visitor happens to warm the cache, the active button must be the store
+     * base — the browser marks the visitor's own choice after the fact.
+     */
+    #[Test]
+    public function testSelectorButtonsBlockMarksTheBaseActiveWhateverThisVisitorResolved(): void
+    {
+        $_COOKIE['fchub_mc_currency'] = 'USD';
+
+        $html = CurrencySelectorButtonsBlock::render([]);
+
+        $this->assertStringContainsString('is-active" data-value="EUR"', $html, 'The base button is the cached active state.');
+        $this->assertStringNotContainsString('is-active" data-value="USD"', $html, 'A cached block must not mark one visitor\'s cookie active.');
+    }
 }

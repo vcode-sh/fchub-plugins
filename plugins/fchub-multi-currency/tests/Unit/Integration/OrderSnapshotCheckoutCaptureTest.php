@@ -18,19 +18,23 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
         parent::setUp();
 
         // Reset cached resolver chain
-        $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
-        $prop = $ref->getProperty('cachedChain');
-        $prop->setValue(null, null);
+        \FChubMultiCurrency\Domain\Services\CurrencyResolution::resetChain();
 
         \FChubMultiCurrency\Domain\Services\CurrencyContextService::reset();
 
         $_GET = [];
         $_COOKIE = [];
 
-        // Create a mock order object
+        // A FluentCart 1.6.1-shaped order: no user_id column, the WP user
+        // lives on the customer relation.
         $this->order = new class {
-            public int $user_id = 0;
+            public ?object $customer;
             private array $meta = [];
+
+            public function __construct()
+            {
+                $this->customer = (object) ['user_id' => 0];
+            }
 
             public function updateMeta(string $key, $value): void
             {
@@ -109,7 +113,7 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
     {
         $this->configureMultiCurrency('GBP');
         $_COOKIE['fchub_mc_currency'] = 'GBP';
-        $this->order->user_id = 0; // Guest
+        $this->order->customer = (object) ['user_id' => 0]; // Guest
 
         OrderSnapshotHooks::captureAtCheckout(['order' => $this->order]);
 
@@ -206,13 +210,11 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
         $this->assertSame('GBP', $this->order->getMeta('_fchub_mc_display_currency'));
 
         // Reset resolver chain to simulate a different context (admin/webhook)
-        $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
-        $prop = $ref->getProperty('cachedChain');
-        $prop->setValue(null, null);
+        \FChubMultiCurrency\Domain\Services\CurrencyResolution::resetChain();
         \FChubMultiCurrency\Domain\Services\CurrencyContextService::reset();
 
         // Now simulate order_paid_done firing in admin context — should NOT overwrite
-        $this->order->user_id = 99;
+        $this->order->customer = (object) ['user_id' => 99];
         $this->setCurrentUserId(99);
         $this->setUserMeta(99, '_fchub_mc_currency', 'EUR');
 
@@ -234,7 +236,7 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
             ],
         ]);
 
-        $this->order->user_id = 42;
+        $this->order->customer = (object) ['user_id' => 42];
         $this->setUserMeta(42, '_fchub_mc_currency', 'GBP');
 
         // No checkout capture ran — simulate a manual order
@@ -248,7 +250,7 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
     public function testOrderPaidDoneAcceptsFluentCartEventPayloadForFallbackCapture(): void
     {
         $this->configureMultiCurrency('GBP');
-        $this->order->user_id = 42;
+        $this->order->customer = (object) ['user_id' => 42];
         $this->setUserMeta(42, '_fchub_mc_currency', 'GBP');
 
         OrderSnapshotHooks::saveSnapshot(['order' => $this->order]);

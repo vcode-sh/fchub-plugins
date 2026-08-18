@@ -80,7 +80,9 @@ final class FluentCrmSync
                 return;
             }
 
-            $userId = (int) ($order->user_id ?? 0);
+            // FluentCart orders carry no user_id column; the WP user lives on
+            // the customer relation (fct_customers.user_id).
+            $userId = (int) ($order->customer->user_id ?? 0);
 
             if ($userId === 0) {
                 return;

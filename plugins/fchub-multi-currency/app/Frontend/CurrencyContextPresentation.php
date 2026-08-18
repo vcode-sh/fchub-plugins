@@ -25,25 +25,50 @@ final class CurrencyContextPresentation
      * every cached document instead would cost 3113 bytes per currency to deliver
      * the single variant a block asks for.
      *
-     * @return array<string, string>
+     * @return array<string, string|array<string, array<int, string>>>
      */
     public static function templates(): array
     {
         return [
+            // translators: %s is a human-readable time difference, e.g. "2 hours".
+            'rateBadgeAgo' => __('Rates updated %s ago', 'fchub-multi-currency'),
+            // Singular/plural pairs the browser combines with a count, mirroring
+            // human_time_diff's units. The browser renders freshness at paint
+            // time because a cached document's pre-rendered age only grows.
+            'timeUnits' => [
+                // translators: %s is a number of minutes.
+                'min'   => [__('%s min', 'fchub-multi-currency'), __('%s mins', 'fchub-multi-currency')],
+                // translators: %s is a number of hours.
+                'hour'  => [__('%s hour', 'fchub-multi-currency'), __('%s hours', 'fchub-multi-currency')],
+                // translators: %s is a number of days.
+                'day'   => [__('%s day', 'fchub-multi-currency'), __('%s days', 'fchub-multi-currency')],
+                // translators: %s is a number of weeks.
+                'week'  => [__('%s week', 'fchub-multi-currency'), __('%s weeks', 'fchub-multi-currency')],
+                // translators: %s is a number of months.
+                'month' => [__('%s month', 'fchub-multi-currency'), __('%s months', 'fchub-multi-currency')],
+                // translators: %s is a number of years.
+                'year'  => [__('%s year', 'fchub-multi-currency'), __('%s years', 'fchub-multi-currency')],
+            ],
+            // translators: %1$s is the base currency code, %2$s the exchange rate, %3$s the display currency code.
             'rate' => __('1 %1$s = %2$s %3$s', 'fchub-multi-currency'),
+            // translators: %1$s is the base currency code, %2$s the exchange rate, %3$s the display currency code.
             'rateSentence' => __('Current rate: 1 %1$s = %2$s %3$s', 'fchub-multi-currency'),
+            // translators: %1$s is the display currency code, %2$s the base currency code.
             'noticeCompact' => __('Viewing prices in %1$s. Checkout in %2$s.', 'fchub-multi-currency'),
+            // translators: %1$s is the display currency code, %2$s the base currency code.
             'noticeFull' => __(
                 'Prices shown in %1$s are approximate. Checkout is charged in %2$s.',
                 'fchub-multi-currency',
             ),
             'switcherRateBase' => __('Base currency currently in use.', 'fchub-multi-currency'),
+            // translators: %s is the base currency code.
             'switcherContext' => __('Display prices only. Checkout is charged in %s.', 'fchub-multi-currency'),
             'switcherContextBase' => __('You are viewing the store base currency.', 'fchub-multi-currency'),
             'currencyUnavailable' => __(
                 'That currency is not available right now.',
                 'fchub-multi-currency',
             ),
+            // translators: %s is the display currency name.
             'currencySwitched' => __('Prices are now shown in %s.', 'fchub-multi-currency'),
         ];
     }

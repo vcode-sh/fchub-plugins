@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Frontend;
 
-use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Bootstrap\Modules\FrontendModule;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
@@ -421,8 +420,7 @@ final class CurrencySwitcherRenderer
             return [];
         }
 
-        $contextService = new CurrencyContextService(ContextModule::buildResolverChain($optionStore), $optionStore);
-        $contextState = $contextService->resolve();
+        $contextState = CurrencyContextService::forVisitor($optionStore)->resolve();
         $baseCode = $contextState->baseCurrency->code;
 
         $basePresent = false;
@@ -457,12 +455,6 @@ final class CurrencySwitcherRenderer
             $favoriteCodes,
             $showFavoritesFirst,
         );
-    }
-
-    public static function currentSelection(OptionStore $optionStore): string
-    {
-        $contextService = new CurrencyContextService(ContextModule::buildResolverChain($optionStore), $optionStore);
-        return $contextService->resolve()->displayCurrency->code;
     }
 
     /**

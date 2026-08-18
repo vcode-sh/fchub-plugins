@@ -28,13 +28,8 @@ final class Logger
 
     private static function log(string $level, string $message, array $context = []): void
     {
-        if (function_exists('fluent_cart_log')) {
-            fluent_cart_log("[fchub-multi-currency] [{$level}] {$message}", $context);
-            return;
-        }
-
         $contextString = $context ? ' ' . wp_json_encode($context) : '';
-        // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- intentional fallback logger
+        // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- intentional plugin logger
         error_log("[fchub-multi-currency] [{$level}] {$message}{$contextString}");
     }
 }

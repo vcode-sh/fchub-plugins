@@ -26,6 +26,27 @@ final class EventLogRepository
     }
 
     /**
+     * Age-based retention. Every storefront switch appends a row, so without
+     * this the table grows for the life of the site.
+     */
+    public function pruneOlderThan(int $days): int
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . Constants::TABLE_EVENT_LOG;
+
+        $cutoff = gmdate('Y-m-d H:i:s', time() - ($days * DAY_IN_SECONDS));
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- This bounded custom-table retention write has no WordPress CRUD equivalent and no query cache.
+        return (int) $wpdb->query(
+            $wpdb->prepare(
+                "DELETE FROM %i WHERE created_at < %s",
+                $table,
+                $cutoff,
+            ),
+        );
+    }
+
+    /**
      * @return array<object>
      */
     public function findByUser(int $userId, int $limit = 50, int $offset = 0): array

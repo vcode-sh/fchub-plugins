@@ -76,6 +76,13 @@ final class CurrencyContextPayload
             ),
             'disclosureEnabled' => $disclosure !== null,
             'disclosureText' => $disclosure,
+            // Epoch seconds plus the store's staleness threshold, so the browser
+            // can render rate freshness at paint time. A cached document's
+            // pre-rendered "2 hours ago" only gets older; these do not.
+            'rateFetchedAt' => $context->isBaseDisplay
+                ? null
+                : (strtotime($context->rate->fetchedAt . ' UTC') ?: null),
+            'rateStaleAfterSeconds' => max(1, (int) $optionStore->get('stale_threshold_hrs', 24)) * HOUR_IN_SECONDS,
         ];
     }
 

@@ -46,6 +46,11 @@ final class CurrenciesHelper
     {
         return isset(self::zeroDecimalCurrencies()[strtoupper($currencyCode)]);
     }
+
+    public static function getCurrencySign(string $currency = 'USD'): string
+    {
+        return self::getCurrencySigns()[strtoupper($currency)] ?? '';
+    }
 }
 
 class Helper
@@ -135,6 +140,9 @@ final class CurrencySettings
     /** @var array<string, mixed> */
     private static array $mock = [];
 
+    /** Counts get() calls so tests can pin how often settings are consulted. */
+    public static int $reads = 0;
+
     /**
      * @param array<string, mixed> $settings
      */
@@ -146,6 +154,7 @@ final class CurrencySettings
     public static function resetMock(): void
     {
         self::$mock = [];
+        self::$reads = 0;
     }
 
     /**
@@ -157,6 +166,7 @@ final class CurrencySettings
      */
     public static function get(string $key = ''): mixed
     {
+        self::$reads++;
         $settings = array_merge([
             'currency_separator' => 'dot',
             'decimal_separator'  => '.',
@@ -169,18 +179,37 @@ final class CurrencySettings
         return $key !== '' ? ($settings[$key] ?? null) : $settings;
     }
 
+    /**
+     * Mirrors FluentCart 1.6.1 `CurrencySettings::getFormattedPrice()`:
+     * catalogue sign, settings separators, and the full seven-value
+     * `currency_position` switch — not a flattened stand-in.
+     */
     public static function getPriceHtml(
         float $price,
-        string $currencyCode = 'USD',
+        ?string $currencyCode = null,
         bool $showDecimal = true,
-    ): string
-    {
-        $showDecimal = $showDecimal && !self::get('is_zero_decimal');
+    ): string {
+        $settings = self::get();
+        $currencyCode = $currencyCode ?: (string) $settings['currency'];
+        $sign = \FluentCart\App\Helpers\CurrenciesHelper::getCurrencySign($currencyCode);
 
-        return sprintf(
-            '%s %s',
-            $currencyCode,
-            number_format($price / 100, $showDecimal ? 2 : 0, '.', ''),
-        );
+        $decimal = $showDecimal ? 2 : 0;
+        if (!empty($settings['is_zero_decimal'])) {
+            $decimal = 0;
+        }
+
+        $decimalSeparator = $settings['decimal_separator'] === 'comma' ? ',' : '.';
+        $thousandSeparator = $decimalSeparator === ',' ? '.' : ',';
+        $amount = number_format($price / 100, $decimal, $decimalSeparator, $thousandSeparator);
+
+        return match ($settings['currency_position'] ?? 'before') {
+            'after' => $amount . $sign,
+            'iso_before' => $currencyCode . ' ' . $amount,
+            'iso_after' => $amount . ' ' . $currencyCode,
+            'symbool_before_iso' => $sign . $amount . ' ' . $currencyCode,
+            'symbool_after_iso' => $currencyCode . ' ' . $amount . $sign,
+            'symbool_and_iso' => $currencyCode . ' ' . $sign . $amount,
+            default => $sign . $amount,
+        };
     }
 }

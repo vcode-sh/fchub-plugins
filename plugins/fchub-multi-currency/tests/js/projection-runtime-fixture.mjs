@@ -171,6 +171,25 @@ export async function runProjection({ config = {}, priceElements = [], selectors
 			windowListeners.set(name, listeners);
 		},
 	};
+	const observers = [];
+	class FakeMutationObserver {
+		constructor(callback) {
+			this.callback = callback;
+			this.observed = [];
+			observers.push(this);
+		}
+
+		observe(target, options) {
+			this.observed.push({ target, options });
+		}
+
+		disconnect() {}
+
+		deliver(mutations) {
+			this.callback(mutations);
+		}
+	}
+
 	const execution = vm.runInNewContext(source, {
 		CustomEvent: class CustomEvent {
 			constructor(type, options = {}) {
@@ -178,6 +197,7 @@ export async function runProjection({ config = {}, priceElements = [], selectors
 				this.detail = options.detail;
 			}
 		},
+		MutationObserver: FakeMutationObserver,
 		clearTimeout(id) {
 			const timer = timers.find((candidate) => candidate.id === id);
 			if (timer) timer.cancelled = true;
@@ -193,7 +213,7 @@ export async function runProjection({ config = {}, priceElements = [], selectors
 
 	await execution;
 
-	return { classes, documentEvents, timers, window, windowListeners };
+	return { classes, documentEvents, observers, timers, window, windowListeners };
 }
 
 export async function projectRenderedPrice({ config, price }) {

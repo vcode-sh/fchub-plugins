@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Integration;
 
-use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Hooks;
@@ -37,10 +36,7 @@ final class PublicPriceApi
         $optionStore = new OptionStore();
         $context = CurrencyContextService::getResolved();
         if ($context === null) {
-            $context = (new CurrencyContextService(
-                ContextModule::buildResolverChain($optionStore),
-                $optionStore,
-            ))->resolve();
+            $context = CurrencyContextService::forVisitor($optionStore)->resolve();
         }
         if ($context->isBaseDisplay) {
             return CurrencySettings::getPriceHtml($basePrice);
@@ -67,8 +63,16 @@ final class PublicPriceApi
         }
 
         $currency = $order->getMeta('_fchub_mc_display_currency');
+        if (!$currency) {
+            return null;
+        }
 
-        return $currency ? (string) $currency : null;
+        // captureAtCheckout() stores the base code with no rate as a "checkout
+        // ran" sentinel on base-display orders. A code equal to the order's own
+        // charge currency is that bookkeeping, not multicurrency data.
+        $currency = (string) $currency;
+
+        return $currency === (string) ($order->currency ?? '') ? null : $currency;
     }
 
     public static function formatOrderPrice(float $basePrice, int $orderId): string

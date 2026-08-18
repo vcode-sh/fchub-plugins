@@ -9,8 +9,6 @@ use FChubMultiCurrency\Domain\Enums\RoundingMode;
 use FChubMultiCurrency\Domain\Services\RoundingPolicy;
 use FChubMultiCurrency\Domain\ValueObjects\Currency;
 use FChubMultiCurrency\Storage\OptionStore;
-use FluentCart\Api\CurrencySettings;
-use FluentCart\App\Helpers\CurrenciesHelper;
 
 defined('ABSPATH') || exit;
 
@@ -99,25 +97,8 @@ final class DisplayPriceFormatter
             }
         }
 
-        $settings = CurrencySettings::get();
-        $currencyNames = CurrenciesHelper::getCurrencies();
-        $currencySigns = CurrenciesHelper::getCurrencySigns();
-        $zeroDecimalCurrencies = CurrenciesHelper::zeroDecimalCurrencies();
-        $position = match ((string) ($settings['currency_position'] ?? 'before')) {
-            'after', 'right' => 'right',
-            'after_space', 'right_space' => 'right_space',
-            'before_space', 'left_space' => 'left_space',
-            default => 'left',
-        };
-
         return [
-            Currency::from([
-                'code' => $currencyCode,
-                'name' => $currencyNames[$currencyCode] ?? $currencyCode,
-                'symbol' => $currencySigns[$currencyCode] ?? $currencyCode,
-                'decimals' => isset($zeroDecimalCurrencies[$currencyCode]) ? 0 : 2,
-                'position' => $position,
-            ]),
+            FluentCartCurrency::displayCurrency($currencyCode),
             $shopSeparators['decimal'],
             $shopSeparators['thousand'],
         ];

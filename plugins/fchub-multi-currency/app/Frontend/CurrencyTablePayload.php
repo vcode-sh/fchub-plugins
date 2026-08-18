@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Frontend;
 
-use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
+use FChubMultiCurrency\Domain\Services\CurrencyResolution;
 use FChubMultiCurrency\Domain\Services\ExchangeRateService;
 use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Http\Controllers\Admin\CurrencyCatalogueController;
@@ -67,8 +67,8 @@ final class CurrencyTablePayload
         $drop = array_flip(self::PER_REQUEST_OR_DERIVABLE);
         $table = [];
 
-        foreach (SelectableCurrencyCodes::fromSettings($optionStore->all())->all() as $code) {
-            $context = ContextModule::resolveSelectablePreference($optionStore, $code);
+        foreach (SelectableCurrencyCodes::fromSettings($settings)->all() as $code) {
+            $context = CurrencyResolution::selectablePreference($optionStore, $code);
             if ($context === null) {
                 continue;
             }

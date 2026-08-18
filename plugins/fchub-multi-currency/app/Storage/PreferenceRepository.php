@@ -20,8 +20,8 @@ final class PreferenceRepository
             'path'     => COOKIEPATH,
             'domain'   => COOKIE_DOMAIN,
             'secure'   => is_ssl(),
-            // The storefront reads this non-sensitive preference to repair pages served
-            // from an edge cache that never varied on the cookie.
+            // The head bootstrap reads this non-sensitive preference as one of
+            // its resolution sources, so it must stay visible to JavaScript.
             'httponly'  => false,
             'samesite' => 'Lax',
         ]);

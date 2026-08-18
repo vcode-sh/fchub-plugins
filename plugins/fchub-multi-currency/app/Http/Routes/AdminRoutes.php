@@ -58,6 +58,12 @@ final class AdminRoutes
             'callback'            => [new DiagnosticsController(), 'get'],
             'permission_callback' => [self::class, 'canManage'],
         ]);
+
+        register_rest_route(Constants::REST_NAMESPACE, '/admin/diagnostics/crm-fields', [
+            'methods'             => 'POST',
+            'callback'            => [new DiagnosticsController(), 'createCrmFields'],
+            'permission_callback' => [self::class, 'canManage'],
+        ]);
     }
 
     public static function canManage(): bool

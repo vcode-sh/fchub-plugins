@@ -39,6 +39,26 @@ final class EventLogRepositoryTest extends TestCase
         );
     }
 
+    /**
+     * Visitor traffic appends to this table on every switch, so without a
+     * retention delete it grows for the life of the site — rate_history gets
+     * one, and the event log needs the same.
+     */
+    #[Test]
+    public function testPruneOlderThanDeletesByAgeOnly(): void
+    {
+        $repository = new EventLogRepository();
+
+        $deleted = $repository->pruneOlderThan(90);
+
+        $this->assertIsInt($deleted);
+        $lastQuery = end($GLOBALS['wpdb']->queries);
+        $this->assertStringContainsString('DELETE FROM', $lastQuery);
+        $this->assertStringContainsString('wp_fchub_mc_event_log', $lastQuery);
+        $this->assertStringContainsString('created_at <', $lastQuery);
+        $this->assertStringNotContainsString('user_id', $lastQuery, 'Retention is by age, never by user.');
+    }
+
     #[Test]
     public function testTopCurrenciesForEventAggregatesPayloads(): void
     {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Blocks;
 
 use FChubMultiCurrency\Bootstrap\Modules\FrontendModule;
+use FChubMultiCurrency\Frontend\CurrencyContextPresenter;
 use FChubMultiCurrency\Frontend\CurrencySwitcherRenderer;
 use FChubMultiCurrency\Storage\OptionStore;
 
@@ -34,7 +35,9 @@ final class CurrencySelectorButtonsBlock
 
         FrontendModule::ensureSwitcherAssetsEnqueued();
 
-        $current = CurrencySwitcherRenderer::currentSelection($optionStore);
+        // The base currency, not this visitor's: the markup is cached and served
+        // to everyone, and the browser marks the visitor's own choice on paint.
+        $current = CurrencyContextPresenter::baseContext()->displayCurrency->code;
         $wrapperAttributes = function_exists('get_block_wrapper_attributes')
             ? get_block_wrapper_attributes(['class' => 'fchub-mc-selector-buttons'])
             : 'class="fchub-mc-selector-buttons"';

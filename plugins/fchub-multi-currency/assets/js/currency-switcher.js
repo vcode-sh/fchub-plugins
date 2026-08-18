@@ -130,16 +130,6 @@
 		document.body.appendChild(region);
 	}
 
-	function clearLoadingState(root) {
-		if (root) {
-			root.classList.remove("fchub-mc-switcher--loading");
-		}
-
-		document.querySelectorAll(".fchub-mc-switcher--loading").forEach((el) => {
-			el.classList.remove("fchub-mc-switcher--loading");
-		});
-	}
-
 	function clearError(root) {
 		if (!root) return;
 		const notice = root.querySelector("[data-fchub-mc-error]");
@@ -165,7 +155,6 @@
 		const root = options.root || null;
 
 		console.warn("[fchub-mc] Currency switch failed:", message);
-		clearLoadingState(root);
 
 		if (typeof options.onFailure === "function") {
 			options.onFailure();
@@ -210,7 +199,6 @@
 
 		window.fchubMc?.setCurrency(code);
 		announceCurrency(code);
-		clearLoadingState(root);
 		window.dispatchEvent(
 			new CustomEvent("fchub_mc:context_changed", { detail: { currency: code } }),
 		);
@@ -394,8 +382,58 @@
 			const target = items[activeIndex];
 			target.classList.add("fchub-mc-switcher__option--focused");
 			target.id = `${uid}-option-${activeIndex}`;
+			// Mirrored onto the search box too: whichever of the two holds focus is
+			// the element assistive technology reads the active option from.
 			trigger.setAttribute("aria-activedescendant", target.id);
+			searchInput?.setAttribute("aria-activedescendant", target.id);
 			target.scrollIntoView({ block: "nearest" });
+		}
+
+		/**
+		 * List navigation for whichever element actually holds focus.
+		 *
+		 * Focus never enters the listbox — it stays on the trigger, or in the
+		 * search box while filtering — so the navigation keys must be handled
+		 * there. Returns whether the key was consumed.
+		 */
+		function handleOpenListKeys(event, { typing = false } = {}) {
+			if (dropdown.hidden) return false;
+
+			switch (event.key) {
+				case "ArrowDown":
+					event.preventDefault();
+					setActiveOption(activeIndex + 1);
+					return true;
+				case "ArrowUp":
+					event.preventDefault();
+					setActiveOption(activeIndex - 1);
+					return true;
+				case "Home":
+				case "End":
+					// While typing these move the caret, not the highlight.
+					if (typing) return false;
+					event.preventDefault();
+					setActiveOption(event.key === "Home" ? 0 : -1);
+					return true;
+				case " ":
+					if (typing) return false;
+					event.preventDefault();
+					selectOption(activeIndex);
+					return true;
+				case "Enter":
+					event.preventDefault();
+					selectOption(activeIndex);
+					return true;
+				case "Escape":
+					event.preventDefault();
+					close();
+					return true;
+				case "Tab":
+					close();
+					return true;
+			}
+
+			return false;
 		}
 
 		const TRIGGER_PART_SELECTORS = [
@@ -494,6 +532,8 @@
 		});
 
 		trigger.addEventListener("keydown", (e) => {
+			if (handleOpenListKeys(e)) return;
+
 			switch (e.key) {
 				case "Enter":
 				case " ":
@@ -502,47 +542,6 @@
 					if (dropdown.hidden) {
 						open();
 					}
-					break;
-				case "Escape":
-					if (!dropdown.hidden) {
-						e.preventDefault();
-						close();
-					}
-					break;
-			}
-		});
-
-		// Listbox keyboard navigation
-		listbox.addEventListener("keydown", (e) => {
-			const items = options();
-			switch (e.key) {
-				case "ArrowDown":
-					e.preventDefault();
-					setActiveOption(activeIndex + 1);
-					break;
-				case "ArrowUp":
-					e.preventDefault();
-					setActiveOption(activeIndex - 1);
-					break;
-				case "Home":
-					e.preventDefault();
-					setActiveOption(0);
-					break;
-				case "End":
-					e.preventDefault();
-					setActiveOption(items.length - 1);
-					break;
-				case "Enter":
-				case " ":
-					e.preventDefault();
-					selectOption(activeIndex);
-					break;
-				case "Escape":
-					e.preventDefault();
-					close();
-					break;
-				case "Tab":
-					close();
 					break;
 			}
 		});
@@ -578,6 +577,8 @@
 		});
 
 		if (searchInput) {
+			searchInput.addEventListener("keydown", (e) => handleOpenListKeys(e, { typing: true }));
+
 			searchInput.addEventListener("input", () => {
 				const query = searchInput.value.trim().toLowerCase();
 				for (const option of options()) {

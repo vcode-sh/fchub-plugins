@@ -4,7 +4,7 @@
  * Plugin Name: FCHub Multi-Currency
  * Plugin URI: https://fchub.co/docs/fchub-multi-currency
  * Description: Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure
- * Version: 1.4.7
+ * Version: 1.4.8
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -21,11 +21,11 @@ declare(strict_types=1);
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_MC_VERSION', '1.4.7');
+define('FCHUB_MC_VERSION', '1.4.8');
 define('FCHUB_MC_FILE', __FILE__);
 define('FCHUB_MC_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_MC_URL', plugin_dir_url(__FILE__));
-define('FCHUB_MC_DB_VERSION', '1.0.0');
+define('FCHUB_MC_DB_VERSION', '1.1.0');
 
 // Updates come from GitHub releases until this plugin is actually listed on
 // WordPress.org. Without it WordPress has no update channel for the plugin at all.
@@ -71,6 +71,7 @@ register_activation_hook(__FILE__, function () {
  */
 register_deactivation_hook(__FILE__, function () {
     wp_clear_scheduled_hook('fchub_mc_refresh_rates');
+    wp_clear_scheduled_hook('fchub_mc_daily_maintenance');
 });
 
 /**
@@ -92,9 +93,10 @@ add_filter('cron_schedules', function (array $schedules): array {
 });
 
 /**
- * Boot the plugin after FluentCart is loaded.
- * FluentCart registers its integrations on 'init' priority 2,
- * so we use priority 3 to ensure all dependencies are available.
+ * Boot the plugin after FluentCart is loaded. FLUENTCART_VERSION is defined at
+ * FluentCart's plugin load, so it is testable here; priority 3 keeps our hook
+ * registrations ahead of FluentCart's own init work (its app boots at
+ * init 10) while staying after its constants and autoloader exist.
  */
 add_action('init', function () {
     if (!defined('FLUENTCART_VERSION')) {
@@ -113,8 +115,23 @@ add_action('init', function () {
     $optionStore->ensureExplicitRateProvider();
     FChubMultiCurrency\Support\RateSchedule::sync($optionStore);
 
+    // Retention runs on its own daily schedule: the refresh cron only exists
+    // for remote providers, and a manual-rate store still accumulates event
+    // log rows it must eventually shed.
+    if (!wp_next_scheduled('fchub_mc_daily_maintenance')) {
+        wp_schedule_event(time(), 'daily', 'fchub_mc_daily_maintenance');
+    }
+
     FChubMultiCurrency\Bootstrap\Plugin::boot();
 }, 3);
+
+/**
+ * Cron: prune plugin-owned tables to their retention window.
+ */
+add_action('fchub_mc_daily_maintenance', function () {
+    (new FChubMultiCurrency\Storage\EventLogRepository())->pruneOlderThan(90);
+    (new FChubMultiCurrency\Storage\Queries\RateHistoryQuery())->pruneOlderThan(90);
+});
 
 /**
  * Register sidebar submenu under FluentCart.
@@ -137,8 +154,6 @@ add_action('fchub_mc_refresh_rates', function () {
         new FChubMultiCurrency\Storage\ExchangeRateRepository(),
         new FChubMultiCurrency\Storage\RatesCacheStore(),
     ))->execute();
-
-    (new FChubMultiCurrency\Storage\Queries\RateHistoryQuery())->pruneOlderThan(90);
 });
 
 /**
@@ -175,8 +190,9 @@ function fchub_mc_format_price(float $basePrice): string
 /**
  * Get the display currency code for a specific order.
  *
- * Returns the currency the customer was browsing in when they placed the order,
- * or null if the order has no multicurrency data (base currency order).
+ * Returns the converted currency the customer placed the order in, or null for
+ * a base-currency order. Checkout leaves a bookkeeping marker on base-currency
+ * orders; that marker is not multicurrency data and never surfaces here.
  *
  * @param int $orderId FluentCart order ID
  * @return string|null Currency code (e.g., 'EUR') or null

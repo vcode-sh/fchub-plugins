@@ -2,7 +2,7 @@
 
 define('FCHUB_TESTING', true);
 define('ABSPATH', '/tmp/wordpress/');
-define('FCHUB_MC_VERSION', '1.4.7');
+define('FCHUB_MC_VERSION', '1.4.8');
 define('FCHUB_MC_PATH', dirname(__DIR__) . '/');
 define('FCHUB_MC_URL', 'http://localhost/wp-content/plugins/fchub-multi-currency/');
 define('FCHUB_MC_DB_VERSION', '1.0.0');
@@ -858,7 +858,8 @@ if (!function_exists('wp_create_nonce')) {
 if (!function_exists('wp_verify_nonce')) {
     function wp_verify_nonce($nonce, $action = -1)
     {
-        return is_string($nonce) && $nonce !== '';
+        // Tests set the override to model an expired-but-present nonce.
+        return $GLOBALS['wp_mock_verify_nonce'] ?? (is_string($nonce) && $nonce !== '');
     }
 }
 

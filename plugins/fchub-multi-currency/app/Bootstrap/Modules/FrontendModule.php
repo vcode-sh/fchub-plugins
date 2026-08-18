@@ -96,6 +96,7 @@ final class FrontendModule implements ModuleContract
         wp_enqueue_style('fchub-mc-critical');
         wp_add_inline_style(
             'fchub-mc-critical',
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local plugin asset, not a remote URL; wp_remote_get does not apply.
             (string) @file_get_contents(FCHUB_MC_PATH . 'assets/css/currency-critical.css'),
         );
     }
@@ -119,6 +120,7 @@ final class FrontendModule implements ModuleContract
             );
             wp_add_inline_script(
                 'fchub-mc-bootstrap',
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local plugin asset, not a remote URL; wp_remote_get does not apply.
                 (string) @file_get_contents(FCHUB_MC_PATH . 'assets/js/currency-bootstrap.js'),
             );
             self::$contextAssetConfigured = true;
@@ -166,7 +168,7 @@ final class FrontendModule implements ModuleContract
             'cookiePersistenceEnabled' => $optionStore->get('cookie_enabled', 'yes') === 'yes',
             'cookieLifetimeDays'    => (int) $optionStore->get('cookie_lifetime_days', 90),
             'accountPersistenceEnabled' => $optionStore->get('account_persistence_enabled', 'yes') === 'yes',
-            'isLoggedIn'            => get_current_user_id() > 0,
+            'isLoggedIn'            => $userId > 0,
             'projectionEnabled'     => Hooks::isEnabled() && FeatureFlags::isEnabled('js_projection'),
             'urlParamEnabled'       => $optionStore->get('url_param_enabled', 'yes') === 'yes',
             'urlParamKey'           => (string) $optionStore->get('url_param_key', 'currency'),

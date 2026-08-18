@@ -34,7 +34,10 @@ final class IpResolver
                 $value = trim(explode(',', $value, 2)[0]);
             }
 
-            if ($value !== '') {
+            // Proxy headers are client-supplied text; anything that is not an
+            // IP address falls through to the next candidate rather than
+            // minting a fabricated identity.
+            if (filter_var($value, FILTER_VALIDATE_IP) !== false) {
                 return $value;
             }
         }

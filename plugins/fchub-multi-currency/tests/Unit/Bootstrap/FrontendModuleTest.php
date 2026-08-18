@@ -291,6 +291,22 @@ final class FrontendModuleTest extends TestCase
     }
 
     /**
+     * A store that never touched the setting shows visitors its own base
+     * currency: the shipped default is "follow the base", not a hardcoded USD
+     * that happens to be wrong on every non-USD store.
+     */
+    #[Test]
+    public function testAFreshStoreDefaultsTheDisplayCurrencyToItsOwnBase(): void
+    {
+        \FluentCart\Api\CurrencySettings::setMock(['currency' => 'EUR']);
+
+        $config = FrontendModule::buildFrontendConfig();
+
+        $this->assertSame('EUR', $config['baseCurrency']);
+        $this->assertSame('', $config['defaultCurrency'], 'Empty means: the browser falls through to the base.');
+    }
+
+    /**
      * `wp_create_nonce()` is per visitor and per twelve hours. Baking one into a
      * cached page hands every later visitor a nonce that is not theirs, and guests
      * never needed one: the context endpoint's permission callback lets them

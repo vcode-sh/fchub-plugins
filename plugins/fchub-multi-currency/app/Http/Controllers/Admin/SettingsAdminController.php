@@ -109,13 +109,17 @@ final class SettingsAdminController
         $displayCurrencies = $sanitized['display_currencies']
             ?? $optionStore->get('display_currencies', []);
         $defaultDisplayCurrency = (string) ($sanitized['default_display_currency']
-            ?? $optionStore->get('default_display_currency', $baseCurrency));
+            ?? $optionStore->get('default_display_currency', ''));
         $selectableCurrencies = SelectableCurrencyCodes::from(
             $baseCurrency,
             is_array($displayCurrencies) ? $displayCurrencies : [],
         );
-        if (!$selectableCurrencies->contains($defaultDisplayCurrency)) {
-            $sanitized['default_display_currency'] = $baseCurrency;
+        // Empty means "follow the base currency" and stays empty on purpose:
+        // freezing it to today's base code would stop it tracking a later base
+        // change in FluentCart. A pick that is no longer selectable degrades to
+        // the same follow-the-base state.
+        if ($defaultDisplayCurrency !== '' && !$selectableCurrencies->contains($defaultDisplayCurrency)) {
+            $sanitized['default_display_currency'] = '';
         }
 
         $optionStore->save($sanitized);

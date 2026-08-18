@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace FChubMultiCurrency\Tests\Unit\Bootstrap;
+namespace FChubMultiCurrency\Tests\Unit\Domain\Services;
 
-use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Enums\ResolverSource;
+use FChubMultiCurrency\Domain\Services\CurrencyResolution;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Tests\Support\TestCase;
 use PHPUnit\Framework\Attributes\Test;
 
-final class ContextModuleTest extends TestCase
+final class CurrencyResolutionTest extends TestCase
 {
     #[Test]
     public function testCookieRecoveryKeepsItsSourceWhenTheSelectedRateIsUnavailable(): void
@@ -27,7 +27,7 @@ final class ContextModuleTest extends TestCase
         ]);
         $this->setWpdbMockRow(null);
 
-        $context = ContextModule::resolveExplicitPreference(new OptionStore(), 'EUR');
+        $context = CurrencyResolution::explicitPreference(new OptionStore(), 'EUR');
 
         $this->assertTrue($context->isBaseDisplay);
         $this->assertSame('USD', $context->displayCurrency->code);
@@ -42,7 +42,7 @@ final class ContextModuleTest extends TestCase
             'display_currencies' => [],
         ]);
 
-        $context = ContextModule::resolveExplicitPreference(new OptionStore(), 'USD');
+        $context = CurrencyResolution::explicitPreference(new OptionStore(), 'USD');
 
         $this->assertSame('US Dollar', $context->displayCurrency->name);
         $this->assertSame('$', $context->displayCurrency->symbol);
@@ -56,7 +56,7 @@ final class ContextModuleTest extends TestCase
             'display_currencies' => [],
         ]);
 
-        $context = ContextModule::resolveExplicitPreference(new OptionStore(), 'USD');
+        $context = CurrencyResolution::explicitPreference(new OptionStore(), 'USD');
 
         $this->assertSame('USD', $context->displayCurrency->code);
         $this->assertTrue($context->isBaseDisplay);
@@ -88,7 +88,7 @@ final class ContextModuleTest extends TestCase
             'fetched_at' => current_time('mysql'),
         ]);
 
-        $context = ContextModule::buildResolverChain(new OptionStore())
+        $context = CurrencyResolution::chain(new OptionStore())
             ->resolve($settings['base_currency'], $settings['display_currencies']);
 
         $this->assertNotNull($context);
@@ -121,7 +121,7 @@ final class ContextModuleTest extends TestCase
         $this->setOption('fchub_mc_settings', $settings);
         $this->setWpdbMockRow(null);
 
-        $chain = ContextModule::buildResolverChain(new OptionStore());
+        $chain = CurrencyResolution::chain(new OptionStore());
         $context = $chain->resolve($settings['base_currency'], $settings['display_currencies']);
 
         $this->assertNotNull($context);
@@ -160,7 +160,7 @@ final class ContextModuleTest extends TestCase
             'fetched_at' => current_time('mysql'),
         ]);
 
-        $chain = ContextModule::buildResolverChain(new OptionStore());
+        $chain = CurrencyResolution::chain(new OptionStore());
         $context = $chain->resolve($settings['base_currency'], $settings['display_currencies']);
 
         $this->assertNotNull($context);

@@ -2,30 +2,28 @@
 
 declare(strict_types=1);
 
-namespace FChubMultiCurrency\Tests\Unit\Bootstrap\Modules;
+namespace FChubMultiCurrency\Tests\Unit\Domain\Services;
 
-use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
+use FChubMultiCurrency\Domain\Services\CurrencyResolution;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Tests\Support\TestCase;
 use PHPUnit\Framework\Attributes\Test;
 
-final class ContextModuleChainCacheTest extends TestCase
+final class CurrencyResolutionChainCacheTest extends TestCase
 {
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Reset the static cached chain before each test
-        $ref = new \ReflectionClass(ContextModule::class);
-        $prop = $ref->getProperty('cachedChain');
-        $prop->setValue(null, null);
+        // Reset the memoised chain before each test
+        CurrencyResolution::resetChain();
 
         $_GET = [];
         $_COOKIE = [];
     }
 
     #[Test]
-    public function testBuildResolverChainReturnsSameInstanceOnSecondCall(): void
+    public function testChainReturnsSameInstanceOnSecondCall(): void
     {
         $this->setOption('fchub_mc_settings', [
             'base_currency'    => 'USD',
@@ -36,13 +34,13 @@ final class ContextModuleChainCacheTest extends TestCase
 
         $optionStore = new OptionStore();
 
-        $chain1 = ContextModule::buildResolverChain($optionStore);
-        $chain2 = ContextModule::buildResolverChain($optionStore);
+        $chain1 = CurrencyResolution::chain($optionStore);
+        $chain2 = CurrencyResolution::chain($optionStore);
 
         $this->assertSame(
             $chain1,
             $chain2,
-            'buildResolverChain must return the cached instance on subsequent calls'
+            'chain must return the cached instance on subsequent calls'
         );
     }
 
@@ -54,7 +52,7 @@ final class ContextModuleChainCacheTest extends TestCase
         ]);
 
         $optionStore = new OptionStore();
-        $chain = ContextModule::buildResolverChain($optionStore);
+        $chain = CurrencyResolution::chain($optionStore);
 
         $this->assertInstanceOf(
             \FChubMultiCurrency\Domain\Resolvers\ResolverChain::class,

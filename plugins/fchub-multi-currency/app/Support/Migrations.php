@@ -37,6 +37,7 @@ final class Migrations
             created_at DATETIME        NOT NULL,
             PRIMARY KEY (id),
             KEY event_created (event, created_at),
+            KEY created_at (created_at),
             KEY user_id (user_id)
         ) {$charset};");
     }

@@ -9,6 +9,33 @@
         "disclosureText": "Your payment will be processed in USD."
     },
     "templates": {
+        "rateBadgeAgo": "Rates updated %s ago",
+        "timeUnits": {
+            "min": [
+                "%s min",
+                "%s mins"
+            ],
+            "hour": [
+                "%s hour",
+                "%s hours"
+            ],
+            "day": [
+                "%s day",
+                "%s days"
+            ],
+            "week": [
+                "%s week",
+                "%s weeks"
+            ],
+            "month": [
+                "%s month",
+                "%s months"
+            ],
+            "year": [
+                "%s year",
+                "%s years"
+            ]
+        },
         "rate": "1 %1$s = %2$s %3$s",
         "rateSentence": "Current rate: 1 %1$s = %2$s %3$s",
         "noticeCompact": "Viewing prices in %1$s. Checkout in %2$s.",

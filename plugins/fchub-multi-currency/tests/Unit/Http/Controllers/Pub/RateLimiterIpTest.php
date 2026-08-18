@@ -19,9 +19,7 @@ final class RateLimiterIpTest extends TestCase
         $this->originalServer = $_SERVER;
 
         // Reset cached resolver chain
-        $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
-        $prop = $ref->getProperty('cachedChain');
-        $prop->setValue(null, null);
+        \FChubMultiCurrency\Domain\Services\CurrencyResolution::resetChain();
 
         $_GET = [];
         $_COOKIE = [];
@@ -153,6 +151,48 @@ final class RateLimiterIpTest extends TestCase
         $this->assertSame(1, $GLOBALS['wp_transients'][$keyA]);
         $this->assertSame(1, $GLOBALS['wp_transients'][$keyB]);
         $this->assertNotSame($keyA, $keyB);
+    }
+
+    /**
+     * Proxy headers are client-supplied text. A value that is not an IP
+     * address must not mint a limiter bucket — junk falls through to the
+     * socket address, which nobody can forge.
+     */
+    #[Test]
+    public function testGarbageForwardedHeaderFallsThroughToRemoteAddr(): void
+    {
+        $_SERVER['REMOTE_ADDR'] = '192.168.1.100';
+        $_SERVER['HTTP_X_FORWARDED_FOR'] = 'not-an-ip, still-not-one';
+
+        $remoteKey = 'fchub_mc_rl_' . substr(md5('192.168.1.100'), 0, 12);
+        $junkKey = 'fchub_mc_rl_' . substr(md5('not-an-ip'), 0, 12);
+
+        $controller = new ContextController();
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params(['currency' => 'USD']);
+
+        $controller->set($request);
+
+        $this->assertArrayHasKey($remoteKey, $GLOBALS['wp_transients']);
+        $this->assertArrayNotHasKey($junkKey, $GLOBALS['wp_transients']);
+    }
+
+    #[Test]
+    public function testGarbageCloudflareHeaderFallsThroughToNextCandidate(): void
+    {
+        $_SERVER['REMOTE_ADDR'] = '10.0.0.1';
+        $_SERVER['HTTP_CF_CONNECTING_IP'] = '<script>alert(1)</script>';
+        $_SERVER['HTTP_X_FORWARDED_FOR'] = '203.0.113.50';
+
+        $clientKey = 'fchub_mc_rl_' . substr(md5('203.0.113.50'), 0, 12);
+
+        $controller = new ContextController();
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params(['currency' => 'USD']);
+
+        $controller->set($request);
+
+        $this->assertArrayHasKey($clientKey, $GLOBALS['wp_transients']);
     }
 
     #[Test]

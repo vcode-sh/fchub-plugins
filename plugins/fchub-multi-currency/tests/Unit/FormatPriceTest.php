@@ -15,9 +15,7 @@ final class FormatPriceTest extends TestCase
         parent::setUp();
 
         // Reset the cached resolver chain between tests
-        $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
-        $prop = $ref->getProperty('cachedChain');
-        $prop->setValue(null, null);
+        \FChubMultiCurrency\Domain\Services\CurrencyResolution::resetChain();
 
         // Reset the cached resolved context
         \FChubMultiCurrency\Domain\Services\CurrencyContextService::reset();
@@ -51,7 +49,7 @@ final class FormatPriceTest extends TestCase
 
         // Pre-resolve context so it's cached
         $optionStore = new \FChubMultiCurrency\Storage\OptionStore();
-        $chain = \FChubMultiCurrency\Bootstrap\Modules\ContextModule::buildResolverChain($optionStore);
+        $chain = \FChubMultiCurrency\Domain\Services\CurrencyResolution::chain($optionStore);
         $service = new \FChubMultiCurrency\Domain\Services\CurrencyContextService($chain, $optionStore);
         $service->resolve();
 
@@ -86,7 +84,7 @@ final class FormatPriceTest extends TestCase
 
         // Pre-resolve context so it's cached
         $optionStore = new \FChubMultiCurrency\Storage\OptionStore();
-        $chain = \FChubMultiCurrency\Bootstrap\Modules\ContextModule::buildResolverChain($optionStore);
+        $chain = \FChubMultiCurrency\Domain\Services\CurrencyResolution::chain($optionStore);
         $service = new \FChubMultiCurrency\Domain\Services\CurrencyContextService($chain, $optionStore);
         $service->resolve();
 

@@ -108,7 +108,35 @@ final class SettingsAdminControllerTest extends TestCase
 
         $this->assertSame(200, $response->get_status());
         $this->assertSame('USD', $settings['base_currency']);
-        $this->assertSame('USD', $settings['default_display_currency']);
+        $this->assertSame(
+            '',
+            $settings['default_display_currency'],
+            'An invalid pick becomes "follow the base", not a frozen copy of today\'s base code.',
+        );
+    }
+
+    /**
+     * The empty value is the shipped default and means "same as the base
+     * currency, whatever it is" — it must survive a save untouched, because
+     * freezing it to today's base code would stop it following a later base
+     * change in FluentCart.
+     */
+    #[Test]
+    public function testAnEmptyDefaultDisplayCurrencyIsPreservedAsFollowTheBase(): void
+    {
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params([
+            'default_display_currency' => '',
+            'display_currencies' => [
+                ['code' => 'EUR', 'name' => 'Euro', 'symbol' => '€'],
+            ],
+        ]);
+
+        $response = (new SettingsAdminController())->save($request);
+        $settings = $response->get_data()['data']['settings'];
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame('', $settings['default_display_currency']);
     }
 
     #[Test]

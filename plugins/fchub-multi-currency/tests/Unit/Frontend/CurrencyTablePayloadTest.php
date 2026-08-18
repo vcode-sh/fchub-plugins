@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Tests\Unit\Frontend;
 
-use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
+use FChubMultiCurrency\Domain\Services\CurrencyResolution;
 use FChubMultiCurrency\Frontend\CurrencyTablePayload;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Constants;
@@ -17,7 +17,7 @@ final class CurrencyTablePayloadTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        ContextModule::resetChain();
+        CurrencyResolution::resetChain();
         CurrencySettings::setMock(['currency' => 'USD', 'currency_sign' => '$']);
     }
 
@@ -66,7 +66,7 @@ final class CurrencyTablePayloadTest extends TestCase
         $settings['checkout_disclosure_enabled'] = 'yes';
         $settings['checkout_disclosure_text'] = 'Showing {display_currency} at {rate}, charged in {base_currency}.';
         $this->setOption('fchub_mc_settings', $settings);
-        ContextModule::resetChain();
+        CurrencyResolution::resetChain();
 
         $table = CurrencyTablePayload::build(new OptionStore());
 
@@ -87,11 +87,11 @@ final class CurrencyTablePayloadTest extends TestCase
         $this->storeWith(['EUR', 'PLN']);
 
         $_COOKIE[Constants::COOKIE_KEY] = 'EUR';
-        ContextModule::resetChain();
+        CurrencyResolution::resetChain();
         $first = CurrencyTablePayload::build(new OptionStore());
 
         $_COOKIE[Constants::COOKIE_KEY] = 'PLN';
-        ContextModule::resetChain();
+        CurrencyResolution::resetChain();
         $second = CurrencyTablePayload::build(new OptionStore());
 
         $this->assertSame($first, $second);
@@ -110,7 +110,7 @@ final class CurrencyTablePayloadTest extends TestCase
 
         $this->setCurrentUserId(7);
         $this->setUserMeta(7, Constants::USER_META_KEY, 'EUR');
-        ContextModule::resetChain();
+        CurrencyResolution::resetChain();
 
         $this->assertSame($guestTable, CurrencyTablePayload::build(new OptionStore()));
     }
@@ -138,10 +138,12 @@ final class CurrencyTablePayloadTest extends TestCase
      * copies. A merchant's own disclosure wording may be any length, which is why
      * this guards the shape and not the size.
      *
-     * `flag` and `rateBadge` are rendered HTML on purpose. They are the two
-     * surfaces the browser cannot build from primitives — one needs a currency to
-     * country mapping, the other a translated relative time — and together they
-     * cost about 270 bytes against the 3113 a full fragment set would.
+     * `flag` and `rateBadge` are rendered HTML on purpose: one needs a currency
+     * to country mapping, the other is the accurate-at-render fallback for a
+     * browser whose config predates the freshness fields. `rateFetchedAt` and
+     * `rateStaleAfterSeconds` exist so the browser can re-render freshness at
+     * paint time — a cached document's pre-rendered "2 hours ago" only gets
+     * older, and its stale styling would otherwise never appear.
      */
     #[Test]
     public function testEntryFieldSetIsExactlyWhatTheBrowserNeeds(): void
@@ -159,9 +161,29 @@ final class CurrencyTablePayloadTest extends TestCase
             'displayDecSep',
             'displayThousandSep',
             'disclosureText',
+            'rateFetchedAt',
+            'rateStaleAfterSeconds',
             'flag',
             'rateBadge',
         ], array_keys($entry));
+    }
+
+    /**
+     * The freshness pair is what lets the browser refuse to repeat a cached
+     * lie: epoch seconds of the rate fetch, and the staleness threshold the
+     * store configured.
+     */
+    #[Test]
+    public function testEntriesCarryTheRateFreshnessPair(): void
+    {
+        $this->storeWith(['EUR']);
+
+        $table = CurrencyTablePayload::build(new OptionStore());
+
+        $this->assertIsInt($table['EUR']['rateFetchedAt']);
+        $this->assertGreaterThan(time() - HOUR_IN_SECONDS, $table['EUR']['rateFetchedAt']);
+        $this->assertSame(24 * HOUR_IN_SECONDS, $table['EUR']['rateStaleAfterSeconds']);
+        $this->assertNull($table['USD']['rateFetchedAt'], 'Base converts at par; freshness is meaningless.');
     }
 
     /**
@@ -197,7 +219,7 @@ final class CurrencyTablePayloadTest extends TestCase
         $small = count($GLOBALS['wpdb']->queries);
 
         $this->storeWith($this->fiftyCodes());
-        ContextModule::resetChain();
+        CurrencyResolution::resetChain();
         $GLOBALS['wpdb']->resetQueries();
         CurrencyTablePayload::build(new OptionStore());
         $large = count($GLOBALS['wpdb']->queries);

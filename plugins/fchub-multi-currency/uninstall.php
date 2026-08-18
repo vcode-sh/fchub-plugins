@@ -62,6 +62,7 @@ if (!function_exists('fchub_mc_cleanup_blog')) {
 
         // Clean up scheduled hooks
         wp_clear_scheduled_hook('fchub_mc_refresh_rates');
+        wp_clear_scheduled_hook('fchub_mc_daily_maintenance');
     }
 }
 

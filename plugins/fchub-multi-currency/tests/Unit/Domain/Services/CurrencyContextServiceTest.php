@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Tests\Unit\Domain\Services;
 
-use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Enums\ResolverSource;
 use FChubMultiCurrency\Domain\Resolvers\ResolverChain;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
+use FChubMultiCurrency\Domain\Services\CurrencyResolution;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Tests\Support\MockBuilder;
 use FChubMultiCurrency\Tests\Support\TestCase;
@@ -128,6 +128,31 @@ final class CurrencyContextServiceTest extends TestCase
     }
 
     #[Test]
+    public function testResolveSurvivesARogueContextFilter(): void
+    {
+        // fchub_mc/context is a public extension point. A third-party filter
+        // returning garbage must degrade to the unfiltered context, never
+        // fatal the storefront with a TypeError.
+        $context = MockBuilder::context();
+
+        $chain = new ResolverChain();
+        $chain->add(ResolverSource::Cookie, fn() => $context);
+
+        $this->setOption('fchub_mc_settings', [
+            'base_currency'      => 'USD',
+            'display_currencies' => [],
+        ]);
+
+        add_filter('fchub_mc/context', static fn() => null);
+
+        $service = new CurrencyContextService($chain, new OptionStore());
+        $resolved = $service->resolve();
+
+        $this->assertSame($context, $resolved);
+        $this->assertSame($context, CurrencyContextService::getResolved(), 'Cache must hold the original, not the rogue value');
+    }
+
+    #[Test]
     public function testGetResolvedReturnsNullBeforeResolve(): void
     {
         $this->assertNull(CurrencyContextService::getResolved());
@@ -146,7 +171,7 @@ final class CurrencyContextServiceTest extends TestCase
         ]);
 
         $optionStore = new OptionStore();
-        $chain = ContextModule::buildResolverChain($optionStore);
+        $chain = CurrencyResolution::chain($optionStore);
         $service = new CurrencyContextService($chain, $optionStore);
         $context = $service->resolve();
 

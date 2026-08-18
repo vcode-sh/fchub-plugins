@@ -28,6 +28,8 @@ abstract class TestCase extends BaseTestCase
         $GLOBALS['fchub_mc_setcookie_result'] = true;
         $GLOBALS['wp_mock_user_meta'] = [];
         $GLOBALS['wp_mock_update_user_meta_result'] = null;
+        unset($GLOBALS['wp_mock_verify_nonce']);
+        \FChubMultiCurrency\Storage\OptionStore::resetMemo();
         $GLOBALS['wp_mock_post_meta'] = [];
         $GLOBALS['wp_cache_store'] = [];
         $GLOBALS['wp_registered_scripts'] = [];
@@ -71,7 +73,7 @@ abstract class TestCase extends BaseTestCase
 
         // Reset CurrencyContextService singleton and the memoised resolver chain
         \FChubMultiCurrency\Domain\Services\CurrencyContextService::reset();
-        \FChubMultiCurrency\Bootstrap\Modules\ContextModule::resetChain();
+        \FChubMultiCurrency\Domain\Services\CurrencyResolution::resetChain();
         \FluentCart\Api\CurrencySettings::resetMock();
 
         $_GET = [];
@@ -88,16 +90,16 @@ abstract class TestCase extends BaseTestCase
     /**
      * Forces the next resolve to start from scratch.
      *
-     * Two statics memoise currency resolution: the resolver chain on ContextModule
-     * and the resolved context on CurrencyContextService. Clearing only the first
-     * lets a test change a cookie, resolve again and silently receive the previous
-     * visitor's answer — which is the exact bug class this suite exists to catch.
-     * `setUp()` already does this; call it again mid-test after changing settings,
-     * cookies or the current user.
+     * Two statics memoise currency resolution: the resolver chain on
+     * CurrencyResolution and the resolved context on CurrencyContextService.
+     * Clearing only the first lets a test change a cookie, resolve again and
+     * silently receive the previous visitor's answer — which is the exact bug
+     * class this suite exists to catch. `setUp()` already does this; call it
+     * again mid-test after changing settings, cookies or the current user.
      */
     protected function resetResolvedContext(): void
     {
-        \FChubMultiCurrency\Bootstrap\Modules\ContextModule::resetChain();
+        \FChubMultiCurrency\Domain\Services\CurrencyResolution::resetChain();
         \FChubMultiCurrency\Domain\Services\CurrencyContextService::reset();
     }
 
@@ -109,6 +111,8 @@ abstract class TestCase extends BaseTestCase
     protected function setOption(string $key, $value): void
     {
         $GLOBALS['wp_options'][$key] = $value;
+        // Tests write options behind the store's back; production code never does.
+        \FChubMultiCurrency\Storage\OptionStore::resetMemo();
     }
 
     protected function setUserCapability(int $userId, string $capability, bool $value = true): void

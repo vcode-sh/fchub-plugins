@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Frontend;
 
-use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
+use FChubMultiCurrency\Domain\Services\CurrencyResolution;
 use FChubMultiCurrency\Http\Controllers\Admin\CurrencyCatalogueController;
 use FChubMultiCurrency\Storage\OptionStore;
 
@@ -27,7 +27,7 @@ final class CurrencyContextPresenter
         $optionStore = new OptionStore();
 
         return CurrencyContextService::applyContextFilter(
-            ContextModule::resolveExplicitPreference(
+            CurrencyResolution::explicitPreference(
                 $optionStore,
                 (string) ($optionStore->all()['base_currency'] ?? 'USD'),
             ),

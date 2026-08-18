@@ -153,23 +153,25 @@ describe("production projection DOM preservation", () => {
 });
 
 describe("production projection adapters", () => {
-	it("reprojects a filter input from its stored base value, not its last display value", async () => {
+	it("leaves the shop price filter inputs and sign in base currency", async () => {
+		// FluentCart submits these inputs verbatim as base-currency bounds
+		// (FormData → filters[price_range_*] → Helper::toCent → min_price BETWEEN),
+		// and noUiSlider writes base values into the same inputs on every drag.
+		// Projecting them corrupted every filtered query for non-base visitors.
 		const input = projectionElement({ value: "100" });
-		const runtime = await runProjection({
-			selectors: { ".fc_price_range_input": [input] },
-		});
-		assert.equal(input.value, "200.00");
+		const sign = projectionElement({ text: "$" });
 
-		input.value = "999.00";
-		const root = {
-			querySelectorAll(selector) {
-				return selector === ".fc_price_range_input" ? [input] : [];
+		await runProjection({
+			selectors: {
+				".fc_price_range_input": [input],
+				".fct-shop-currency-sign": [sign],
 			},
-		};
-		runtime.window.fchubMcProjectPrices(root);
+		});
 
-		assert.equal(input.value, "200.00");
-		assert.equal(input.getAttribute("data-fchub-mc-base"), "100");
+		assert.equal(input.value, "100");
+		assert.equal(input.getAttribute("data-fchub-mc-base"), null);
+		assert.equal(sign.textContent, "$");
+		assert.equal(sign.getAttribute("data-fchub-mc-projected"), null);
 	});
 
 	it("converts multiple receipt payment amounts through the real thank-you selector path", async () => {

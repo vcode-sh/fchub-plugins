@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Integration;
 
-use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Actions\SaveOrderSnapshotAction;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
+use FChubMultiCurrency\Domain\Services\CurrencyResolution;
 use FChubMultiCurrency\Domain\ValueObjects\CurrencyContext;
 use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Storage\OptionStore;
@@ -87,7 +87,7 @@ final class OrderSnapshotHooks
         if (is_string($submitted)) {
             $code = strtoupper(sanitize_text_field(wp_unslash($submitted)));
             if (SelectableCurrencyCodes::fromSettings($optionStore->all())->contains($code)) {
-                $context = ContextModule::resolveSelectablePreference($optionStore, $code);
+                $context = CurrencyResolution::selectablePreference($optionStore, $code);
                 if ($context !== null) {
                     return $context;
                 }
@@ -99,10 +99,7 @@ final class OrderSnapshotHooks
 
     private static function resolveCurrentContext(OptionStore $optionStore): CurrencyContext
     {
-        return (new CurrencyContextService(
-            ContextModule::buildResolverChain($optionStore),
-            $optionStore,
-        ))->resolve();
+        return CurrencyContextService::forVisitor($optionStore)->resolve();
     }
 
     public static function saveSnapshot($eventData): void
@@ -123,8 +120,10 @@ final class OrderSnapshotHooks
         }
 
         // Fallback for manual/API orders or pre-1.2.1 upgrades:
-        // try the order customer's stored preference, validated against enabled currencies
-        $userId = (int) ($order->user_id ?? 0);
+        // try the order customer's stored preference, validated against enabled
+        // currencies. FluentCart orders carry no user_id column; the WP user
+        // lives on the customer relation (fct_customers.user_id).
+        $userId = (int) ($order->customer->user_id ?? 0);
         if ($userId <= 0) {
             return;
         }
@@ -136,16 +135,11 @@ final class OrderSnapshotHooks
         }
 
         $optionStore = new OptionStore();
-        $context = ContextModule::resolveSelectablePreference($optionStore, $preferredCode);
+        $context = CurrencyResolution::selectablePreference($optionStore, $preferredCode);
         if ($context === null || $context->isBaseDisplay) {
             return;
         }
 
-        $contextService = new CurrencyContextService(
-            ContextModule::buildResolverChain($optionStore),
-            $optionStore,
-        );
-        $action = new SaveOrderSnapshotAction($contextService);
-        $action->execute($order, $context);
+        (new SaveOrderSnapshotAction())->execute($order, $context);
     }
 }

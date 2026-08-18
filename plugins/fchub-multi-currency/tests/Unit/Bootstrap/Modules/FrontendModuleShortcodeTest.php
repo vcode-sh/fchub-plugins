@@ -14,10 +14,8 @@ final class FrontendModuleShortcodeTest extends TestCase
     {
         parent::setUp();
 
-        // Reset the static cached chain before each test
-        $ref = new \ReflectionClass(\FChubMultiCurrency\Bootstrap\Modules\ContextModule::class);
-        $prop = $ref->getProperty('cachedChain');
-        $prop->setValue(null, null);
+        // Reset the memoised chain before each test
+        \FChubMultiCurrency\Domain\Services\CurrencyResolution::resetChain();
 
         $_GET = [];
         $_COOKIE = [];
