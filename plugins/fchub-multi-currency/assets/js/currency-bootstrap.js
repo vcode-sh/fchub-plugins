@@ -120,12 +120,16 @@
 	}
 
 	/**
-	 * Hide amounts only where they are about to change. A visitor already on the
-	 * base currency has nothing to convert and must never wait behind a shield.
+	 * Hide amounts only where they are about to change.
+	 *
+	 * A visitor already on the base currency has nothing to convert. Neither does a
+	 * store with no usable rate at all — its table is empty, so there is no currency
+	 * to resolve to and nothing will ever arrive to lower the shield.
 	 */
 	function shieldPrices(code) {
-		const needed = config.projectionEnabled === true && code !== normalizeCode(config.baseCurrency);
-		document.documentElement.classList.toggle("fchub-mc-pending", needed);
+		const converts =
+			code !== "" && code !== normalizeCode(config.baseCurrency) && config.projectionEnabled === true;
+		document.documentElement.classList.toggle("fchub-mc-pending", converts);
 	}
 
 	current = resolve();

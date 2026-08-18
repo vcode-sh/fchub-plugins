@@ -144,6 +144,19 @@ describe("currency bootstrap price shield", () => {
 		assert.equal(loadBootstrap({}).pending, false, "A base-currency visitor waits for nothing.");
 	});
 
+	/**
+	 * A store with no usable rate has an empty table, so there is no currency to
+	 * resolve to. Raising the shield there hid every price behind a two-second CSS
+	 * fallback on a fresh install, where nothing was ever going to be converted.
+	 */
+	it("raises no shield when the store has no currency to offer", () => {
+		const config = baseConfig({ currencyTable: {} });
+		const run = loadBootstrap({ config });
+
+		assert.equal(run.currency, "");
+		assert.equal(run.pending, false);
+	});
+
 	it("never hides prices in a store that has projection switched off", () => {
 		const config = baseConfig({ projectionEnabled: false });
 

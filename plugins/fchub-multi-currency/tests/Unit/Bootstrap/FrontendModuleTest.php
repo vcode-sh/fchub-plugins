@@ -184,6 +184,40 @@ final class FrontendModuleTest extends TestCase
     }
 
     /**
+     * One read of the rate table serves a whole page.
+     *
+     * The table warms the rate cache in one read, and everything after it — the
+     * config, each switcher, each block — answers from that. Two switchers on a page
+     * must not cost two reads, and twenty-five currencies must not cost twenty-five.
+     */
+    #[Test]
+    public function testAPageRenderReadsTheRateTableOnce(): void
+    {
+        $this->setOption('fchub_mc_settings', $this->switcherSettings());
+        $this->setWpdbMockRow($this->rateRow());
+        $this->setWpdbMockResults([
+            ['base_currency' => 'EUR', 'quote_currency' => 'USD'] + $this->rateRow(),
+        ]);
+        FrontendModule::registerAssets();
+
+        $GLOBALS['wpdb']->resetQueries();
+        FrontendModule::enqueueProjectionAssets();
+        FrontendModule::renderSwitcher([]);
+        FrontendModule::renderSwitcher([]);
+
+        // The wpdb mock records prepare() templates alongside the executed query, so
+        // the unsubstituted ones are filtered out rather than counted twice.
+        $reads = array_filter(
+            $GLOBALS['wpdb']->queries,
+            static fn(string $query): bool => str_contains($query, 'rate_history')
+                && str_contains($query, 'SELECT')
+                && !str_contains($query, '%i'),
+        );
+
+        $this->assertLessThanOrEqual(1, count($reads), 'A page render should read the rate table once.');
+    }
+
+    /**
      * The invariant the whole change rests on, now assertable over the whole config.
      *
      * Storefront HTML goes into a shared cache, so nothing the browser reads out of

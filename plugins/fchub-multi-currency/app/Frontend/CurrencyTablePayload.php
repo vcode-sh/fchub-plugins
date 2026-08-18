@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Frontend;
 
 use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
+use FChubMultiCurrency\Domain\Services\ExchangeRateService;
 use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Http\Controllers\Admin\CurrencyCatalogueController;
+use FChubMultiCurrency\Storage\ExchangeRateRepository;
 use FChubMultiCurrency\Storage\OptionStore;
+use FChubMultiCurrency\Storage\RatesCacheStore;
 
 defined('ABSPATH') || exit;
 
@@ -55,6 +58,12 @@ final class CurrencyTablePayload
      */
     public static function build(OptionStore $optionStore): array
     {
+        $settings = $optionStore->all();
+
+        // Every rate this loop is about to want, in one read rather than one each.
+        (new ExchangeRateService(new ExchangeRateRepository(), new RatesCacheStore()))
+            ->primeCache((string) ($settings['base_currency'] ?? 'USD'));
+
         $drop = array_flip(self::PER_REQUEST_OR_DERIVABLE);
         $table = [];
 

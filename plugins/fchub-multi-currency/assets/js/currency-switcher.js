@@ -12,22 +12,63 @@
 	const flagBaseUrl = config.flagBaseUrl || "";
 
 	const currencyFlagMap = {
-		USD: "us", EUR: "eu", GBP: "gb", JPY: "jp", CHF: "ch", CAD: "ca",
-		AUD: "au", NZD: "nz", SEK: "se", NOK: "no", DKK: "dk", PLN: "pl",
-		CZK: "cz", HUF: "hu", RON: "ro", BGN: "bg", HRK: "hr", ISK: "is",
-		TRY: "tr", RUB: "ru", UAH: "ua", BRL: "br", MXN: "mx", ARS: "ar",
-		CLP: "cl", COP: "co", PEN: "pe", CNY: "cn", HKD: "hk", SGD: "sg",
-		TWD: "tw", KRW: "kr", INR: "in", IDR: "id", MYR: "my", PHP: "ph",
-		THB: "th", VND: "vn", AED: "ae", SAR: "sa", QAR: "qa", KWD: "kw",
-		BHD: "bh", OMR: "om", ILS: "il", EGP: "eg", ZAR: "za", NGN: "ng",
-		KES: "ke", GHS: "gh",
+		USD: "us",
+		EUR: "eu",
+		GBP: "gb",
+		JPY: "jp",
+		CHF: "ch",
+		CAD: "ca",
+		AUD: "au",
+		NZD: "nz",
+		SEK: "se",
+		NOK: "no",
+		DKK: "dk",
+		PLN: "pl",
+		CZK: "cz",
+		HUF: "hu",
+		RON: "ro",
+		BGN: "bg",
+		HRK: "hr",
+		ISK: "is",
+		TRY: "tr",
+		RUB: "ru",
+		UAH: "ua",
+		BRL: "br",
+		MXN: "mx",
+		ARS: "ar",
+		CLP: "cl",
+		COP: "co",
+		PEN: "pe",
+		CNY: "cn",
+		HKD: "hk",
+		SGD: "sg",
+		TWD: "tw",
+		KRW: "kr",
+		INR: "in",
+		IDR: "id",
+		MYR: "my",
+		PHP: "ph",
+		THB: "th",
+		VND: "vn",
+		AED: "ae",
+		SAR: "sa",
+		QAR: "qa",
+		KWD: "kw",
+		BHD: "bh",
+		OMR: "om",
+		ILS: "il",
+		EGP: "eg",
+		ZAR: "za",
+		NGN: "ng",
+		KES: "ke",
+		GHS: "gh",
 	};
 
 	function buildFlagImg(currencyCode) {
 		const country = currencyFlagMap[currencyCode.toUpperCase()];
 		if (!country || !flagBaseUrl) return null;
 		const img = document.createElement("img");
-		img.src = flagBaseUrl + country + ".svg";
+		img.src = `${flagBaseUrl + country}.svg`;
 		img.alt = currencyCode;
 		img.className = "fchub-mc-flag";
 		img.width = 20;
@@ -37,16 +78,8 @@
 
 	let idCounter = 0;
 
-	const FALLBACK_ERROR = "Currency preference could not be saved.";
+	const _FALLBACK_ERROR = "Currency preference could not be saved.";
 	const UNAVAILABLE_ERROR = "That currency is not available right now.";
-
-	function persistBrowserPreference(currencyCode) {
-		try {
-			window.fchubMcPersistBrowserPreference?.(currencyCode);
-		} catch {
-			// The context adapter already treats browser storage as optional.
-		}
-	}
 
 	function clearLoadingState(root) {
 		if (root) {
@@ -77,44 +110,6 @@
 			root.appendChild(notice);
 		}
 		notice.textContent = message;
-	}
-
-	/**
-	 * Pulls the most useful message out of either envelope: the plugin's own
-	 * `{data: {message}}` or WordPress's REST error `{code, message, data: {status}}`.
-	 */
-	function readMessage(payload, status) {
-		const data = payload && typeof payload === "object" ? payload.data : null;
-
-		if (data && typeof data.message === "string" && data.message !== "") {
-			return data.message;
-		}
-
-		if (payload && typeof payload.message === "string" && payload.message !== "") {
-			return payload.message;
-		}
-
-		return status ? `${FALLBACK_ERROR} (HTTP ${status})` : FALLBACK_ERROR;
-	}
-
-	/**
-	 * The stable outcome slug the server sends alongside the message — e.g.
-	 * "persistence_unavailable", "module_disabled", "rate_limited". Branch on
-	 * this, never on the message, which is translated. Falls back to WordPress's
-	 * own top-level `code` when the REST layer answers before we do.
-	 */
-	function readCode(payload) {
-		const data = payload && typeof payload === "object" ? payload.data : null;
-
-		if (data && typeof data.code === "string" && data.code !== "") {
-			return data.code;
-		}
-
-		if (payload && typeof payload.code === "string" && payload.code !== "") {
-			return payload.code;
-		}
-
-		return "";
 	}
 
 	function failSwitch(currencyCode, message, options, status, code) {
@@ -156,7 +151,9 @@
 		const root = settings.root || null;
 		clearError(root);
 
-		const code = String(currencyCode || "").trim().toUpperCase();
+		const code = String(currencyCode || "")
+			.trim()
+			.toUpperCase();
 		if (window.fchubMcApplyCurrency?.(code) !== true) {
 			failSwitch(code, UNAVAILABLE_ERROR, settings, 0, "currency_unavailable");
 			return Promise.resolve();
@@ -247,13 +244,24 @@
 			const availableDown = window.innerHeight - rootRect.bottom - viewportPadding;
 			const availableUp = rootRect.top - viewportPadding;
 
-			let vertical = preferredVertical === "auto"
-				? (availableDown >= availableUp ? "down" : "up")
-				: preferredVertical;
-			if (preferredVertical === "down" && availableDown < dropdownRect.height && availableUp > availableDown) {
+			let vertical =
+				preferredVertical === "auto"
+					? availableDown >= availableUp
+						? "down"
+						: "up"
+					: preferredVertical;
+			if (
+				preferredVertical === "down" &&
+				availableDown < dropdownRect.height &&
+				availableUp > availableDown
+			) {
 				vertical = "up";
 			}
-			if (preferredVertical === "up" && availableUp < dropdownRect.height && availableDown > availableUp) {
+			if (
+				preferredVertical === "up" &&
+				availableUp < dropdownRect.height &&
+				availableDown > availableUp
+			) {
 				vertical = "down";
 			}
 
@@ -275,16 +283,18 @@
 				return overflowLeft + overflowRight;
 			}
 
-			let left = preferredHorizontal === "start"
-				? candidateStart
-				: preferredHorizontal === "end"
-					? candidateEnd
-					: candidateStart;
-			const alternateLeft = preferredHorizontal === "start"
-				? candidateEnd
-				: preferredHorizontal === "end"
+			let left =
+				preferredHorizontal === "start"
 					? candidateStart
-					: candidateEnd;
+					: preferredHorizontal === "end"
+						? candidateEnd
+						: candidateStart;
+			const alternateLeft =
+				preferredHorizontal === "start"
+					? candidateEnd
+					: preferredHorizontal === "end"
+						? candidateStart
+						: candidateEnd;
 			if (preferredHorizontal === "auto" || overflowScore(alternateLeft) < overflowScore(left)) {
 				left = alternateLeft;
 			}
@@ -544,11 +554,15 @@
 			}
 		});
 
-		window.addEventListener("scroll", () => {
-			if (!dropdown.hidden) {
-				applyDropdownFit();
-			}
-		}, true);
+		window.addEventListener(
+			"scroll",
+			() => {
+				if (!dropdown.hidden) {
+					applyDropdownFit();
+				}
+			},
+			true,
+		);
 	}
 
 	function initAll() {

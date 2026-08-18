@@ -36,13 +36,14 @@
 	}
 
 	function entryFor(code) {
-		return (config.currencyTable || {})[code] || {};
+		return config.currencyTable?.[code] || {};
 	}
 
 	function renderCurrent(code, mode) {
 		const entry = entryFor(code);
 		const wrap = (inner) => `<span class="fchub-mc-inline-current">${inner}</span>`;
-		const text = (value) => `<span class="fchub-mc-inline-current__text">${escapeHtml(value)}</span>`;
+		const text = (value) =>
+			`<span class="fchub-mc-inline-current__text">${escapeHtml(value)}</span>`;
 
 		switch (mode) {
 			case "code":
@@ -134,13 +135,13 @@
 		const textParts = {
 			code,
 			name:
-				context.displayCurrencyName
-				|| selected?.querySelector(".fchub-mc-switcher__option-name")?.textContent
-				|| code,
+				context.displayCurrencyName ||
+				selected?.querySelector(".fchub-mc-switcher__option-name")?.textContent ||
+				code,
 			symbol:
-				context.symbol
-				|| selected?.querySelector(".fchub-mc-switcher__option-symbol")?.textContent
-				|| code,
+				context.symbol ||
+				selected?.querySelector(".fchub-mc-switcher__option-symbol")?.textContent ||
+				code,
 		};
 		for (const [part, value] of Object.entries(textParts)) {
 			const element = trigger.querySelector(`.fchub-mc-switcher__${part}`);
@@ -182,7 +183,10 @@
 		const isBase = code === config.baseCurrency;
 
 		for (const root of document.querySelectorAll("[data-fchub-mc-context-current]")) {
-			root.innerHTML = renderCurrent(code, root.getAttribute("data-fchub-mc-context-current") || "flag_code");
+			root.innerHTML = renderCurrent(
+				code,
+				root.getAttribute("data-fchub-mc-context-current") || "flag_code",
+			);
 		}
 
 		for (const root of document.querySelectorAll("[data-fchub-mc-context-rate]")) {

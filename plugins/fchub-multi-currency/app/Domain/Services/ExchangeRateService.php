@@ -19,6 +19,21 @@ final class ExchangeRateService
     ) {
     }
 
+    /**
+     * Loads every rate for a base currency in one read.
+     *
+     * `getRate()` caches per pair, and `wp_cache_get` spans a single request unless
+     * the site runs a persistent object cache — so a page offering N currencies paid
+     * N round trips before this existed. Callers that are about to ask for the whole
+     * set should warm it first; callers asking for one pair should not bother.
+     */
+    public function primeCache(string $baseCurrency): void
+    {
+        foreach ($this->repository->findAllLatest($baseCurrency) as $rate) {
+            $this->cache->set($rate);
+        }
+    }
+
     public function getRate(string $baseCurrency, string $quoteCurrency): ?ExchangeRate
     {
         if ($baseCurrency === $quoteCurrency) {

@@ -44,8 +44,13 @@
 		disclosureText = cfg.disclosureText || "";
 
 		buildPriceRegexes();
-		converting = Boolean(displayCode) && Boolean(baseCode) && displayCode !== baseCode
-			&& Number.isFinite(rate) && rate > 0 && rate !== 1;
+		converting =
+			Boolean(displayCode) &&
+			Boolean(baseCode) &&
+			displayCode !== baseCode &&
+			Number.isFinite(rate) &&
+			rate > 0 &&
+			rate !== 1;
 
 		return converting;
 	}
@@ -110,11 +115,11 @@
 	let stripRegex, basePriceRegex;
 
 	function buildPriceRegexes() {
-		const escape = (value) => String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-		const escSign = escape(baseSign);
-		const escCode = escape(baseCode);
-		const escThousandSep = baseThousandSep ? escape(baseThousandSep) : "";
-		const escDecSep = escape(baseDecSep);
+		const quote = (value) => String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+		const escSign = quote(baseSign);
+		const escCode = quote(baseCode);
+		const escThousandSep = baseThousandSep ? quote(baseThousandSep) : "";
+		const escDecSep = quote(baseDecSep);
 
 		stripRegex = new RegExp(`(${escSign}|${escCode})`, "g");
 		// Captures the full price token (sign/code + digits + separators + decimals)
@@ -152,7 +157,7 @@
 		if (match) {
 			const stripped = match[1].replace(stripRegex, "").trim();
 			if (stripped.length > 0) {
-				return { prefix: stripped + " ", priceText: match[2] };
+				return { prefix: `${stripped} `, priceText: match[2] };
 			}
 		}
 		return { prefix: "", priceText: text };
@@ -212,15 +217,15 @@
 				return Math.floor(scaled) / factor;
 			case "half_down": {
 				const lower = Math.floor(magnitude);
-				const rounded = (magnitude - lower) > 0.5 ? lower + 1 : lower;
-				return sign * rounded / factor;
+				const rounded = magnitude - lower > 0.5 ? lower + 1 : lower;
+				return (sign * rounded) / factor;
 			}
 			case "none": {
 				const truncated = Math.trunc(scaled);
 				return truncated / factor;
 			}
 			default:
-				return sign * Math.floor(magnitude + 0.5) / factor;
+				return (sign * Math.floor(magnitude + 0.5)) / factor;
 		}
 	}
 
@@ -302,7 +307,9 @@
 		// Drill into styled child spans that FluentCart uses for price formatting
 		// (e.g. .fct_line_item_total inside .fct_line_item_price). Setting textContent
 		// on the parent would destroy these inner elements and lose their styling.
-		const styledChild = el.querySelector(".fct_line_item_total, .fct_summary_value, .fct_coupon_price");
+		const styledChild = el.querySelector(
+			".fct_line_item_total, .fct_summary_value, .fct_coupon_price",
+		);
 		if (styledChild && looksLikePrice(styledChild.textContent)) {
 			return styledChild;
 		}
@@ -475,7 +482,7 @@
 		};
 
 		const injectAfter = (anchor, extraClass) => {
-			if (!anchor || !anchor.parentNode) return;
+			if (!anchor?.parentNode) return;
 			if (anchor.parentNode.querySelector(`[${DISCLOSURE_ATTR}]`)) return;
 			try {
 				anchor.insertAdjacentElement("afterend", makeNotice(extraClass));
@@ -675,9 +682,7 @@
 	 * Contains spans with inline prices like "300.00zł per year for 12 cycles".
 	 */
 	function projectPricingTablePaymentTypes(root) {
-		const elements = root.querySelectorAll(
-			".fluent-cart-pricing-table-variant-payment-type",
-		);
+		const elements = root.querySelectorAll(".fluent-cart-pricing-table-variant-payment-type");
 		for (const el of elements) {
 			if (el.getAttribute(ATTR_PROJECTED)) continue;
 
@@ -852,7 +857,7 @@
 	 */
 	function applyCurrency(code) {
 		const cfg = window.fchubMcConfig || {};
-		const entry = (cfg.currencyTable || {})[code];
+		const entry = cfg.currencyTable?.[code];
 		if (!entry) return false;
 
 		Object.assign(cfg, entry, { displayCurrency: code, isBaseDisplay: code === cfg.baseCurrency });

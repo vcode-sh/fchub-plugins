@@ -124,7 +124,8 @@ final class CurrencyTablePayloadTest extends TestCase
     public function testTableOmitsCurrenciesWithoutAUsableRate(): void
     {
         $this->storeWith(['EUR']);
-        $GLOBALS['wpdb_mock_row'] = null;
+        $this->setWpdbMockRow(null);
+        $this->setWpdbMockResults([]);
 
         $table = CurrencyTablePayload::build(new OptionStore());
 
@@ -181,6 +182,34 @@ final class CurrencyTablePayloadTest extends TestCase
     }
 
     /**
+     * The table is built on every storefront request, so a query per currency is a
+     * query per currency on every page. `wp_cache_get` only spans one request
+     * without a persistent object cache, and each pair is a distinct key, so nothing
+     * amortises it — a twenty-five currency store paid twenty-five round trips to
+     * the database to render a page.
+     */
+    #[Test]
+    public function testTheTableCostsOneQueryNoMatterHowManyCurrenciesAStoreOffers(): void
+    {
+        $this->storeWith(['EUR']);
+        $GLOBALS['wpdb']->resetQueries();
+        CurrencyTablePayload::build(new OptionStore());
+        $small = count($GLOBALS['wpdb']->queries);
+
+        $this->storeWith($this->fiftyCodes());
+        ContextModule::resetChain();
+        $GLOBALS['wpdb']->resetQueries();
+        CurrencyTablePayload::build(new OptionStore());
+        $large = count($GLOBALS['wpdb']->queries);
+
+        $this->assertSame(
+            $small,
+            $large,
+            "Fifty currencies cost {$large} queries against {$small} for one; the rate read is not batched.",
+        );
+    }
+
+    /**
      * @param string[] $quoteCodes
      */
     private function storeWith(array $quoteCodes): void
@@ -202,13 +231,21 @@ final class CurrencyTablePayloadTest extends TestCase
             'display_currencies' => $currencies,
         ]);
 
-        $this->setWpdbMockRow([
+        $row = [
             'base_currency'  => 'USD',
             'quote_currency' => 'EUR',
             'rate'           => '0.92000000',
             'provider'       => 'manual',
             'fetched_at'     => current_time('mysql'),
-        ]);
+        ];
+        $this->setWpdbMockRow($row);
+
+        // The batch read the table warms itself with returns one row per quote
+        // currency; without this the fixture would only model the per-pair path.
+        $this->setWpdbMockResults(array_map(
+            static fn(string $code): array => ['quote_currency' => $code] + $row,
+            $quoteCodes,
+        ));
     }
 
     /**
