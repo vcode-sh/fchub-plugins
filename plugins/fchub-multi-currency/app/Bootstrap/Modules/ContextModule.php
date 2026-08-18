@@ -39,7 +39,6 @@ final class ContextModule implements ModuleContract
     public function register(): void
     {
         add_action('wp', [self::class, 'persistPostedCurrencyPreference'], 0);
-        add_action('wp', [self::class, 'resolveContext'], 1);
         add_action('wp_login', [self::class, 'mergeGuestPreference'], 10, 2);
     }
 
@@ -117,18 +116,6 @@ final class ContextModule implements ModuleContract
             'currency' => $currencyCode,
             'source' => 'noscript',
         ]);
-    }
-
-    public static function resolveContext(): void
-    {
-        if (!Hooks::isEnabled()) {
-            return;
-        }
-
-        $optionStore = new OptionStore();
-        $chain = self::buildResolverChain($optionStore);
-        $service = new CurrencyContextService($chain, $optionStore);
-        $service->resolve();
     }
 
     public static function mergeGuestPreference(string $userLogin, $user): void
