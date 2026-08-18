@@ -128,7 +128,9 @@
 	 */
 	function shieldPrices(code) {
 		const converts =
-			code !== "" && code !== normalizeCode(config.baseCurrency) && config.projectionEnabled === true;
+			code !== "" &&
+			code !== normalizeCode(config.baseCurrency) &&
+			config.projectionEnabled === true;
 		document.documentElement.classList.toggle("fchub-mc-pending", converts);
 	}
 
