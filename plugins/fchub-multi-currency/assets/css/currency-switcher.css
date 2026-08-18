@@ -358,17 +358,6 @@
     justify-content: space-between;
 }
 
-/* ----- Loading state ----- */
-.fchub-mc-switcher--loading .fchub-mc-switcher__trigger {
-    opacity: 0.6;
-    pointer-events: none;
-}
-
-.fchub-mc-selector-buttons--loading .fchub-mc-selector-buttons__button {
-    opacity: 0.6;
-    pointer-events: none;
-}
-
 /* ----- Failed switch ----- */
 /* Only widgets currently showing an error wrap, so normal layout is untouched. */
 .fchub-mc-switcher:has(.fchub-mc-switcher__error) {

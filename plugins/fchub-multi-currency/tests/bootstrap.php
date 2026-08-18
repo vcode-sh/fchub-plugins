@@ -143,6 +143,7 @@ $GLOBALS['wp_enqueued_scripts'] = [];
 $GLOBALS['wp_enqueued_styles'] = [];
 $GLOBALS['wp_localized_scripts'] = [];
 $GLOBALS['wp_inline_scripts'] = [];
+$GLOBALS['wp_inline_styles'] = [];
 $GLOBALS['wp_registered_blocks'] = [];
 $GLOBALS['wp_registered_block_patterns'] = [];
 $GLOBALS['wp_registered_block_pattern_categories'] = [];
@@ -715,6 +716,14 @@ if (!function_exists('wp_add_inline_script')) {
     function wp_add_inline_script($handle, $data, $position = 'after')
     {
         $GLOBALS['wp_inline_scripts'][$handle][$position][] = $data;
+        return true;
+    }
+}
+
+if (!function_exists('wp_add_inline_style')) {
+    function wp_add_inline_style($handle, $data)
+    {
+        $GLOBALS['wp_inline_styles'][$handle][] = $data;
         return true;
     }
 }

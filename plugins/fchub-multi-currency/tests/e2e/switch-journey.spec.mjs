@@ -241,9 +241,6 @@ test("critical-window CSS does not depend on classes missing from the served HTM
 		"currency-switcher.css": await (
 			await request.get(`${origin.url}/assets/css/currency-switcher.css`)
 		).text(),
-		"currency-projection.css": await (
-			await request.get(`${origin.url}/assets/css/currency-projection.css`)
-		).text(),
 	};
 
 	// Only the runtime state classes are the point. A price class missing from this

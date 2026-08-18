@@ -36,6 +36,7 @@ abstract class TestCase extends BaseTestCase
         $GLOBALS['wp_enqueued_styles'] = [];
         $GLOBALS['wp_localized_scripts'] = [];
         $GLOBALS['wp_inline_scripts'] = [];
+        $GLOBALS['wp_inline_styles'] = [];
         $GLOBALS['wp_registered_blocks'] = [];
         $GLOBALS['wp_registered_block_patterns'] = [];
         $GLOBALS['wp_registered_block_pattern_categories'] = [];

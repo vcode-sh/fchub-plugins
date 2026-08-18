@@ -37,7 +37,7 @@ final class FrontendModuleTest extends TestCase
 
         $this->assertScriptEnqueued('fchub-mc-context');
         $this->assertScriptEnqueued('fchub-mc-projection');
-        $this->assertStyleEnqueued('fchub-mc-projection');
+        $this->assertStyleEnqueued('fchub-mc-critical');
         $this->assertNotContains('fchub-mc-switcher', $GLOBALS['wp_enqueued_styles']);
     }
 
@@ -144,6 +144,30 @@ final class FrontendModuleTest extends TestCase
         $this->assertSame('money', $config['urlParamKey']);
         $this->assertArrayNotHasKey('presentation', $config);
         $this->assertArrayNotHasKey('rateValue', $config);
+    }
+
+    /**
+     * The rules that must apply before the first paint ship as markup, not as a
+     * request. A linked stylesheet is something an optimizer may defer, strip as
+     * unused, or simply deliver after the paint it was supposed to govern — and
+     * every rule in this file keys off a class that appears in no document.
+     */
+    #[Test]
+    public function testCriticalStylesArePrintedInlineRatherThanFetched(): void
+    {
+        $this->setOption('fchub_mc_settings', $this->switcherSettings());
+        FrontendModule::registerAssets();
+        FrontendModule::enqueueProjectionAssets();
+
+        $this->assertStyleEnqueued('fchub-mc-critical');
+        $this->assertFalse(
+            $GLOBALS['wp_registered_styles']['fchub-mc-critical']['src'],
+            'A critical stylesheet with a src is a request, and a request can arrive late.',
+        );
+
+        $inline = implode('', $GLOBALS['wp_inline_styles']['fchub-mc-critical'] ?? []);
+        $this->assertStringContainsString('.fchub-mc-switcher--loading', $inline);
+        $this->assertStringContainsString('visibility: hidden', $inline);
     }
 
     /**

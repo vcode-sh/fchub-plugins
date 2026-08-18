@@ -52,13 +52,8 @@ final class FrontendModule implements ModuleContract
             true,
         );
 
-        $projectionCssPath = FCHUB_MC_PATH . 'assets/css/currency-projection.css';
-        wp_register_style(
-            'fchub-mc-projection',
-            FCHUB_MC_URL . 'assets/css/currency-projection.css',
-            [],
-            (string) (@filemtime($projectionCssPath) ?: FCHUB_MC_VERSION),
-        );
+        // Src-less on purpose: this stylesheet is printed inline, never fetched.
+        wp_register_style('fchub-mc-critical', false, [], FCHUB_MC_VERSION);
 
         $switcherJsPath = FCHUB_MC_PATH . 'assets/js/currency-switcher.js';
         wp_register_script(
@@ -86,7 +81,21 @@ final class FrontendModule implements ModuleContract
 
         self::ensureContextAssetEnqueued();
         wp_enqueue_script('fchub-mc-projection');
-        wp_enqueue_style('fchub-mc-projection');
+        self::enqueueCriticalStyles();
+    }
+
+    /**
+     * Inlines the rules that must apply before the first paint and that no
+     * optimizer may defer or strip, because every one of them keys off a class
+     * the runtime adds rather than one the document ships.
+     */
+    private static function enqueueCriticalStyles(): void
+    {
+        wp_enqueue_style('fchub-mc-critical');
+        wp_add_inline_style(
+            'fchub-mc-critical',
+            (string) @file_get_contents(FCHUB_MC_PATH . 'assets/css/currency-critical.css'),
+        );
     }
 
     public static function ensureSwitcherAssetsEnqueued(): void

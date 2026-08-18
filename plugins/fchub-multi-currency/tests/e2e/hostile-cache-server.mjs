@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 
 const PLUGIN_DIR = fileURLToPath(new URL("../../", import.meta.url));
 const ASSET_DIR = join(PLUGIN_DIR, "assets");
+const CRITICAL_CSS = readFileSync(join(ASSET_DIR, "css/currency-critical.css"), "utf8");
 const FIXTURE_PATH = fileURLToPath(new URL("./.fixture/fixture.json", import.meta.url));
 
 const MIME = {
@@ -132,7 +133,7 @@ function renderPage({ fixture, currency, deferScripts, stripUnusedCss, disabledB
 <meta charset="utf-8">
 <title>Pricing</title>
 <style id="theme-css">${themeStyles}</style>
-<link rel="stylesheet" href="/assets/css/currency-projection.css${stripUnusedCss ? "?rucss=1" : ""}">
+<style id="fchub-mc-critical-inline-css">${CRITICAL_CSS}</style>
 <script id="fchub-mc-config">window.fchubMcConfig = ${JSON.stringify(config)};</script>
 <script src="/assets/js/currency-context.js"${defer}></script>
 </head>
