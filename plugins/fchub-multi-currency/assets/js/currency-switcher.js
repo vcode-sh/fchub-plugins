@@ -38,6 +38,7 @@
 	let idCounter = 0;
 
 	const FALLBACK_ERROR = "Currency preference could not be saved.";
+	const UNAVAILABLE_ERROR = "That currency is not available right now.";
 
 	function persistBrowserPreference(currencyCode) {
 		try {
@@ -141,31 +142,37 @@
 	}
 
 	/**
-	 * Guests reload through the explicit resolver because shared edge HTML does
-	 * not vary by cookie. Account preferences keep their normal URL-free path.
-	 */
-	function buildReloadUrl(currencyCode) {
-		if (config.urlParamEnabled !== true || !config.urlParamKey) return "";
-
-		const url = new URL(window.location.href);
-		if (config.isLoggedIn === true) {
-			if (!url.searchParams.has(config.urlParamKey)) return "";
-			url.searchParams.delete(config.urlParamKey);
-		} else {
-			url.searchParams.set(config.urlParamKey, currencyCode);
-		}
-
-		return url.toString();
-	}
-
-	/**
-	 * Posts the preference and only reloads once the server confirms it stored something.
-	 * A 403 (plugin disabled), 409 (nothing to persist for this visitor), 422 (bad currency)
-	 * or 429 (rate limited) leaves the page alone and surfaces the server's message.
+	 * Applies the visitor's choice immediately, then tells the server about it.
+	 *
+	 * The browser already holds every rate the page offers, so nothing here needs
+	 * a round trip to be correct. The POST that follows keeps the cookie in step
+	 * for the places the browser cannot reach — order metadata, emails, CRM — and
+	 * a failure there means the preference will not outlive this session, not that
+	 * the visitor is looking at the wrong prices. Undoing a correct switch to
+	 * report a cookie problem would be the worse lie.
 	 */
 	function switchCurrency(currencyCode, options) {
 		const settings = options || {};
-		clearError(settings.root || null);
+		const root = settings.root || null;
+		clearError(root);
+
+		const code = String(currencyCode || "").trim().toUpperCase();
+		if (window.fchubMcApplyCurrency?.(code) !== true) {
+			failSwitch(code, UNAVAILABLE_ERROR, settings, 0, "currency_unavailable");
+			return Promise.resolve();
+		}
+
+		window.fchubMc?.setCurrency(code);
+		clearLoadingState(root);
+		window.dispatchEvent(
+			new CustomEvent("fchub_mc:context_changed", { detail: { currency: code } }),
+		);
+
+		return persistPreference(code);
+	}
+
+	/** Fire-and-forget: the visitor is already looking at the right prices. */
+	function persistPreference(currencyCode) {
 		const headers = { "Content-Type": "application/json" };
 		if (config.isLoggedIn === true && nonce) {
 			headers["X-WP-Nonce"] = nonce;
@@ -178,41 +185,13 @@
 			headers,
 			body: JSON.stringify({ currency: currencyCode }),
 		})
-			.then((response) =>
-				response
-					.json()
-					.catch(() => null)
-					.then((payload) => ({ response, payload })),
-			)
-			.then(({ response, payload }) => {
-				const data = payload && typeof payload === "object" ? payload.data : null;
-				const persisted = data?.persisted === true;
-
-				if (!response.ok || !persisted) {
-					failSwitch(
-						currencyCode,
-						readMessage(payload, response.status),
-						settings,
-						response.status,
-						readCode(payload),
-					);
-					return;
-				}
-
-				persistBrowserPreference(currencyCode);
-				const reloadUrl = buildReloadUrl(currencyCode);
-				if (reloadUrl) {
-					window.history.replaceState(window.history.state, "", reloadUrl);
-				}
-				window.dispatchEvent(
-					new CustomEvent("fchub_mc:context_changed", {
-						detail: { currency: currencyCode, response: payload },
-					}),
-				);
-				window.location.reload();
+			.then((response) => (response.ok ? null : response.json().catch(() => null)))
+			.then((payload) => {
+				if (payload === null) return;
+				console.warn("[fchub-mc] Currency preference not stored:", readMessage(payload, 0));
 			})
-			.catch((err) => {
-				failSwitch(currencyCode, err?.message || FALLBACK_ERROR, settings, 0, "network_error");
+			.catch((error) => {
+				console.warn("[fchub-mc] Currency preference not stored:", error?.message || "");
 			});
 	}
 
@@ -440,7 +419,6 @@
 			}
 
 			close();
-			root.classList.add("fchub-mc-switcher--loading");
 			switchCurrency(value, {
 				root: root,
 				onFailure: () => {
