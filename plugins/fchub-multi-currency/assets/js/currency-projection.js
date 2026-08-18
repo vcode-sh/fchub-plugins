@@ -378,59 +378,86 @@
 	/**
 	 * Project a single variant price container (.fct-product-item-price).
 	 */
-	function projectVariantPrice(el) {
-		if (el.getAttribute(ATTR_PROJECTED)) return 0;
-
-		let count = 0;
-
+	/**
+	 * Captures the base-currency markup, once and only once.
+	 *
+	 * Every later switch restores from this and converts again. Overwrite it after a
+	 * conversion and the next switch converts the last switch's output, compounding
+	 * silently on every price on the page.
+	 */
+	function rememberOriginal(el) {
 		if (!el.getAttribute(ATTR_ORIGINAL)) {
 			el.setAttribute(ATTR_ORIGINAL, el.innerHTML);
 		}
+	}
 
-		// clearProjectionMarkers restores innerHTML from the initial render, which may
-		// contain stale is-hidden classes. Sync child variation-content visibility with
-		// the parent's current state so FluentCart's tab toggling isn't undone.
-		const parentHidden = el.classList.contains("is-hidden");
-		for (const child of el.querySelectorAll(".fluent-cart-product-variation-content")) {
-			child.classList.toggle("is-hidden", parentHidden);
-		}
+	/** Writes converted text onto one node and records the element as converted. */
+	function commitText(el, node, text, marker = "1") {
+		rememberOriginal(el);
+		if (text === null) return 0;
 
-		const del = el.querySelector("del");
-		if (del && looksLikePrice(del.textContent)) {
-			const compareAmount = parseBasePrice(del.textContent.trim());
-			if (!Number.isNaN(compareAmount)) {
-				del.textContent = formatPrice(applyRounding(compareAmount * rate));
+		node.textContent = text;
+		el.setAttribute(ATTR_PROJECTED, marker);
+		return 1;
+	}
+
+	/** Converts the price-bearing text nodes among `nodes`, returning how many changed. */
+	function convertTextNodes(nodes, convert) {
+		let count = 0;
+
+		for (const node of nodes) {
+			if (node.nodeType !== 3 || !looksLikePrice(node.textContent)) continue;
+
+			const converted = convert(node.textContent);
+			if (converted !== null) {
+				node.textContent = converted;
 				count++;
 			}
 		}
 
-		const childNodes = el.childNodes;
-		for (let j = 0; j < childNodes.length; j++) {
-			const node = childNodes[j];
-			if (node.nodeType === 3 && looksLikePrice(node.textContent)) {
-				const converted = replaceInlinePrice(node.textContent);
-				if (converted !== null) {
-					node.textContent = converted;
-					count++;
-				}
-			}
-		}
+		return count;
+	}
 
-		// Subscription/installment products wrap price text in a child
-		// .fct-product-payment-type div. Text nodes there can contain multiple prices
-		// (e.g. "300.00zł per year for 12 cycles + 100.00zł one-time setup fee").
-		const paymentType = el.querySelector(".fct-product-payment-type");
-		if (paymentType) {
-			for (const node of paymentType.childNodes) {
-				if (node.nodeType === 3 && looksLikePrice(node.textContent)) {
-					const converted = replaceAllInlinePrices(node.textContent);
-					if (converted !== null) {
-						node.textContent = converted;
-						count++;
-					}
-				}
-			}
+	/**
+	 * `clearProjectionMarkers` restores the innerHTML captured at first render, which
+	 * may carry an `is-hidden` class from whichever variation tab was open then. Sync
+	 * the children with the parent's current state so a switch does not reopen a tab
+	 * the visitor had closed.
+	 */
+	function syncVariationVisibility(el) {
+		const parentHidden = el.classList.contains("is-hidden");
+
+		for (const child of el.querySelectorAll(".fluent-cart-product-variation-content")) {
+			child.classList.toggle("is-hidden", parentHidden);
 		}
+	}
+
+	/** The struck-through "was" price, when the variant carries one. */
+	function projectComparePrice(el) {
+		const del = el.querySelector("del");
+		if (!del || !looksLikePrice(del.textContent)) return 0;
+
+		const compareAmount = parseBasePrice(del.textContent.trim());
+		if (Number.isNaN(compareAmount)) return 0;
+
+		del.textContent = formatPrice(applyRounding(compareAmount * rate));
+		return 1;
+	}
+
+	function projectVariantPrice(el) {
+		if (el.getAttribute(ATTR_PROJECTED)) return 0;
+
+		rememberOriginal(el);
+		syncVariationVisibility(el);
+
+		// Subscription and instalment products wrap their price text in a child
+		// .fct-product-payment-type, whose text nodes may hold several amounts at once
+		// ("300.00zł per year for 12 cycles + 100.00zł one-time setup fee").
+		const paymentType = el.querySelector(".fct-product-payment-type");
+		const count =
+			projectComparePrice(el)
+			+ convertTextNodes(el.childNodes, replaceInlinePrice)
+			+ (paymentType ? convertTextNodes(paymentType.childNodes, replaceAllInlinePrices) : 0);
 
 		if (count > 0) {
 			el.setAttribute(ATTR_PROJECTED, "1");
@@ -514,74 +541,38 @@
 	 * Project a single standard price element (not variant, not range).
 	 * Returns 1 if projected, 0 otherwise.
 	 */
-	function projectSinglePrice(el) {
-		const target = findPriceTarget(el);
+	/**
+	 * Mixed markup, such as `<sup>$</sup>12.00<span class="repeat-interval">`.
+	 * Only the text node holding the amount changes, so sibling markup survives.
+	 */
+	function projectMixedMarkup(el, target) {
+		rememberOriginal(el);
 
-		// Mixed content (e.g. <sup>$</sup>12.00<span class="repeat-interval">...)
-		// Modify only the text node containing the price, preserving sibling markup.
-		if (target.mixed) {
-			const node = target.textNode;
-			if (!el.getAttribute(ATTR_ORIGINAL)) {
-				el.setAttribute(ATTR_ORIGINAL, el.innerHTML);
-			}
-			const converted = replaceInlinePrice(node.textContent, formatNumber);
-			if (converted === null) return 0;
+		const converted = replaceInlinePrice(target.textNode.textContent, formatNumber);
+		if (converted === null) return 0;
 
-			// Replace <sup> currency sign with display currency sign
-			const sup = el.querySelector("sup");
-			if (sup) {
-				sup.textContent = symbol;
-			}
+		const sup = el.querySelector("sup");
+		if (sup) sup.textContent = symbol;
 
-			node.textContent = converted;
-			el.setAttribute(ATTR_PROJECTED, "1");
-			return 1;
-		}
+		target.textNode.textContent = converted;
+		el.setAttribute(ATTR_PROJECTED, "1");
+		return 1;
+	}
 
-		const rawText = target.textContent;
-		if (!looksLikePrice(rawText)) return 0;
-
-		// For elements with subscription text (e.g. ".fct_item_payment_info"),
-		// replace only the price portion, preserving suffix like "per month, until cancel"
-		if (el.classList.contains("fct_item_payment_info")) {
-			if (!el.getAttribute(ATTR_ORIGINAL)) {
-				el.setAttribute(ATTR_ORIGINAL, el.innerHTML);
-			}
-			const converted = replaceInlinePrice(rawText);
-			if (converted === null) return 0;
-			target.textContent = converted;
-			el.setAttribute(ATTR_PROJECTED, "1");
-			return 1;
-		}
-
-		// Thank you page payment info — may contain multiple inline prices
-		if (el.classList.contains("fct-thank-you-page-order-items-list-payment-info")) {
-			if (!el.getAttribute(ATTR_ORIGINAL)) {
-				el.setAttribute(ATTR_ORIGINAL, el.innerHTML);
-			}
-			const converted = replaceAllInlinePrices(rawText);
-			if (converted === null) return 0;
-			target.textContent = converted;
-			el.setAttribute(ATTR_PROJECTED, "1");
-			return 1;
-		}
-
-		let baseAmount;
+	/**
+	 * The ordinary path: find one amount, convert it, and write it back wearing
+	 * whatever prefix it arrived with.
+	 */
+	function projectAmount(el, target, rawText) {
 		let prefix = "";
+		let baseAmount;
 
 		const explicitBase = el.getAttribute(ATTR_BASE);
 		if (explicitBase) {
 			baseAmount = parseFloat(explicitBase);
 		} else {
 			const rangeResult = projectRange(rawText.trim());
-			if (rangeResult) {
-				if (!el.getAttribute(ATTR_ORIGINAL)) {
-					el.setAttribute(ATTR_ORIGINAL, el.innerHTML);
-				}
-				target.textContent = rangeResult;
-				el.setAttribute(ATTR_PROJECTED, "range");
-				return 1;
-			}
+			if (rangeResult) return commitText(el, target, rangeResult, "range");
 
 			const extracted = extractPrefix(rawText.trim());
 			prefix = extracted.prefix;
@@ -590,31 +581,41 @@
 
 		if (Number.isNaN(baseAmount)) return 0;
 
-		if (!el.getAttribute(ATTR_ORIGINAL)) {
-			el.setAttribute(ATTR_ORIGINAL, el.innerHTML);
-		}
-
+		rememberOriginal(el);
 		const converted = applyRounding(baseAmount * rate);
-		const formattedPrice = formatPrice(converted);
 		const approxPrefix = isTotal(el) ? "\u2248 " : "";
 
-		if (prefix) {
-			target.textContent = prefix + approxPrefix + formattedPrice;
-			el.setAttribute(ATTR_PREFIX, prefix);
-		} else {
-			target.textContent = approxPrefix + formattedPrice;
-		}
-
+		target.textContent = prefix + approxPrefix + formatPrice(converted);
+		if (prefix) el.setAttribute(ATTR_PREFIX, prefix);
 		el.setAttribute(ATTR_PROJECTED, converted.toString());
 
-		// When the target is a styled child element (e.g. .fct_line_item_total
-		// inside .fct_line_item_price), mark it as projected too so the selector
-		// loop doesn't re-process it and attempt a double-conversion.
+		// A styled child target (.fct_line_item_total inside .fct_line_item_price) is
+		// in the selector list too; mark it so the loop does not convert it again.
 		if (target !== el && target.setAttribute) {
 			target.setAttribute(ATTR_PROJECTED, "1");
 		}
 
 		return 1;
+	}
+
+	function projectSinglePrice(el) {
+		const target = findPriceTarget(el);
+		if (target.mixed) return projectMixedMarkup(el, target);
+
+		const rawText = target.textContent;
+		if (!looksLikePrice(rawText)) return 0;
+
+		// Subscription text keeps its sentence: only the amount inside it changes.
+		if (el.classList.contains("fct_item_payment_info")) {
+			return commitText(el, target, replaceInlinePrice(rawText));
+		}
+
+		// A receipt line may quote several amounts at once.
+		if (el.classList.contains("fct-thank-you-page-order-items-list-payment-info")) {
+			return commitText(el, target, replaceAllInlinePrices(rawText));
+		}
+
+		return projectAmount(el, target, rawText);
 	}
 
 	/**
