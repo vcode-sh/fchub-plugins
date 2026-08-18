@@ -25,7 +25,7 @@ final class CurrencySwitcherRenderer
     /**
      * @return array<string, string|bool|array<int, string>>
      */
-    public static function defaults(): array
+    private static function defaults(): array
     {
         return [
             'useGlobalDefaults'    => true,
@@ -58,7 +58,7 @@ final class CurrencySwitcherRenderer
     /**
      * @param array<string, mixed> $atts
      */
-    public static function normalizeShortcodeAttributes(array $atts): array
+    private static function normalizeShortcodeAttributes(array $atts): array
     {
         return [
             'useGlobalDefaults'    => true,
@@ -124,7 +124,7 @@ final class CurrencySwitcherRenderer
     /**
      * @param array<string, mixed> $atts
      */
-    public static function buildStageClassName(array $atts): string
+    private static function buildStageClassName(array $atts): string
     {
         $defaults = self::defaults();
         $atts = array_merge($defaults, $atts);
@@ -145,7 +145,7 @@ final class CurrencySwitcherRenderer
     /**
      * @param array<string, mixed> $atts
      */
-    public static function buildWidgetClassName(array $atts): string
+    private static function buildWidgetClassName(array $atts): string
     {
         $defaults = self::defaults();
         $atts = array_merge($defaults, $atts);
@@ -414,7 +414,7 @@ final class CurrencySwitcherRenderer
     /**
      * @return array<int, array<string, mixed>>
      */
-    public static function resolveCurrencies(OptionStore $optionStore): array
+    private static function resolveCurrencies(OptionStore $optionStore): array
     {
         $currencies = $optionStore->get('display_currencies', []);
         if (!is_array($currencies) || $currencies === []) {
@@ -648,14 +648,6 @@ final class CurrencySwitcherRenderer
         $html .= '</noscript>';
 
         return $html;
-    }
-
-    /**
-     * @return string[]
-     */
-    public static function allowedCurrencyCodes(OptionStore $optionStore): array
-    {
-        return SelectableCurrencyCodes::fromSettings($optionStore->all())->all();
     }
 
     private static function toBool(mixed $value): bool

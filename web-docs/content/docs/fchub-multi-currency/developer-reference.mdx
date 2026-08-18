@@ -333,25 +333,20 @@ The widget implements the combobox/listbox pattern:
 
 ## JavaScript Configuration Object
 
-The `fchubMcConfig` object is emitted as typed JSON before the shared context script
+The `fchubMcConfig` object is emitted as typed JSON inline in the document head
 and is available globally:
 
 | Key | Type | Description |
 |---|---|---|
-| `rate` | number | Current exchange rate |
-| `displayCurrency` | string | Display currency code |
-| `displayCurrencyName` | string | Display currency name |
-| `baseCurrency` | string | Base currency code |
-| `decimals` | int | Display currency decimal places |
-| `symbol` | string | Display currency symbol |
-| `position` | string | Symbol position (`left`, `right`, `left_space`, `right_space`) |
-| `isBaseDisplay` | bool | Whether display equals base |
-| `resolverSource` | string | Winning resolver: `url_param`, `user_meta`, `cookie`, `geo`, or `default` |
+| `currencyTable` | object | Every selectable currency, keyed by code. Each entry carries `rate`, `symbol`, `displayCurrencyName`, `decimals`, `position`, `displayDecSep`, `displayThousandSep`, `disclosureText`, `flag` and `rateBadge`. Currencies without a usable rate are absent |
+| `presentationTemplates` | object | The translated sentences the browser fills to render a currency surface |
+| `baseCurrency` | string | Base currency code. A table key equal to this needs no conversion |
+| `defaultCurrency` | string | Configured default display currency, if any |
+| `accountCurrency` | string | The signed-in visitor's saved preference. Empty for guests, and only trustworthy when `isLoggedIn` is true |
 | `roundingMode` | string | Rounding mode slug |
 | `restUrl` | string | REST API base URL |
-| `nonce` | string | WP REST nonce |
+| `nonce` | string | WP REST nonce. Empty for guests: a nonce is per visitor, and a cached page would hand one visitor's to everybody after them |
 | `currencies` | array | All display currencies with flags |
-| `allowedCurrencyCodes` | array | Base plus configured display currency codes accepted by browser recovery |
 | `cookieName` | string | Cookie and local-storage key, currently `fchub_mc_currency` |
 | `cookiePersistenceEnabled` | bool | Whether guest browser persistence is enabled |
 | `cookieLifetimeDays` | int | Shared cookie and local-storage lifetime |
