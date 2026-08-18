@@ -136,6 +136,11 @@ final class CurrencyTablePayloadTest extends TestCase
      * currency in every cached document, so a field added upstream costs fifty
      * copies. A merchant's own disclosure wording may be any length, which is why
      * this guards the shape and not the size.
+     *
+     * `flag` and `rateBadge` are rendered HTML on purpose. They are the two
+     * surfaces the browser cannot build from primitives — one needs a currency to
+     * country mapping, the other a translated relative time — and together they
+     * cost about 270 bytes against the 3113 a full fragment set would.
      */
     #[Test]
     public function testEntryFieldSetIsExactlyWhatTheBrowserNeeds(): void
@@ -153,6 +158,8 @@ final class CurrencyTablePayloadTest extends TestCase
             'displayDecSep',
             'displayThousandSep',
             'disclosureText',
+            'flag',
+            'rateBadge',
         ], array_keys($entry));
     }
 

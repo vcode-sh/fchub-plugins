@@ -37,6 +37,18 @@ async function switchToEuro(page) {
 	await expect(page.locator(".fct-item-price").first()).toHaveText(/€/);
 }
 
+/** Opens the dropdown first, so the measured window starts at the actual choice. */
+async function openThenSwitch(page) {
+	await page.locator("[data-fchub-mc-trigger]").click();
+	await expect(page.locator("[role='option'][data-value='EUR']")).toBeVisible();
+
+	const switchedAt = await page.evaluate(() => performance.now());
+	await page.locator("[role='option'][data-value='EUR']").click();
+	await expect(page.locator(".fct-item-price").first()).toHaveText(/€/);
+
+	return switchedAt;
+}
+
 /**
  * How an edge may treat the `?currency=` parameter the switcher navigates to.
  * The three cases cost wildly different amounts, so the lane measures all three
@@ -84,6 +96,7 @@ for (const { mode, note } of QUERY_MODES) {
 			clickToStableMs,
 			budgetMs: CLICK_TO_STABLE_BUDGET_MS,
 			originHits: originHits.length,
+			navigations: journey.filter((r) => !r.path.startsWith("/wp-json")).length,
 			originLatencyMs: ORIGIN_LATENCY_MS,
 			restLatencyMs: REST_LATENCY_MS,
 			requests: journey.map((r) => ({
@@ -94,10 +107,11 @@ for (const { mode, note } of QUERY_MODES) {
 			})),
 		});
 
-		expect(
-			originHits.length,
-			"A currency switch should cost the origin nothing: the browser already knows the choice.",
-		).toBe(0);
+		const navigations = journey.filter((r) => !r.path.startsWith("/wp-json"));
+		const reads = journey.filter((r) => r.method === "GET" && r.path.startsWith("/wp-json"));
+
+		expect(navigations, "A switch must not reload the page.").toHaveLength(0);
+		expect(reads, "The browser already holds every rate; it has nothing to ask for.").toHaveLength(0);
 		expect(clickToStableMs).toBeLessThan(CLICK_TO_STABLE_BUDGET_MS);
 	});
 }
@@ -110,7 +124,6 @@ for (const { mode, note } of QUERY_MODES) {
 function installPaintRecorder(page) {
 	return page.addInitScript(() => {
 		window.__fchubTimeline = [];
-		const start = performance.now();
 		const keys = ["price", "priceVisible", "trigger", "background", "opacity", "disabled"];
 
 		const sample = () => {
@@ -120,7 +133,7 @@ function installPaintRecorder(page) {
 				const triggerStyle = trigger ? getComputedStyle(trigger) : null;
 				const priceStyle = price ? getComputedStyle(price) : null;
 				const frame = {
-					t: Math.round(performance.now() - start),
+					t: Math.round(performance.now()),
 					price: price ? price.textContent.trim() : null,
 					priceVisible: priceStyle ? priceStyle.visibility !== "hidden" : null,
 					trigger: trigger ? trigger.textContent.replace(/\s+/g, " ").trim() : null,
@@ -188,11 +201,12 @@ for (const { name, lateAssetLatencyMs, themeDisabledBackground } of PAINT_CASES)
 		await page.goto(`${origin.url}/pricing`, { waitUntil: "load" });
 		await expect(page.locator(".fct-item-price").first()).toHaveText(/\$/);
 
-		await switchToEuro(page);
+		// The window under test opens when the visitor picks a currency, not when
+		// they open the dropdown to look at the list.
+		const switchedAt = await openThenSwitch(page);
 
-		// addInitScript reinstalls the recorder on the post-switch document, so this
-		// timeline covers exactly the window the reporter described.
-		const timeline = await page.evaluate(() => window.__fchubTimeline);
+		const allFrames = await page.evaluate(() => window.__fchubTimeline);
+		const timeline = allFrames.filter((frame) => frame.t >= Math.round(switchedAt));
 		const states = visualStates(timeline);
 		const stalePaints = timeline.filter((frame) => frame.priceVisible && frame.price?.includes("$"));
 
@@ -205,12 +219,15 @@ for (const { name, lateAssetLatencyMs, themeDisabledBackground } of PAINT_CASES)
 			timeline,
 		});
 
+		expect(timeline.length, "The recorder saw nothing change; it is not measuring the switch.")
+			.toBeGreaterThan(0);
+		expect(timeline.at(-1).price, "The window must end on the corrected amount.").toMatch(/€/);
 		expect(stalePaints, "No frame after the switch may show a readable pre-switch amount.").toHaveLength(
 			0,
 		);
 		expect(
 			states.length,
-			`The switcher should look locked, then settled — not ${states.length} ways: ${states.join(" -> ")}`,
+			`The switcher should look settled throughout — not ${states.length} ways: ${states.join(" -> ")}`,
 		).toBeLessThanOrEqual(2);
 	});
 }

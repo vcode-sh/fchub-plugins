@@ -12,8 +12,8 @@
  * currency-projection.js; tests/js/critical-css.test.mjs fails when it drifts.
  */
 
-/* Hide stale amounts from cached-context recovery through the first projection. */
-:is(.fchub-mc-recovering, .fchub-mc-projecting) :is(
+/* Hide amounts only until the browser has applied the visitor's currency. */
+.fchub-mc-pending :is(
 	.fct-item-price,
 	.fct-compare-price,
 	.fct-min-price,
@@ -44,23 +44,18 @@
 	[data-fchub-mc-base]
 ) {
 	visibility: hidden;
+	/**
+	 * A bounded promise rather than an escape hatch: no amount stays hidden for
+	 * more than two seconds, whatever an optimizer does to the scripts. The normal
+	 * path clears this class in milliseconds because applying a currency needs no
+	 * network, so this only ever fires when the projection runtime never arrives —
+	 * and a base-currency price beats no price at all.
+	 */
+	animation: fchub-mc-reveal 0s 2s forwards;
 }
 
-/* Reveal the most common prices if a third-party script strands the projection. */
-@keyframes fchub-mc-fouc-fallback {
+@keyframes fchub-mc-reveal {
 	to { visibility: visible; }
-}
-
-.fchub-mc-projecting .fct-item-price,
-.fchub-mc-projecting .fct-compare-price {
-	animation: fchub-mc-fouc-fallback 0s 2s forwards;
-}
-
-/* Both switcher variants stay locked for the same window. */
-.fchub-mc-switcher--loading .fchub-mc-switcher__trigger,
-.fchub-mc-selector-buttons--loading .fchub-mc-selector-buttons__button {
-	opacity: 0.6;
-	pointer-events: none;
 }
 
 /**

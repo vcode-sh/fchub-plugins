@@ -17,61 +17,38 @@
  *
  * Fires: fchub_mc:prices_projected (after each projection pass)
  */
-(async () => {
-	let projectionShieldTimeout = null;
-	function releaseProjectionShield() {
-		document.documentElement.classList.remove("fchub-mc-projecting");
-		window.fchubMcCompleteRecovery?.();
-		if (projectionShieldTimeout !== null) {
-			clearTimeout(projectionShieldTimeout);
-			projectionShieldTimeout = null;
-		}
+(() => {
+	// Re-read per pass rather than captured once: the visitor may switch currency
+	// without leaving the page, and every one of these changes when they do.
+	let rate, decimals, symbol, position, roundingMode, displayCode, baseCode;
+	let baseSign, baseDecSep, baseThousandSep, displayDecSep, displayThousandSep, disclosureText;
+	let converting = false;
+
+	/** Loads the current display settings and reports whether anything needs converting. */
+	function readConfig() {
+		const cfg = window.fchubMcConfig || {};
+		const parsedDecimals = parseInt(cfg.decimals, 10);
+
+		rate = parseFloat(cfg.rate || "1");
+		decimals = Math.max(0, Math.min(20, Number.isNaN(parsedDecimals) ? 2 : parsedDecimals));
+		symbol = cfg.symbol || cfg.displayCurrency;
+		position = cfg.position || "left";
+		roundingMode = cfg.roundingMode || "half_up";
+		displayCode = cfg.displayCurrency;
+		baseCode = cfg.baseCurrencyCode || cfg.baseCurrency;
+		baseSign = cfg.baseCurrencySign || "$";
+		baseDecSep = cfg.baseDecimalSep || ".";
+		baseThousandSep = cfg.baseThousandSep || ",";
+		displayDecSep = cfg.displayDecSep || ".";
+		displayThousandSep = typeof cfg.displayThousandSep === "string" ? cfg.displayThousandSep : ",";
+		disclosureText = cfg.disclosureText || "";
+
+		buildPriceRegexes();
+		converting = Boolean(displayCode) && Boolean(baseCode) && displayCode !== baseCode
+			&& Number.isFinite(rate) && rate > 0 && rate !== 1;
+
+		return converting;
 	}
-
-	const contextReady = window.fchubMcContextReady;
-	if (contextReady && typeof contextReady.then === "function") {
-		await contextReady;
-	}
-
-	document.documentElement.classList.add("fchub-mc-projecting");
-	projectionShieldTimeout = setTimeout(releaseProjectionShield, 2000);
-
-	const cfg = window.fchubMcConfig || {};
-	const rate = parseFloat(cfg.rate || "1");
-
-	// Bail out if no conversion needed
-	if (
-		!cfg.displayCurrency
-		|| !cfg.baseCurrency
-		|| cfg.isBaseDisplay
-		|| cfg.displayCurrency === cfg.baseCurrency
-		|| !rate
-		|| !Number.isFinite(rate)
-		|| rate === 1
-	) {
-		releaseProjectionShield();
-		return;
-	}
-
-	// Display currency config
-	const parsedDecimals = parseInt(cfg.decimals, 10);
-	const decimals = Math.max(0, Math.min(20, Number.isNaN(parsedDecimals) ? 2 : parsedDecimals));
-	const symbol = cfg.symbol || cfg.displayCurrency;
-	const position = cfg.position || "left";
-	const roundingMode = cfg.roundingMode || "half_up";
-	const displayCode = cfg.displayCurrency;
-	const baseCode = cfg.baseCurrencyCode || cfg.baseCurrency;
-
-	// Base currency parsing config
-	const baseSign = cfg.baseCurrencySign || "$";
-	const baseDecSep = cfg.baseDecimalSep || ".";
-	const baseThousandSep = cfg.baseThousandSep || ",";
-
-	// Display currency formatting config (for output)
-	const displayDecSep = cfg.displayDecSep || ".";
-	const displayThousandSep = typeof cfg.displayThousandSep === "string"
-		? cfg.displayThousandSep
-		: ",";
 
 	// Flag to suppress MutationObserver during our own DOM changes
 	let projecting = false;
@@ -128,21 +105,24 @@
 	// Selector for the price filter currency sign (shop sidebar)
 	const CURRENCY_SIGN_SELECTOR = ".fct-shop-currency-sign";
 
-	// Build regex to strip the base currency sign (escaped for regex)
-	const escSign = baseSign.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const escCode = baseCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const stripRegex = new RegExp(`(${escSign}|${escCode})`, "g");
+	// Derived from the base-currency settings, so they are rebuilt whenever those
+	// are re-read rather than captured once at load.
+	let stripRegex, basePriceRegex;
 
-	// Regex to match a formatted base-currency price within a larger string.
-	// Captures the full price token (sign/code + digits + separators + decimals)
-	// so we can replace just that portion while preserving surrounding text.
-	const escThousandSep = baseThousandSep
-		? baseThousandSep.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-		: "";
-	const escDecSep = baseDecSep.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const basePriceRegex = new RegExp(
-		`(?:${escSign}|${escCode})?\\s*\\d[\\d${escThousandSep}]*(?:${escDecSep}\\d+)?\\s*(?:${escSign}|${escCode})?`,
-	);
+	function buildPriceRegexes() {
+		const escape = (value) => String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+		const escSign = escape(baseSign);
+		const escCode = escape(baseCode);
+		const escThousandSep = baseThousandSep ? escape(baseThousandSep) : "";
+		const escDecSep = escape(baseDecSep);
+
+		stripRegex = new RegExp(`(${escSign}|${escCode})`, "g");
+		// Captures the full price token (sign/code + digits + separators + decimals)
+		// so we replace just that portion and preserve the surrounding text.
+		basePriceRegex = new RegExp(
+			`(?:${escSign}|${escCode})?\\s*\\d[\\d${escThousandSep}]*(?:${escDecSep}\\d+)?\\s*(?:${escSign}|${escCode})?`,
+		);
+	}
 
 	const ATTR_PROJECTED = "data-fchub-mc-projected";
 	const ATTR_BASE = "data-fchub-mc-base";
@@ -484,16 +464,13 @@
 	 * Placed after checkout order summary and inside cart drawer.
 	 */
 	function injectDisclosures() {
-		if (cfg.disclosureEnabled === false) return;
-		const text =
-			cfg.disclosureText ||
-			`Prices shown in ${displayCode} are approximate. You will be charged in ${baseCode}.`;
+		if (!disclosureText) return;
 
 		const makeNotice = (extraClass) => {
 			const el = document.createElement("div");
 			el.className = DISCLOSURE_CLASS + (extraClass ? ` ${extraClass}` : "");
 			el.setAttribute(DISCLOSURE_ATTR, "1");
-			el.textContent = text;
+			el.textContent = disclosureText;
 			return el;
 		};
 
@@ -727,6 +704,8 @@
 	 * Main projection: find all price elements and convert them.
 	 */
 	function projectPrices(root) {
+		if (!converting) return;
+
 		root = root || document;
 		projecting = true;
 
@@ -756,7 +735,6 @@
 		}
 
 		injectDisclosures();
-		releaseProjectionShield();
 
 		setTimeout(() => {
 			projecting = false;
@@ -864,16 +842,39 @@
 		window.addEventListener("fchub_mc:context_changed", () => reproject(100));
 	}
 
-	// Initial projection
-	function init() {
+	/**
+	 * Shows every price in `code`, whether that is the first paint or the fifth
+	 * switch. Originals are restored before each pass, so switching is repeatable
+	 * and switching back to base is just a pass that converts nothing.
+	 *
+	 * The one owner of the price shield: nothing else may reveal amounts, because
+	 * nothing else knows they are finally correct.
+	 */
+	function applyCurrency(code) {
+		const cfg = window.fchubMcConfig || {};
+		const entry = (cfg.currencyTable || {})[code];
+		if (!entry) return false;
+
+		Object.assign(cfg, entry, { displayCurrency: code, isBaseDisplay: code === cfg.baseCurrency });
+
 		try {
-			projectPrices();
-			observeDynamicUpdates();
-			listenForFluentCartEvents();
+			clearProjectionMarkers(document);
+			readConfig();
+			projectPrices(document);
+			window.fchubMcSyncLabels?.(cfg);
 		} catch (error) {
-			console.error("[fchub-mc] Initial price projection failed:", error);
-			releaseProjectionShield();
+			console.error("[fchub-mc] Price projection failed:", error);
+		} finally {
+			document.documentElement.classList.remove("fchub-mc-pending");
 		}
+
+		return true;
+	}
+
+	function init() {
+		applyCurrency(window.fchubMc?.currentCurrency() || "");
+		observeDynamicUpdates();
+		listenForFluentCartEvents();
 	}
 
 	if (document.readyState === "loading") {
@@ -882,6 +883,6 @@
 		init();
 	}
 
-	// Expose for programmatic use
 	window.fchubMcProjectPrices = projectPrices;
+	window.fchubMcApplyCurrency = applyCurrency;
 })();

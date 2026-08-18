@@ -106,8 +106,9 @@ export async function runProjection({ config = {}, priceElements = [], selectors
 			return selectors[selector] ?? [];
 		},
 	};
-	const window = {
-		fchubMcConfig: {
+	// The runtime takes its display settings from the currency table now, the way a
+	// page does, so the fixture describes the same world rather than a shortcut.
+	const settings = {
 			baseCurrency: "USD",
 			baseCurrencyCode: "USD",
 			baseCurrencySign: "$",
@@ -124,6 +125,14 @@ export async function runProjection({ config = {}, priceElements = [], selectors
 			roundingMode: "half_up",
 			symbol: "€",
 			...config,
+	};
+	const displayCurrency = settings.displayCurrency;
+	const window = {
+		fchubMc: { currentCurrency: () => displayCurrency },
+		fchubMcConfig: {
+			...settings,
+			baseCurrency: settings.baseCurrency,
+			currencyTable: { [displayCurrency]: settings, ...(settings.currencyTable || {}) },
 		},
 		addEventListener(name, callback) {
 			const listeners = windowListeners.get(name) ?? [];

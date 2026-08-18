@@ -16,6 +16,33 @@ defined('ABSPATH') || exit;
  */
 final class CurrencyContextPresentation
 {
+    /**
+     * The translated sentences the browser needs to render a currency surface.
+     *
+     * Placeholders stay intact; the browser fills them from the currency table.
+     * These ship once per page. The pre-rendered variants below still serve the
+     * REST response, where one request pays for one context — carrying them in
+     * every cached document instead would cost 3113 bytes per currency to deliver
+     * the single variant a block asks for.
+     *
+     * @return array<string, string>
+     */
+    public static function templates(): array
+    {
+        return [
+            'rate' => __('1 %1$s = %2$s %3$s', 'fchub-multi-currency'),
+            'rateSentence' => __('Current rate: 1 %1$s = %2$s %3$s', 'fchub-multi-currency'),
+            'noticeCompact' => __('Viewing prices in %1$s. Checkout in %2$s.', 'fchub-multi-currency'),
+            'noticeFull' => __(
+                'Prices shown in %1$s are approximate. Checkout is charged in %2$s.',
+                'fchub-multi-currency',
+            ),
+            'switcherRateBase' => __('Base currency currently in use.', 'fchub-multi-currency'),
+            'switcherContext' => __('Display prices only. Checkout is charged in %s.', 'fchub-multi-currency'),
+            'switcherContextBase' => __('You are viewing the store base currency.', 'fchub-multi-currency'),
+        ];
+    }
+
     public static function renderCurrent(CurrencyContext $context, string $displayMode = 'flag_code'): string
     {
         $code = $context->displayCurrency->code;
@@ -152,7 +179,7 @@ final class CurrencyContextPresentation
             : '<span class="fchub-mc-inline-notice">' . $disclosure . '</span>';
     }
 
-    private static function renderRateBadge(CurrencyContext $context, OptionStore $optionStore): string
+    public static function renderRateBadge(CurrencyContext $context, OptionStore $optionStore): string
     {
         if ($context->isBaseDisplay || $optionStore->get('show_rate_freshness_badge', 'yes') !== 'yes') {
             return '';

@@ -84,9 +84,15 @@
     color: var(--fchub-mc-text);
     font: inherit;
     cursor: pointer;
+    /**
+     * Border and shadow only. Transitioning the background meant that whenever a
+     * theme had already painted this button — and this stylesheet then arrived, or
+     * a `:disabled` rule stopped applying — the change played out as a visible
+     * colour sweep rather than a repaint nobody notices. That sweep is the flicker
+     * reported on issue #72. Hover still reads as responsive without it.
+     */
     transition: border-color var(--fchub-mc-transition),
-                box-shadow var(--fchub-mc-transition),
-                background-color var(--fchub-mc-transition);
+                box-shadow var(--fchub-mc-transition);
     white-space: nowrap;
     line-height: 1.5;
 }

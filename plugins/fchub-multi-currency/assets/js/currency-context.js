@@ -1,193 +1,115 @@
 /**
- * FCHub Multi-Currency — Cached Context Recovery
+ * FCHub Multi-Currency — Currency Surfaces
  *
- * Repairs currency state when an edge cache serves shared HTML. Guest choices
- * are mirrored in local storage because some hosts do not vary pages by cookie.
+ * Paints the currency the browser resolved onto every surface that names one:
+ * both switcher variants, the context blocks, and the hidden checkout field.
+ *
+ * It owns no decision. `currency-bootstrap.js` decides which currency this
+ * visitor sees; this only makes the page say so.
  */
 (() => {
 	const config = window.fchubMcConfig || {};
-	const storageKey = config.cookieName || "fchub_mc_currency";
-	const recoveryDisabledControls = new Set();
-	let recoveryActive = false;
-	let recoveryCurrency = "";
 
 	function normalizeCode(value) {
 		const code = typeof value === "string" ? value.trim().toUpperCase() : "";
 		return /^[A-Z]{3}$/.test(code) ? code : "";
 	}
 
-	function allowedCodes() {
-		return Array.isArray(config.allowedCurrencyCodes)
-			? config.allowedCurrencyCodes.map(normalizeCode).filter(Boolean)
-			: [];
+	const templates = config.presentationTemplates || {};
+
+	/** Matches esc_html(), so a JS-rendered surface is byte-identical to the PHP one. */
+	function escapeHtml(value) {
+		return String(value ?? "")
+			.replaceAll("&", "&amp;")
+			.replaceAll("<", "&lt;")
+			.replaceAll(">", "&gt;")
+			.replaceAll('"', "&quot;")
+			.replaceAll("'", "&#039;");
 	}
 
-	function readCookie(name) {
-		if (!name) return "";
-
-		for (const part of document.cookie.split(";")) {
-			const separator = part.indexOf("=");
-			const key = separator >= 0 ? part.slice(0, separator).trim() : part.trim();
-			if (key !== name) continue;
-
-			try {
-				return decodeURIComponent(separator >= 0 ? part.slice(separator + 1) : "");
-			} catch {
-				return "";
-			}
-		}
-
-		return "";
+	/** Fills the `%1$s`-style placeholders WordPress translators rely on. */
+	function fill(template, values) {
+		let index = 0;
+		return String(template || "").replace(/%(?:(\d+)\$)?s/g, (_match, position) =>
+			String(values[position ? Number(position) - 1 : index++] ?? ""),
+		);
 	}
 
-	function readStoredPreference() {
-		try {
-			return window.localStorage.getItem(storageKey) || "";
-		} catch {
-			return "";
-		}
+	function entryFor(code) {
+		return (config.currencyTable || {})[code] || {};
 	}
 
-	function removeStoredPreference() {
-		try {
-			window.localStorage.removeItem(storageKey);
-		} catch {
-			// Cookie persistence remains available when browser storage is blocked.
-		}
-	}
+	function renderCurrent(code, mode) {
+		const entry = entryFor(code);
+		const wrap = (inner) => `<span class="fchub-mc-inline-current">${inner}</span>`;
+		const text = (value) => `<span class="fchub-mc-inline-current__text">${escapeHtml(value)}</span>`;
 
-	function writeStoredPreference(currency) {
-		const lifetimeDays = Math.max(1, Math.min(365, Number(config.cookieLifetimeDays) || 90));
-		const value = JSON.stringify({
-			currency,
-			expiresAt: Date.now() + lifetimeDays * 86400000,
-		});
-
-		try {
-			window.localStorage.setItem(storageKey, value);
-		} catch {
-			// Cookie persistence remains available when browser storage is blocked.
+		switch (mode) {
+			case "code":
+				return wrap(escapeHtml(code));
+			case "symbol":
+				return wrap(escapeHtml(entry.symbol));
+			case "name":
+				return wrap(escapeHtml(entry.displayCurrencyName));
+			case "flag_name":
+				return wrap((entry.flag || "") + text(entry.displayCurrencyName));
+			case "symbol_code":
+				return wrap(text(entry.symbol) + text(code));
+			default:
+				return wrap((entry.flag || "") + text(code));
 		}
 	}
 
-	function storedCurrency(codes) {
-		const raw = readStoredPreference();
-		if (!raw) return "";
+	function renderRate(code, precision, format) {
+		const digits = Math.max(0, Math.min(8, Number(precision) || 0));
+		const rate = Number(entryFor(code).rate || 1).toFixed(digits);
+		const template = format === "sentence" ? templates.rateSentence : templates.rate;
 
-		const legacyCode = normalizeCode(raw);
-		if (codes.includes(legacyCode)) {
-			writeStoredPreference(legacyCode);
-			return legacyCode;
-		}
-
-		try {
-			const value = JSON.parse(raw);
-			const code = normalizeCode(value?.currency);
-			const expiresAt = Number(value?.expiresAt);
-			if (codes.includes(code) && Number.isFinite(expiresAt) && expiresAt > Date.now()) return code;
-		} catch {
-			// Invalid browser data is discarded below.
-		}
-
-		removeStoredPreference();
-		return "";
+		return `<span class="fchub-mc-inline-rate">${escapeHtml(fill(template, [config.baseCurrency, rate, code]))}</span>`;
 	}
 
-	function persistBrowserPreference(value) {
-		const code = normalizeCode(value);
-		if (config.cookiePersistenceEnabled !== true) {
-			removeStoredPreference();
-			return;
+	function renderNotice(code, mode) {
+		if (mode === "checkout") {
+			const disclosure = entryFor(code).disclosureText;
+			return disclosure ? `<span class="fchub-mc-inline-notice">${disclosure}</span>` : "";
 		}
-		if (allowedCodes().includes(code)) writeStoredPreference(code);
+
+		const template = mode === "full" ? templates.noticeFull : templates.noticeCompact;
+		return `<span class="fchub-mc-inline-notice">${escapeHtml(fill(template, [code, config.baseCurrency]))}</span>`;
+	}
+
+	function switcherParts(code) {
+		const isBase = code === config.baseCurrency;
+		const context = (inner) => `<span class="fchub-mc-rate-context">${inner}</span>`;
+
+		return {
+			rateBadge: entryFor(code).rateBadge || "",
+			rateValue: context(
+				escapeHtml(
+					isBase
+						? templates.switcherRateBase
+						: fill(templates.rate, [config.baseCurrency, entryFor(code).rate, code]),
+				),
+			),
+			contextNote: context(
+				escapeHtml(
+					isBase
+						? templates.switcherContextBase
+						: fill(templates.switcherContext, [config.baseCurrency]),
+				),
+			),
+		};
 	}
 
 	function syncCheckoutCurrencyFields(root) {
 		if (!root || typeof root.querySelectorAll !== "function") return;
 
 		const code = normalizeCode(config.displayCurrency);
-		if (!allowedCodes().includes(code)) return;
+		if (!Object.hasOwn(config.currencyTable || {}, code)) return;
 
 		for (const field of root.querySelectorAll("[data-fchub-mc-checkout-currency]")) {
 			field.value = code;
 		}
-	}
-
-	function explicitUrlCurrency(codes) {
-		if (config.urlParamEnabled !== true || !config.urlParamKey) return "";
-
-		const params = new URLSearchParams(window.location.search || "");
-		const urlCode = normalizeCode(params.get(config.urlParamKey));
-		return codes.includes(urlCode) ? urlCode : "";
-	}
-
-	function stripConfirmedSwitchUrl(codes, confirmedCurrency) {
-		if (
-			config.cookiePersistenceEnabled !== true ||
-			config.urlParamEnabled !== true ||
-			!config.urlParamKey ||
-			typeof window.history?.replaceState !== "function"
-		) {
-			return;
-		}
-
-		try {
-			const url = new URL(window.location.href);
-			const urlCode = normalizeCode(url.searchParams.get(config.urlParamKey));
-			const confirmedCode = normalizeCode(confirmedCurrency);
-			if (
-				!codes.includes(urlCode) ||
-				confirmedCode !== urlCode ||
-				normalizeCode(config.displayCurrency) !== urlCode ||
-				storedCurrency(codes) !== urlCode
-			) {
-				return;
-			}
-
-			url.searchParams.delete(config.urlParamKey);
-			window.history.replaceState(window.history.state, "", url.toString());
-		} catch {
-			// URL cleanup is cosmetic; the resolved currency remains authoritative.
-		}
-	}
-
-	function recoveryRequest(codes) {
-		if (config.cookiePersistenceEnabled !== true) {
-			removeStoredPreference();
-		}
-
-		const urlCurrency = explicitUrlCurrency(codes);
-		if (urlCurrency !== "") {
-			return {
-				currency: urlCurrency,
-				cookieSnapshot: readCookie(config.cookieName),
-				storageSnapshot: readStoredPreference(),
-			};
-		}
-
-		if (config.cookiePersistenceEnabled !== true) return null;
-		if (config.resolverSource === "user_meta") return null;
-		if (config.isLoggedIn === true && config.accountPersistenceEnabled === true) return null;
-
-		const validStoredCode = storedCurrency(codes);
-
-		const rawCookie = readCookie(config.cookieName);
-		const cookieCode = normalizeCode(rawCookie);
-		const validCookieCode = codes.includes(cookieCode) ? cookieCode : "";
-		if (!validStoredCode && validCookieCode) writeStoredPreference(validCookieCode);
-
-		const currency = validStoredCode || validCookieCode;
-		const snapshots = {
-			cookieSnapshot: rawCookie,
-			storageSnapshot: readStoredPreference(),
-		};
-		if (currency !== "") {
-			return currency === normalizeCode(config.displayCurrency) ? null : { currency, ...snapshots };
-		}
-
-		return ["cookie", "url_param"].includes(config.resolverSource)
-			? { currency: "", ...snapshots }
-			: null;
 	}
 
 	function enabled(root, attribute) {
@@ -226,14 +148,10 @@
 		}
 
 		const flag = trigger.querySelector(".fchub-mc-switcher__flag");
-		const recoveredFlag = context.presentation?.flag;
-		if (flag && typeof recoveredFlag === "string") {
-			flag.innerHTML = recoveredFlag;
-			return;
-		}
+		if (!flag) return;
 
 		const selectedFlag = selected?.querySelector(".fchub-mc-switcher__flag");
-		if (flag && selectedFlag) flag.innerHTML = selectedFlag.innerHTML;
+		flag.innerHTML = entryFor(code).flag || selectedFlag?.innerHTML || "";
 	}
 
 	function syncSwitcherFooter(root, parts) {
@@ -256,100 +174,34 @@
 		}
 
 		syncTrigger(root.querySelector("[data-fchub-mc-trigger]"), context, selected);
-		syncSwitcherFooter(root, context.presentation?.switcher);
-	}
-
-	function setRecoveryControlState(control, busy) {
-		if (!control) return;
-
-		if (busy) {
-			if (control.disabled !== true) {
-				control.disabled = true;
-				recoveryDisabledControls.add(control);
-			}
-			return;
-		}
-
-		if (recoveryDisabledControls.has(control)) {
-			control.disabled = false;
-			recoveryDisabledControls.delete(control);
-		}
-	}
-
-	function setRecoveryRootState(root, className, busy) {
-		root.classList.toggle(className, busy);
-		if (busy) root.setAttribute("aria-busy", "true");
-		else root.removeAttribute("aria-busy");
-	}
-
-	function setRecoveryState(busy, currency = "") {
-		recoveryActive = busy;
-		if (busy && currency) recoveryCurrency = currency;
-		config.recoveryPending = busy;
-		document.documentElement.classList.toggle("fchub-mc-recovering", busy);
-
-		for (const root of document.querySelectorAll("[data-fchub-mc-switcher]")) {
-			setRecoveryRootState(root, "fchub-mc-switcher--loading", busy);
-			setRecoveryControlState(root.querySelector("[data-fchub-mc-trigger]"), busy);
-			if (busy && currency) syncSwitcher(root, { displayCurrency: currency });
-		}
-
-		for (const root of document.querySelectorAll("[data-fchub-mc-button-switcher]")) {
-			setRecoveryRootState(root, "fchub-mc-selector-buttons--loading", busy);
-			for (const button of root.querySelectorAll("[data-value]")) {
-				setRecoveryControlState(button, busy);
-				if (busy && currency) {
-					button.classList.toggle(
-						"is-active",
-						normalizeCode(button.getAttribute("data-value")) === currency,
-					);
-				}
-			}
-		}
-	}
-
-	function completeRecovery() {
-		if (!recoveryActive) return;
-		setRecoveryState(false);
-	}
-
-	function syncCurrentBlocks(presentation) {
-		for (const root of document.querySelectorAll("[data-fchub-mc-context-current]")) {
-			const mode = root.getAttribute("data-fchub-mc-context-current") || "flag_code";
-			if (typeof presentation.current?.[mode] === "string") {
-				root.innerHTML = presentation.current[mode];
-			}
-		}
-	}
-
-	function syncRateBlocks(context, presentation) {
-		for (const root of document.querySelectorAll("[data-fchub-mc-context-rate]")) {
-			const hide = enabled(root, "data-fchub-mc-hide-when-base") && context.isBaseDisplay;
-			const format = root.getAttribute("data-fchub-mc-context-rate") || "compact";
-			const precision = root.getAttribute("data-fchub-mc-rate-precision") || "4";
-			const fragment = presentation.rate?.[format]?.[precision];
-			if (hide) root.innerHTML = "";
-			else if (typeof fragment === "string") root.innerHTML = fragment;
-		}
-	}
-
-	function syncNoticeBlocks(context, presentation) {
-		for (const root of document.querySelectorAll("[data-fchub-mc-context-notice]")) {
-			const hide = enabled(root, "data-fchub-mc-hide-when-base") && context.isBaseDisplay;
-			const mode = root.getAttribute("data-fchub-mc-context-notice") || "compact";
-			const fragment = presentation.notice?.[mode];
-			if (hide) root.innerHTML = "";
-			else if (typeof fragment === "string") root.innerHTML = fragment;
-		}
+		syncSwitcherFooter(root, switcherParts(context.displayCurrency));
 	}
 
 	function syncContextBlocks(context) {
-		const presentation = context.presentation;
-		if (!presentation) return;
+		const code = context.displayCurrency;
+		const isBase = code === config.baseCurrency;
 
-		syncCurrentBlocks(presentation);
-		syncRateBlocks(context, presentation);
-		syncNoticeBlocks(context, presentation);
+		for (const root of document.querySelectorAll("[data-fchub-mc-context-current]")) {
+			root.innerHTML = renderCurrent(code, root.getAttribute("data-fchub-mc-context-current") || "flag_code");
+		}
+
+		for (const root of document.querySelectorAll("[data-fchub-mc-context-rate]")) {
+			const hide = enabled(root, "data-fchub-mc-hide-when-base") && isBase;
+			root.innerHTML = hide
+				? ""
+				: renderRate(
+						code,
+						root.getAttribute("data-fchub-mc-rate-precision") || "4",
+						root.getAttribute("data-fchub-mc-context-rate") || "compact",
+					);
+		}
+
+		for (const root of document.querySelectorAll("[data-fchub-mc-context-notice]")) {
+			const hide = enabled(root, "data-fchub-mc-hide-when-base") && isBase;
+			root.innerHTML = hide
+				? ""
+				: renderNotice(code, root.getAttribute("data-fchub-mc-context-notice") || "compact");
+		}
 	}
 
 	function applyContext(context) {
@@ -370,81 +222,13 @@
 		syncCheckoutCurrencyFields(document);
 	}
 
-	function isValidContext(context) {
-		if (!context || typeof context !== "object") return false;
-		const codes = allowedCodes();
-		const displayCode = normalizeCode(context.displayCurrency);
-		const baseCode = normalizeCode(context.baseCurrency);
-		const rate = Number(context.rate);
-
-		return (
-			codes.includes(displayCode) && codes.includes(baseCode) && Number.isFinite(rate) && rate > 0
-		);
-	}
-
-	async function recover() {
-		const codes = allowedCodes();
-		const request = recoveryRequest(codes);
-		if (!request) return config;
-		const currency = request.currency;
-		setRecoveryState(true, currency);
-
-		const restUrl = String(config.restUrl || "/wp-json/fchub-mc/v1").replace(/\/+$/, "");
-		const explicitCurrency = currency ? `currency=${encodeURIComponent(currency)}&` : "";
-		const endpoint = `${restUrl}/context?${explicitCurrency}_fchub_mc=${Date.now()}`;
-		const controller = typeof AbortController === "function" ? new AbortController() : null;
-		const timeout = controller ? setTimeout(() => controller.abort(), 15000) : null;
-
-		try {
-			const response = await fetch(endpoint, {
-				method: "GET",
-				credentials: "same-origin",
-				cache: "no-store",
-				headers: { Accept: "application/json" },
-				...(controller ? { signal: controller.signal } : {}),
-			});
-			const payload = await response.json();
-			const context = payload?.data?.context;
-
-			if (!response.ok || !isValidContext(context)) {
-				throw new Error(`Currency context recovery failed (HTTP ${response.status || 0}).`);
-			}
-			if (
-				readCookie(config.cookieName) !== request.cookieSnapshot ||
-				readStoredPreference() !== request.storageSnapshot
-			) {
-				applyContext(config);
-				return config;
-			}
-
-			Object.assign(config, context);
-			applyContext(context);
-			stripConfirmedSwitchUrl(codes, currency);
-		} catch (error) {
-			applyContext(config);
-			console.warn("[fchub-mc] Currency context recovery failed:", error);
-		} finally {
-			if (timeout !== null) clearTimeout(timeout);
-			recoveryCurrency = normalizeCode(config.displayCurrency);
-			if (config.projectionEnabled !== true) completeRecovery();
-		}
-
-		return config;
-	}
-
 	// Capture runs before FluentCart's form handler constructs FormData.
 	document.addEventListener("submit", (event) => syncCheckoutCurrencyFields(event.target), true);
-	window.fchubMcPersistBrowserPreference = persistBrowserPreference;
-	window.fchubMcCompleteRecovery = completeRecovery;
-	window.fchubMcContextReady = recover();
+	window.fchubMcSyncLabels = applyContext;
+
 	if (document.readyState === "loading") {
-		document.addEventListener(
-			"DOMContentLoaded",
-			() => {
-				applyContext(config);
-				if (recoveryActive) setRecoveryState(true, recoveryCurrency);
-			},
-			{ once: true },
-		);
+		document.addEventListener("DOMContentLoaded", () => applyContext(config), { once: true });
+	} else {
+		applyContext(config);
 	}
 })();
