@@ -1,0 +1,145 @@
+/**
+ * FCHub Multi-Currency — Display Currency Bootstrap
+ *
+ * Decides which currency this visitor sees, from the currency table the page
+ * already carries. The page itself is the same bytes for everyone, so nobody but
+ * the browser can answer this — and the browser can answer it without a request.
+ *
+ * Exposes `window.fchubMc.currentCurrency()` and `.setCurrency(code)`.
+ */
+(() => {
+	const config = window.fchubMcConfig || {};
+	const storageKey = config.cookieName || "fchub_mc_currency";
+	let current = "";
+
+	function normalizeCode(value) {
+		const code = typeof value === "string" ? value.trim().toUpperCase() : "";
+		return /^[A-Z]{3}$/.test(code) ? code : "";
+	}
+
+	function offered(code) {
+		return code !== "" && Object.hasOwn(config.currencyTable || {}, code);
+	}
+
+	function readCookie(name) {
+		if (!name) return "";
+
+		for (const part of document.cookie.split(";")) {
+			const separator = part.indexOf("=");
+			const key = separator >= 0 ? part.slice(0, separator).trim() : part.trim();
+			if (key !== name) continue;
+
+			try {
+				return decodeURIComponent(separator >= 0 ? part.slice(separator + 1) : "");
+			} catch {
+				return "";
+			}
+		}
+
+		return "";
+	}
+
+	/** Blocked storage is not an error; it is one fewer place to look for a preference. */
+	function optional(read) {
+		try {
+			return read() || "";
+		} catch {
+			return "";
+		}
+	}
+
+	function forget() {
+		optional(() => window.localStorage.removeItem(storageKey));
+	}
+
+	function remember(code) {
+		const days = Math.max(1, Math.min(365, Number(config.cookieLifetimeDays) || 90));
+		const entry = JSON.stringify({ currency: code, expiresAt: Date.now() + days * 86400000 });
+		optional(() => window.localStorage.setItem(storageKey, entry));
+	}
+
+	/** Reads the saved choice, migrating the bare code older versions wrote. */
+	function storedCurrency() {
+		const raw = optional(() => window.localStorage.getItem(storageKey));
+		if (!raw) return "";
+
+		const legacy = normalizeCode(raw);
+		if (offered(legacy)) {
+			remember(legacy);
+			return legacy;
+		}
+
+		try {
+			const saved = JSON.parse(raw);
+			const code = normalizeCode(saved?.currency);
+			if (offered(code) && Number(saved?.expiresAt) > Date.now()) return code;
+		} catch {
+			// Unreadable data is cleared below along with the expired and withdrawn.
+		}
+
+		forget();
+		return "";
+	}
+
+	/**
+	 * An explicit link wins for the page it was followed to, and only that page.
+	 * Adopting it would let anyone rewrite a stranger's saved preference by
+	 * sending them a URL.
+	 */
+	function urlCurrency() {
+		if (config.urlParamEnabled !== true || !config.urlParamKey) return "";
+
+		const params = new URLSearchParams(window.location.search || "");
+		const code = normalizeCode(params.get(config.urlParamKey));
+		return offered(code) ? code : "";
+	}
+
+	function accountCurrency() {
+		if (config.isLoggedIn !== true) return "";
+
+		const code = normalizeCode(config.accountCurrency);
+		return offered(code) ? code : "";
+	}
+
+	/** Mirrors the server's resolver order, so a page and its scripts never disagree. */
+	function resolve() {
+		if (config.cookiePersistenceEnabled !== true) forget();
+
+		const cookie = normalizeCode(readCookie(config.cookieName));
+		const fallback = normalizeCode(config.defaultCurrency);
+		const base = normalizeCode(config.baseCurrency);
+
+		return (
+			urlCurrency() ||
+			storedCurrency() ||
+			accountCurrency() ||
+			(offered(cookie) ? cookie : "") ||
+			(offered(fallback) ? fallback : "") ||
+			(offered(base) ? base : "")
+		);
+	}
+
+	/**
+	 * Hide amounts only where they are about to change. A visitor already on the
+	 * base currency has nothing to convert and must never wait behind a shield.
+	 */
+	function shieldPrices(code) {
+		const needed = config.projectionEnabled === true && code !== normalizeCode(config.baseCurrency);
+		document.documentElement.classList.toggle("fchub-mc-pending", needed);
+	}
+
+	current = resolve();
+	shieldPrices(current);
+
+	window.fchubMc = {
+		currentCurrency: () => current,
+		setCurrency: (value) => {
+			const code = normalizeCode(value);
+			if (!offered(code)) return false;
+
+			current = code;
+			if (config.cookiePersistenceEnabled === true) remember(code);
+			return true;
+		},
+	};
+})();
