@@ -455,9 +455,9 @@
 		// ("300.00zł per year for 12 cycles + 100.00zł one-time setup fee").
 		const paymentType = el.querySelector(".fct-product-payment-type");
 		const count =
-			projectComparePrice(el)
-			+ convertTextNodes(el.childNodes, replaceInlinePrice)
-			+ (paymentType ? convertTextNodes(paymentType.childNodes, replaceAllInlinePrices) : 0);
+			projectComparePrice(el) +
+			convertTextNodes(el.childNodes, replaceInlinePrice) +
+			(paymentType ? convertTextNodes(paymentType.childNodes, replaceAllInlinePrices) : 0);
 
 		if (count > 0) {
 			el.setAttribute(ATTR_PROJECTED, "1");

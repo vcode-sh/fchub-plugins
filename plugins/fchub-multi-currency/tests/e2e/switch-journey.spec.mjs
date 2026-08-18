@@ -272,6 +272,67 @@ for (const { name, lateAssetLatencyMs, themeDisabledBackground } of PAINT_CASES)
 }
 
 /**
+ * Dropdown placement had no test at all, which only became uncomfortable once the
+ * function that decides it was split apart. It is pure geometry — where there is
+ * room, which side was asked for, does the preferred side fit — so it needs a real
+ * viewport to mean anything, and this lane is the only place with one.
+ */
+test.describe("dropdown placement", () => {
+	async function openAt(page, origin, offsetFromTop) {
+		await page.goto(`${origin.url}/pricing`, { waitUntil: "load" });
+		await page.evaluate((top) => {
+			const slot = document.querySelector(".switcher-slot");
+			slot.style.position = "absolute";
+			slot.style.top = `${top}px`;
+			document.body.style.minHeight = "3000px";
+		}, offsetFromTop);
+
+		await page.locator("[data-fchub-mc-trigger]").click();
+
+		return page.evaluate(() => {
+			const root = document.querySelector("[data-fchub-mc-switcher]");
+			const dropdown = document.querySelector("[data-fchub-mc-dropdown]");
+			const r = dropdown.getBoundingClientRect();
+			const anchor = root.getBoundingClientRect();
+			return { left: r.left, right: r.right, openedUpward: r.bottom <= anchor.top + 4, height: r.height };
+		});
+	}
+
+	test("opens downward with room below and upward without", async ({ page }) => {
+		await using origin = await startHostileOrigin({ queryStringMode: "ignored" });
+
+		const nearTop = await openAt(page, origin, 20);
+		expect(nearTop.height, "The dropdown should actually be laid out.").toBeGreaterThan(0);
+		expect(nearTop.openedUpward, "With the whole viewport below it, it opens downward.").toBe(false);
+
+		const nearBottom = await openAt(page, origin, 700);
+		expect(nearBottom.openedUpward, "Pinned near the fold, it opens upward instead.").toBe(true);
+	});
+
+	test("stays inside the viewport horizontally", async ({ page }) => {
+		await using origin = await startHostileOrigin({ queryStringMode: "ignored" });
+
+		await page.goto(`${origin.url}/pricing`, { waitUntil: "load" });
+		await page.evaluate(() => {
+			const slot = document.querySelector(".switcher-slot");
+			slot.style.position = "absolute";
+			// Hard against the right edge, where a naive left-align overflows.
+			slot.style.right = "0px";
+			slot.style.top = "20px";
+		});
+		await page.locator("[data-fchub-mc-trigger]").click();
+
+		const box = await page.evaluate(() => {
+			const r = document.querySelector("[data-fchub-mc-dropdown]").getBoundingClientRect();
+			return { left: r.left, right: r.right, viewportWidth: window.innerWidth };
+		});
+
+		expect(box.left, "A dropdown off the left edge is unreachable.").toBeGreaterThanOrEqual(0);
+		expect(box.right, "A dropdown off the right edge is unreachable.").toBeLessThanOrEqual(box.viewportWidth);
+	});
+});
+
+/**
  * A design assertion, free of any optimizer model: every CSS rule the plugin needs
  * during the correction window keys off a class that its own JavaScript adds at
  * runtime, so those classes are absent from the served HTML. Any tool that

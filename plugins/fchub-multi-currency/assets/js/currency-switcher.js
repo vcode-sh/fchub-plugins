@@ -192,6 +192,64 @@
 			});
 	}
 
+	/**
+	 * Where the dropdown opens, as two independent questions.
+	 *
+	 * Each asks the same three things — what did the shortcode ask for, how much room
+	 * is there, and does the preferred side actually fit — but about a different axis.
+	 * Answering both in one function meant nine branches and no name for either.
+	 */
+	function preferredSide(root, startClass, endClass, startName, endName) {
+		if (root.classList.contains(startClass)) return startName;
+		if (root.classList.contains(endClass)) return endName;
+		return "auto";
+	}
+
+	function chooseVertical(root, rootRect, dropdownHeight, padding) {
+		const preferred = preferredSide(
+			root,
+			"fchub-mc-switcher--direction-up",
+			"fchub-mc-switcher--direction-down",
+			"up",
+			"down",
+		);
+		const room = {
+			down: window.innerHeight - rootRect.bottom - padding,
+			up: rootRect.top - padding,
+		};
+
+		if (preferred === "auto") return room.down >= room.up ? "down" : "up";
+
+		// Honour the request unless it plainly does not fit and the other side does.
+		const opposite = preferred === "up" ? "down" : "up";
+		const doesNotFit = room[preferred] < dropdownHeight && room[opposite] > room[preferred];
+		return doesNotFit ? opposite : preferred;
+	}
+
+	function chooseLeft(root, rootRect, width, padding) {
+		const preferred = preferredSide(
+			root,
+			"fchub-mc-switcher--dropdown-start",
+			"fchub-mc-switcher--dropdown-end",
+			"start",
+			"end",
+		);
+		const start = rootRect.left;
+		const end = rootRect.right - width;
+		const overflow = (left) =>
+			Math.max(0, padding - left) + Math.max(0, left + width - (window.innerWidth - padding));
+
+		const first = preferred === "end" ? end : start;
+		const alternate = preferred === "start" ? end : preferred === "end" ? start : end;
+		const chosen =
+			preferred === "auto" || overflow(alternate) < overflow(first) ? alternate : first;
+
+		return Math.min(
+			Math.max(chosen, padding),
+			Math.max(padding, window.innerWidth - padding - width),
+		);
+	}
+
 	function initSwitcher(root) {
 		if (root.hasAttribute("data-fchub-mc-enhanced")) {
 			return;
@@ -230,42 +288,8 @@
 
 			const rootRect = root.getBoundingClientRect();
 			const dropdownRect = dropdown.getBoundingClientRect();
-			const preferredHorizontal = root.classList.contains("fchub-mc-switcher--dropdown-start")
-				? "start"
-				: root.classList.contains("fchub-mc-switcher--dropdown-end")
-					? "end"
-					: "auto";
-			const preferredVertical = root.classList.contains("fchub-mc-switcher--direction-up")
-				? "up"
-				: root.classList.contains("fchub-mc-switcher--direction-down")
-					? "down"
-					: "auto";
 
-			const availableDown = window.innerHeight - rootRect.bottom - viewportPadding;
-			const availableUp = rootRect.top - viewportPadding;
-
-			let vertical =
-				preferredVertical === "auto"
-					? availableDown >= availableUp
-						? "down"
-						: "up"
-					: preferredVertical;
-			if (
-				preferredVertical === "down" &&
-				availableDown < dropdownRect.height &&
-				availableUp > availableDown
-			) {
-				vertical = "up";
-			}
-			if (
-				preferredVertical === "up" &&
-				availableUp < dropdownRect.height &&
-				availableDown > availableUp
-			) {
-				vertical = "down";
-			}
-
-			if (vertical === "up") {
+			if (chooseVertical(root, rootRect, dropdownRect.height, viewportPadding) === "up") {
 				dropdown.style.top = "auto";
 				dropdown.style.bottom = "calc(100% + 4px)";
 			} else {
@@ -273,38 +297,8 @@
 				dropdown.style.bottom = "auto";
 			}
 
-			const width = dropdownRect.width;
-			const candidateStart = rootRect.left;
-			const candidateEnd = rootRect.right - width;
-
-			function overflowScore(left) {
-				const overflowLeft = Math.max(0, viewportPadding - left);
-				const overflowRight = Math.max(0, left + width - (window.innerWidth - viewportPadding));
-				return overflowLeft + overflowRight;
-			}
-
-			let left =
-				preferredHorizontal === "start"
-					? candidateStart
-					: preferredHorizontal === "end"
-						? candidateEnd
-						: candidateStart;
-			const alternateLeft =
-				preferredHorizontal === "start"
-					? candidateEnd
-					: preferredHorizontal === "end"
-						? candidateStart
-						: candidateEnd;
-			if (preferredHorizontal === "auto" || overflowScore(alternateLeft) < overflowScore(left)) {
-				left = alternateLeft;
-			}
-
-			const clampedLeft = Math.min(
-				Math.max(left, viewportPadding),
-				Math.max(viewportPadding, window.innerWidth - viewportPadding - width),
-			);
-
-			dropdown.style.left = `${clampedLeft - rootRect.left}px`;
+			const left = chooseLeft(root, rootRect, dropdownRect.width, viewportPadding);
+			dropdown.style.left = `${left - rootRect.left}px`;
 			dropdown.style.right = "auto";
 		}
 
@@ -383,6 +377,40 @@
 			}
 		}
 
+		/** Moves the active marker from whichever option held it to this one. */
+		function markActive(target) {
+			const previous = listbox.querySelector(".fchub-mc-switcher__option--active");
+			if (previous) {
+				previous.classList.remove("fchub-mc-switcher__option--active");
+				previous.setAttribute("aria-selected", "false");
+			}
+
+			target.classList.add("fchub-mc-switcher__option--active");
+			target.setAttribute("aria-selected", "true");
+			return previous;
+		}
+
+		/** Copies the chosen option's flag and labels onto the closed trigger. */
+		function paintTrigger(target, value) {
+			const flag = trigger.querySelector(".fchub-mc-switcher__flag");
+			if (flag) {
+				const image = buildFlagImg(value);
+				if (image) {
+					flag.textContent = "";
+					flag.appendChild(image);
+				} else {
+					const optionFlag = target.querySelector(".fchub-mc-switcher__flag");
+					if (optionFlag) flag.innerHTML = optionFlag.innerHTML;
+				}
+			}
+
+			for (const part of ["code", "symbol", "name"]) {
+				const destination = trigger.querySelector(`.fchub-mc-switcher__${part}`);
+				const source = target.querySelector(`.fchub-mc-switcher__option-${part}`);
+				if (destination && source) destination.textContent = source.textContent;
+			}
+		}
+
 		function selectOption(index) {
 			const items = options().filter((option) => option.style.display !== "none");
 			const target = items[index];
@@ -390,43 +418,8 @@
 
 			const value = target.dataset.value;
 			const previousTriggerState = captureTriggerState();
-			const currentActive = listbox.querySelector(".fchub-mc-switcher__option--active");
-			if (currentActive) {
-				currentActive.classList.remove("fchub-mc-switcher__option--active");
-				currentActive.setAttribute("aria-selected", "false");
-			}
-			target.classList.add("fchub-mc-switcher__option--active");
-			target.setAttribute("aria-selected", "true");
-
-			// Update trigger display
-			const triggerFlag = trigger.querySelector(".fchub-mc-switcher__flag");
-			const triggerCode = trigger.querySelector(".fchub-mc-switcher__code");
-			const triggerSymbol = trigger.querySelector(".fchub-mc-switcher__symbol");
-			const triggerName = trigger.querySelector(".fchub-mc-switcher__name");
-			const optionCode = target.querySelector(".fchub-mc-switcher__option-code");
-			const optionSymbol = target.querySelector(".fchub-mc-switcher__option-symbol");
-			const optionName = target.querySelector(".fchub-mc-switcher__option-name");
-			if (triggerFlag) {
-				const flagImg = buildFlagImg(value);
-				if (flagImg) {
-					triggerFlag.textContent = "";
-					triggerFlag.appendChild(flagImg);
-				} else {
-					const optionFlag = target.querySelector(".fchub-mc-switcher__flag");
-					if (optionFlag) {
-						triggerFlag.innerHTML = optionFlag.innerHTML;
-					}
-				}
-			}
-			if (triggerCode && optionCode) {
-				triggerCode.textContent = optionCode.textContent;
-			}
-			if (triggerSymbol && optionSymbol) {
-				triggerSymbol.textContent = optionSymbol.textContent;
-			}
-			if (triggerName && optionName) {
-				triggerName.textContent = optionName.textContent;
-			}
+			const currentActive = markActive(target);
+			paintTrigger(target, value);
 
 			close();
 			switchCurrency(value, {
