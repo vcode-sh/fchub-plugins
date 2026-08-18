@@ -1,0 +1,15 @@
+{
+  "name": "fchub-multi-currency",
+  "private": true,
+  "version": "1.4.7",
+  "type": "module",
+  "description": "Test tooling for the FCHub Multi-Currency plugin. Not shipped; excluded by .distignore.",
+  "scripts": {
+    "test": "node --test tests/js/*.test.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:report": "playwright show-report tests/e2e/.report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}

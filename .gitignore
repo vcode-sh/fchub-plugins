@@ -34,6 +34,10 @@ Thumbs.db
 /plugins/*/test-results/
 /plugins/*/playwright-report/
 /plugins/*/blob-report/
+# Browser-lane artefacts: regenerated on every run, never evidence on their own.
+/plugins/*/tests/e2e/.output/
+/plugins/*/tests/e2e/.report/
+/plugins/*/tests/e2e/.fixture/
 /fluentcart-mcp/test-results/
 /.playwright-cli/
 
