@@ -12,6 +12,7 @@
  */
 
 (() => {
+	var { __, _n, sprintf } = window.wp.i18n;
 	var config = window.fchubMcAdmin || {};
 	var flagBaseUrl = config.flag_base_url || "";
 	var flagMap = config.flag_map || {};
@@ -20,9 +21,24 @@
 	var PREVIEW_MAX = 4;
 
 	var FALLBACK_CURRENCIES = [
-		{ code: "USD", name: "US Dollar", symbol: "$", flagUrl: `${flagBaseUrl}us.svg` },
-		{ code: "EUR", name: "Euro", symbol: "€", flagUrl: `${flagBaseUrl}eu.svg` },
-		{ code: "GBP", name: "British Pound", symbol: "£", flagUrl: `${flagBaseUrl}gb.svg` },
+		{
+			code: "USD",
+			name: __("US Dollar", "fchub-multi-currency"),
+			symbol: "$",
+			flagUrl: `${flagBaseUrl}us.svg`,
+		},
+		{
+			code: "EUR",
+			name: __("Euro", "fchub-multi-currency"),
+			symbol: "€",
+			flagUrl: `${flagBaseUrl}eu.svg`,
+		},
+		{
+			code: "GBP",
+			name: __("British Pound", "fchub-multi-currency"),
+			symbol: "£",
+			flagUrl: `${flagBaseUrl}gb.svg`,
+		},
 	];
 
 	function mapCurrency(c) {
@@ -43,16 +59,16 @@
 
 	// Mirrors human_time_diff: one-minute floor, largest sensible unit.
 	var TIME_TIERS = [
-		[3600, 60, "minute"],
-		[86400, 3600, "hour"],
-		[604800, 86400, "day"],
-		[Infinity, 604800, "week"],
+		[3600, 60, (count) => _n("%s minute", "%s minutes", count, "fchub-multi-currency")],
+		[86400, 3600, (count) => _n("%s hour", "%s hours", count, "fchub-multi-currency")],
+		[604800, 86400, (count) => _n("%s day", "%s days", count, "fchub-multi-currency")],
+		[Infinity, 604800, (count) => _n("%s week", "%s weeks", count, "fchub-multi-currency")],
 	];
 
 	function timeAgo(ageSeconds) {
 		var tier = TIME_TIERS.find(([limit]) => ageSeconds < limit);
 		var count = Math.max(1, Math.round(ageSeconds / tier[1]));
-		return `${count} ${tier[2]}${count === 1 ? "" : "s"}`;
+		return sprintf(tier[2](count), count);
 	}
 
 	window.FchubMcSwitcherPreview = {
@@ -96,6 +112,17 @@
 			isTruncated: function () {
 				return this.totalCurrencyCount > PREVIEW_MAX;
 			},
+			truncationNote: function () {
+				return sprintf(
+					// translators: %1$s is the number of currencies shown, %2$s the total configured.
+					__(
+						"Showing %1$s of %2$s currencies. The full list appears on the frontend — this is just a taste.",
+						"fchub-multi-currency",
+					),
+					this.sortedCurrencies.length,
+					this.totalCurrencyCount,
+				);
+			},
 			widgetClass: function () {
 				var cls = "fchub-mc-switcher fchub-mc-switcher--preview-open";
 				var preset = this.s.preset || "default";
@@ -133,18 +160,29 @@
 				});
 				if (newest === null) return null;
 				var age = Math.max(0, Math.round((Date.now() - newest) / 1000));
-				return `Rates updated ${timeAgo(age)} ago`;
+				return sprintf(__("Rates updated %s ago", "fchub-multi-currency"), timeAgo(age));
 			},
 			rateLine: function () {
 				var row = (this.rates || [])[0];
 				if (!row?.base_currency || !row.rate || !row.quote_currency) return null;
-				return `1 ${row.base_currency} = ${row.rate} ${row.quote_currency}`;
+				return sprintf(
+					__("1 %1$s = %2$s %3$s", "fchub-multi-currency"),
+					row.base_currency,
+					row.rate,
+					row.quote_currency,
+				);
 			},
 			contextNote: function () {
 				var base = (this.rates || [])[0]?.base_currency;
 				return base
-					? `Display prices only. Checkout charged in ${base}.`
-					: "Display prices only. Checkout is charged in the store currency.";
+					? sprintf(
+							__("Display prices only. Checkout charged in %s.", "fchub-multi-currency"),
+							base,
+						)
+					: __(
+							"Display prices only. Checkout is charged in the store currency.",
+							"fchub-multi-currency",
+						);
 			},
 			hasFooter: function () {
 				return (
@@ -164,8 +202,10 @@
 		template:
 			'\
 <div class="fchub-mc-admin-preview">\
-	<div class="fchub-mc-admin-preview__header">Preview</div>\
-	<div v-if="isTruncated" class="fchub-mc-admin-preview__note">Showing {{ sortedCurrencies.length }} of {{ totalCurrencyCount }} currencies. The full list appears on the frontend — this is just a taste.</div>\
+	<div class="fchub-mc-admin-preview__header">' +
+			__("Preview", "fchub-multi-currency") +
+			'</div>\
+	<div v-if="isTruncated" class="fchub-mc-admin-preview__note">{{ truncationNote }}</div>\
 	<div :class="stageClass">\
 		<span v-if="label && labelFirst" class="fchub-mc-switcher__label">{{ label }}</span>\
 		<span :class="widgetClass">\
@@ -178,7 +218,9 @@
 			</button>\
 			<span class="fchub-mc-switcher__dropdown">\
 				<span v-if="s.search_mode===\'inline\'" class="fchub-mc-switcher__search-wrap">\
-					<input type="search" class="fchub-mc-switcher__search" disabled placeholder="Search currency" />\
+					<input type="search" class="fchub-mc-switcher__search" disabled placeholder="' +
+			__("Search currency", "fchub-multi-currency") +
+			'" />\
 				</span>\
 				<span class="fchub-mc-switcher__list" role="listbox">\
 					<span v-for="(c, i) in sortedCurrencies" :key="c.code" :class="optionClass(c, i)" role="option">\

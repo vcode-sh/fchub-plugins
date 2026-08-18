@@ -17,11 +17,11 @@ enum ResolverSource: string
     public function label(): string
     {
         return match ($this) {
-            self::UrlParam => 'URL parameter',
-            self::UserMeta => 'User preference',
-            self::Cookie   => 'Cookie (guest)',
-            self::Geo      => 'Geolocation',
-            self::Fallback => 'Store default',
+            self::UrlParam => __('URL parameter', 'fchub-multi-currency'),
+            self::UserMeta => __('User preference', 'fchub-multi-currency'),
+            self::Cookie   => __('Cookie (guest)', 'fchub-multi-currency'),
+            self::Geo      => __('Geolocation', 'fchub-multi-currency'),
+            self::Fallback => __('Store default', 'fchub-multi-currency'),
         };
     }
 }

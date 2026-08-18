@@ -7,6 +7,7 @@
  */
 
 (() => {
+	const { __ } = window.wp.i18n;
 	window.FchubMcAdmin = window.FchubMcAdmin || {};
 	window.FchubMcAdmin.components = window.FchubMcAdmin.components || {};
 	const components = window.FchubMcAdmin.components;
@@ -43,126 +44,238 @@
     <switcher-preview :settings="switcherDefaults" :currencies="settings.display_currencies" :rates="rates" />\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Default Preset</span>\
-            <div class="form-note">Visual style used by switcher blocks that inherit global defaults.</div>\
+            <span class="setting-label">' +
+			__("Default Preset", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__(
+				"Visual style used by switcher blocks that inherit global defaults.",
+				"fchub-multi-currency",
+			) +
+			'</div>\
         </div>\
         <div class="setting-fields-inner">\
             <el-select v-model="switcherDefaults.preset" style="max-width:260px">\
-                <el-option label="Default" value="default" />\
-                <el-option label="Pill" value="pill" />\
-                <el-option label="Minimal" value="minimal" />\
-                <el-option label="Subtle" value="subtle" />\
-                <el-option label="Glass" value="glass" />\
-                <el-option label="Contrast" value="contrast" />\
+                <el-option label="' +
+			__("Default", "fchub-multi-currency") +
+			'" value="default" />\
+                <el-option label="' +
+			__("Pill", "fchub-multi-currency") +
+			'" value="pill" />\
+                <el-option label="' +
+			__("Minimal", "fchub-multi-currency") +
+			'" value="minimal" />\
+                <el-option label="' +
+			__("Subtle", "fchub-multi-currency") +
+			'" value="subtle" />\
+                <el-option label="' +
+			__("Glass", "fchub-multi-currency") +
+			'" value="glass" />\
+                <el-option label="' +
+			__("Contrast", "fchub-multi-currency") +
+			'" value="contrast" />\
             </el-select>\
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Label Position</span>\
-            <div class="form-note">Where the optional label should sit relative to the switcher.</div>\
+            <span class="setting-label">' +
+			__("Label Position", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__("Where the optional label should sit relative to the switcher.", "fchub-multi-currency") +
+			'</div>\
         </div>\
         <div class="setting-fields-inner">\
             <el-select v-model="switcherDefaults.label_position" style="max-width:260px">\
-                <el-option label="Before" value="before" />\
-                <el-option label="After" value="after" />\
-                <el-option label="Above" value="above" />\
-                <el-option label="Below" value="below" />\
+                <el-option label="' +
+			__("Before", "fchub-multi-currency") +
+			'" value="before" />\
+                <el-option label="' +
+			__("After", "fchub-multi-currency") +
+			'" value="after" />\
+                <el-option label="' +
+			__("Above", "fchub-multi-currency") +
+			'" value="above" />\
+                <el-option label="' +
+			__("Below", "fchub-multi-currency") +
+			'" value="below" />\
             </el-select>\
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
-    <h3 style="font-size:14px;font-weight:600;margin:16px 0 12px">Trigger Content</h3>\
+    <h3 style="font-size:14px;font-weight:600;margin:16px 0 12px">' +
+			__("Trigger Content", "fchub-multi-currency") +
+			'</h3>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Trigger Elements</span>\
-            <div class="form-note">Choose what appears in the closed switcher button.</div>\
+            <span class="setting-label">' +
+			__("Trigger Elements", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__("Choose what appears in the closed switcher button.", "fchub-multi-currency") +
+			'</div>\
         </div>\
         <div class="setting-fields-inner fchub-mc-switcher-toggle-grid">\
-            <el-switch v-model="switcherDefaults.show_flag" active-value="yes" inactive-value="no" active-text="Flag" />\
-            <el-switch v-model="switcherDefaults.show_code" active-value="yes" inactive-value="no" active-text="Code" />\
-            <el-switch v-model="switcherDefaults.show_symbol" active-value="yes" inactive-value="no" active-text="Symbol" />\
-            <el-switch v-model="switcherDefaults.show_name" active-value="yes" inactive-value="no" active-text="Name" />\
+            <el-switch v-model="switcherDefaults.show_flag" active-value="yes" inactive-value="no" active-text="' +
+			__("Flag", "fchub-multi-currency") +
+			'" />\
+            <el-switch v-model="switcherDefaults.show_code" active-value="yes" inactive-value="no" active-text="' +
+			__("Code", "fchub-multi-currency") +
+			'" />\
+            <el-switch v-model="switcherDefaults.show_symbol" active-value="yes" inactive-value="no" active-text="' +
+			__("Symbol", "fchub-multi-currency") +
+			'" />\
+            <el-switch v-model="switcherDefaults.show_name" active-value="yes" inactive-value="no" active-text="' +
+			__("Name", "fchub-multi-currency") +
+			'" />\
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
-    <h3 style="font-size:14px;font-weight:600;margin:16px 0 12px">Dropdown Content</h3>\
+    <h3 style="font-size:14px;font-weight:600;margin:16px 0 12px">' +
+			__("Dropdown Content", "fchub-multi-currency") +
+			'</h3>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Option Elements</span>\
-            <div class="form-note">Choose what each currency row displays inside the dropdown.</div>\
+            <span class="setting-label">' +
+			__("Option Elements", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__("Choose what each currency row displays inside the dropdown.", "fchub-multi-currency") +
+			'</div>\
         </div>\
         <div class="setting-fields-inner fchub-mc-switcher-toggle-grid">\
-            <el-switch v-model="switcherDefaults.show_option_flags" active-value="yes" inactive-value="no" active-text="Flags" />\
-            <el-switch v-model="switcherDefaults.show_option_codes" active-value="yes" inactive-value="no" active-text="Codes" />\
-            <el-switch v-model="switcherDefaults.show_option_symbols" active-value="yes" inactive-value="no" active-text="Symbols" />\
-            <el-switch v-model="switcherDefaults.show_option_names" active-value="yes" inactive-value="no" active-text="Names" />\
-            <el-switch v-model="switcherDefaults.show_active_indicator" active-value="yes" inactive-value="no" active-text="Active check" />\
+            <el-switch v-model="switcherDefaults.show_option_flags" active-value="yes" inactive-value="no" active-text="' +
+			__("Flags", "fchub-multi-currency") +
+			'" />\
+            <el-switch v-model="switcherDefaults.show_option_codes" active-value="yes" inactive-value="no" active-text="' +
+			__("Codes", "fchub-multi-currency") +
+			'" />\
+            <el-switch v-model="switcherDefaults.show_option_symbols" active-value="yes" inactive-value="no" active-text="' +
+			__("Symbols", "fchub-multi-currency") +
+			'" />\
+            <el-switch v-model="switcherDefaults.show_option_names" active-value="yes" inactive-value="no" active-text="' +
+			__("Names", "fchub-multi-currency") +
+			'" />\
+            <el-switch v-model="switcherDefaults.show_active_indicator" active-value="yes" inactive-value="no" active-text="' +
+			__("Active check", "fchub-multi-currency") +
+			'" />\
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Search Mode</span>\
-            <div class="form-note">Useful when you expose more than a handful of currencies.</div>\
+            <span class="setting-label">' +
+			__("Search Mode", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__("Useful when you expose more than a handful of currencies.", "fchub-multi-currency") +
+			'</div>\
         </div>\
         <div class="setting-fields-inner">\
             <el-radio-group v-model="switcherDefaults.search_mode">\
-                <el-radio label="Off" value="off" />\
-                <el-radio label="Inline search" value="inline" />\
+                <el-radio label="' +
+			__("Off", "fchub-multi-currency") +
+			'" value="off" />\
+                <el-radio label="' +
+			__("Inline search", "fchub-multi-currency") +
+			'" value="inline" />\
             </el-radio-group>\
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Favorite Currencies</span>\
-            <div class="form-note">Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP</div>\
+            <span class="setting-label">' +
+			__("Favorite Currencies", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__(
+				"Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP",
+				"fchub-multi-currency",
+			) +
+			'</div>\
         </div>\
         <div class="setting-fields-inner">\
             <el-input v-model="favoriteCurrenciesCsv" placeholder="EUR, USD, GBP" style="max-width:320px" autocomplete="one-time-code" />\
             <div style="margin-top:10px">\
-                <el-switch v-model="switcherDefaults.show_favorites_first" active-value="yes" inactive-value="no" active-text="Show favorites first" />\
+                <el-switch v-model="switcherDefaults.show_favorites_first" active-value="yes" inactive-value="no" active-text="' +
+			__("Show favorites first", "fchub-multi-currency") +
+			'" />\
             </div>\
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Layout Defaults</span>\
-            <div class="form-note">Baseline geometry for inheriting switcher blocks.</div>\
+            <span class="setting-label">' +
+			__("Layout Defaults", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__("Baseline geometry for inheriting switcher blocks.", "fchub-multi-currency") +
+			'</div>\
         </div>\
         <div class="setting-fields-inner fchub-mc-switcher-select-grid">\
             <div class="fchub-mc-field">\
-                <span class="fchub-mc-field__label">Size</span>\
+                <span class="fchub-mc-field__label">' +
+			__("Size", "fchub-multi-currency") +
+			'</span>\
                 <el-select v-model="switcherDefaults.size">\
-                    <el-option label="Small" value="sm" />\
-                    <el-option label="Medium" value="md" />\
-                    <el-option label="Large" value="lg" />\
+                    <el-option label="' +
+			__("Small", "fchub-multi-currency") +
+			'" value="sm" />\
+                    <el-option label="' +
+			__("Medium", "fchub-multi-currency") +
+			'" value="md" />\
+                    <el-option label="' +
+			__("Large", "fchub-multi-currency") +
+			'" value="lg" />\
                 </el-select>\
             </div>\
             <div class="fchub-mc-field">\
-                <span class="fchub-mc-field__label">Width</span>\
+                <span class="fchub-mc-field__label">' +
+			__("Width", "fchub-multi-currency") +
+			'</span>\
                 <el-select v-model="switcherDefaults.width_mode">\
-                    <el-option label="Auto width" value="auto" />\
-                    <el-option label="Full width" value="full" />\
+                    <el-option label="' +
+			__("Auto width", "fchub-multi-currency") +
+			'" value="auto" />\
+                    <el-option label="' +
+			__("Full width", "fchub-multi-currency") +
+			'" value="full" />\
                 </el-select>\
             </div>\
             <div class="fchub-mc-field">\
-                <span class="fchub-mc-field__label">Dropdown position</span>\
+                <span class="fchub-mc-field__label">' +
+			__("Dropdown position", "fchub-multi-currency") +
+			'</span>\
                 <el-select v-model="switcherDefaults.dropdown_position">\
-                    <el-option label="Auto position" value="auto" />\
-                    <el-option label="Start" value="start" />\
-                    <el-option label="End" value="end" />\
+                    <el-option label="' +
+			__("Auto position", "fchub-multi-currency") +
+			'" value="auto" />\
+                    <el-option label="' +
+			__("Start", "fchub-multi-currency") +
+			'" value="start" />\
+                    <el-option label="' +
+			__("End", "fchub-multi-currency") +
+			'" value="end" />\
                 </el-select>\
             </div>\
             <div class="fchub-mc-field">\
-                <span class="fchub-mc-field__label">Dropdown direction</span>\
+                <span class="fchub-mc-field__label">' +
+			__("Dropdown direction", "fchub-multi-currency") +
+			'</span>\
                 <el-select v-model="switcherDefaults.dropdown_direction">\
-                    <el-option label="Auto direction" value="auto" />\
-                    <el-option label="Down" value="down" />\
-                    <el-option label="Up" value="up" />\
+                    <el-option label="' +
+			__("Auto direction", "fchub-multi-currency") +
+			'" value="auto" />\
+                    <el-option label="' +
+			__("Down", "fchub-multi-currency") +
+			'" value="down" />\
+                    <el-option label="' +
+			__("Up", "fchub-multi-currency") +
+			'" value="up" />\
                 </el-select>\
             </div>\
         </div>\
@@ -170,13 +283,26 @@
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Footer Context</span>\
-            <div class="form-note">Optional trust-building context shown at the bottom of the dropdown. The freshness badge also requires the global Rate Freshness Badge gate on the Checkout tab.</div>\
+            <span class="setting-label">' +
+			__("Footer Context", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__(
+				"Optional trust-building context shown at the bottom of the dropdown. The freshness badge also requires the global Rate Freshness Badge gate on the Checkout tab.",
+				"fchub-multi-currency",
+			) +
+			'</div>\
         </div>\
         <div class="setting-fields-inner fchub-mc-switcher-toggle-grid">\
-            <el-switch v-model="switcherDefaults.show_rate_badge" active-value="yes" inactive-value="no" active-text="Freshness badge" />\
-            <el-switch v-model="switcherDefaults.show_rate_value" active-value="yes" inactive-value="no" active-text="Rate value" />\
-            <el-switch v-model="switcherDefaults.show_context_note" active-value="yes" inactive-value="no" active-text="Checkout context" />\
+            <el-switch v-model="switcherDefaults.show_rate_badge" active-value="yes" inactive-value="no" active-text="' +
+			__("Freshness badge", "fchub-multi-currency") +
+			'" />\
+            <el-switch v-model="switcherDefaults.show_rate_value" active-value="yes" inactive-value="no" active-text="' +
+			__("Rate value", "fchub-multi-currency") +
+			'" />\
+            <el-switch v-model="switcherDefaults.show_context_note" active-value="yes" inactive-value="no" active-text="' +
+			__("Checkout context", "fchub-multi-currency") +
+			'" />\
         </div>\
     </div>\
 </div>',

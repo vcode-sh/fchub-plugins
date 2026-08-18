@@ -7,6 +7,7 @@
  */
 
 (() => {
+	const { __ } = window.wp.i18n;
 	window.FchubMcAdmin = window.FchubMcAdmin || {};
 	window.FchubMcAdmin.components = window.FchubMcAdmin.components || {};
 	const components = window.FchubMcAdmin.components;
@@ -108,7 +109,9 @@
         <el-select\
             v-model="pickerValue"\
             filterable\
-            placeholder="Search and add a currency…"\
+            placeholder="' +
+			__("Search and add a currency…", "fchub-multi-currency") +
+			'"\
             style="width:100%;max-width:420px"\
             @change="onPick"\
         >\
@@ -123,18 +126,32 @@
     <div v-if="settings.display_currencies && settings.display_currencies.length" class="fchub-mc-currency-list">\
         <div class="fchub-mc-currency-header">\
             <div class="fchub-mc-col-handle"></div>\
-            <div class="fchub-mc-col-currency">Currency</div>\
-            <div class="fchub-mc-col-symbol">Symbol</div>\
-            <div class="fchub-mc-col-decimals">Decimals</div>\
-            <div class="fchub-mc-col-separator">Decimal</div>\
-            <div class="fchub-mc-col-separator">Thousands</div>\
-            <div class="fchub-mc-col-position">Position</div>\
+            <div class="fchub-mc-col-currency">' +
+			__("Currency", "fchub-multi-currency") +
+			'</div>\
+            <div class="fchub-mc-col-symbol">' +
+			__("Symbol", "fchub-multi-currency") +
+			'</div>\
+            <div class="fchub-mc-col-decimals">' +
+			__("Decimals", "fchub-multi-currency") +
+			'</div>\
+            <div class="fchub-mc-col-separator">' +
+			__("Decimal", "fchub-multi-currency") +
+			'</div>\
+            <div class="fchub-mc-col-separator">' +
+			__("Thousands", "fchub-multi-currency") +
+			'</div>\
+            <div class="fchub-mc-col-position">' +
+			__("Position", "fchub-multi-currency") +
+			'</div>\
             <div class="fchub-mc-col-action"></div>\
         </div>\
         <div ref="sortableBody" class="fchub-mc-currency-body">\
             <div v-for="(row, index) in settings.display_currencies" :key="row.code" class="fchub-mc-currency-row">\
                 <div class="fchub-mc-col-handle">\
-                    <span class="fchub-mc-drag-handle" title="Drag to reorder">\
+                    <span class="fchub-mc-drag-handle" title="' +
+			__("Drag to reorder", "fchub-multi-currency") +
+			'">\
                         <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/><circle cx="2" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="2" cy="14" r="1.5"/><circle cx="8" cy="14" r="1.5"/></svg>\
                     </span>\
                 </div>\
@@ -151,26 +168,50 @@
                 </div>\
                 <div class="fchub-mc-col-separator">\
                     <el-select v-model="row.decimal_separator" size="small">\
-                        <el-option label="Auto" value="" />\
-                        <el-option label="Dot (.)" value="." />\
-                        <el-option label="Comma (,)" value="," />\
+                        <el-option label="' +
+			__("Auto", "fchub-multi-currency") +
+			'" value="" />\
+                        <el-option label="' +
+			__("Dot (.)", "fchub-multi-currency") +
+			'" value="." />\
+                        <el-option label="' +
+			__("Comma (,)", "fchub-multi-currency") +
+			'" value="," />\
                     </el-select>\
                 </div>\
                 <div class="fchub-mc-col-separator">\
                     <el-select v-model="row.thousand_separator" size="small">\
-                        <el-option label="Auto" value="" />\
-                        <el-option label="Comma (,)" value="," />\
-                        <el-option label="Dot (.)" value="." />\
-                        <el-option label="Space" value=" " />\
-                        <el-option label="None" value="none" />\
+                        <el-option label="' +
+			__("Auto", "fchub-multi-currency") +
+			'" value="" />\
+                        <el-option label="' +
+			__("Comma (,)", "fchub-multi-currency") +
+			'" value="," />\
+                        <el-option label="' +
+			__("Dot (.)", "fchub-multi-currency") +
+			'" value="." />\
+                        <el-option label="' +
+			__("Space", "fchub-multi-currency") +
+			'" value=" " />\
+                        <el-option label="' +
+			__("None", "fchub-multi-currency") +
+			'" value="none" />\
                     </el-select>\
                 </div>\
                 <div class="fchub-mc-col-position">\
                     <el-select v-model="row.position" size="small">\
-                        <el-option label="Left ($100)" value="left" />\
-                        <el-option label="Right (100$)" value="right" />\
-                        <el-option label="Left space ($ 100)" value="left_space" />\
-                        <el-option label="Right space (100 $)" value="right_space" />\
+                        <el-option label="' +
+			__("Left ($100)", "fchub-multi-currency") +
+			'" value="left" />\
+                        <el-option label="' +
+			__("Right (100$)", "fchub-multi-currency") +
+			'" value="right" />\
+                        <el-option label="' +
+			__("Left space ($ 100)", "fchub-multi-currency") +
+			'" value="left_space" />\
+                        <el-option label="' +
+			__("Right space (100 $)", "fchub-multi-currency") +
+			'" value="right_space" />\
                     </el-select>\
                 </div>\
                 <div class="fchub-mc-col-action">\
@@ -180,8 +221,13 @@
         </div>\
     </div>\
     <div v-else style="padding:40px;text-align:center;color:#909399">\
-        No display currencies added yet. Use the picker above to add currencies.\
+        ' +
+			__(
+				"No display currencies added yet. Use the picker above to add currencies.",
+				"fchub-multi-currency",
+			) +
+			"\
     </div>\
-</div>',
+</div>",
 	};
 })();

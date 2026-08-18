@@ -17,11 +17,11 @@ enum RoundingMode: string
     public function label(): string
     {
         return match ($this) {
-            self::None     => 'Truncate (no rounding)',
-            self::HalfUp   => 'Round half up (standard)',
-            self::HalfDown => 'Round half down',
-            self::Ceil     => 'Always round up',
-            self::Floor    => 'Always round down',
+            self::None     => __('Truncate (no rounding)', 'fchub-multi-currency'),
+            self::HalfUp   => __('Round half up (standard)', 'fchub-multi-currency'),
+            self::HalfDown => __('Round half down', 'fchub-multi-currency'),
+            self::Ceil     => __('Always round up', 'fchub-multi-currency'),
+            self::Floor    => __('Always round down', 'fchub-multi-currency'),
         };
     }
 }

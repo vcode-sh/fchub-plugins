@@ -76,6 +76,55 @@ final class WordPressOrgPackageTest extends TestCase
     }
 
     #[Test]
+    public function translationsLoadFromTheLanguagesDirectory(): void
+    {
+        $mainFile = (string) file_get_contents($this->pluginRoot . '/fchub-multi-currency.php');
+
+        self::assertStringContainsString('Domain Path: /languages', $mainFile);
+        self::assertStringContainsString("load_plugin_textdomain('fchub-multi-currency'", $mainFile);
+    }
+
+    /**
+     * The POT is the string catalogue translators start from. The sentinels
+     * pin every extraction surface: visitor-facing PHP, admin REST PHP, the
+     * admin SPA JS, the block editor JS, and block.json metadata. A missing
+     * sentinel means an extraction surface silently fell out of the build.
+     */
+    #[Test]
+    public function potCataloguesEveryStringSurface(): void
+    {
+        $potPath = $this->pluginRoot . '/languages/fchub-multi-currency.pot';
+
+        self::assertFileExists($potPath);
+        $pot = (string) file_get_contents($potPath);
+
+        $sentinels = [
+            'Prices are now shown in %s.',                  // visitor-facing PHP template
+            'Your payment will be processed in {base_currency}.', // checkout disclosure default
+            'Settings saved successfully.',                 // admin REST message
+            'Multi-Currency Enabled',                       // admin SPA component JS
+            'Network error. Please check your connection.', // admin SPA entry JS
+            'Search currency',                              // preview + frontend shared string
+            'Use global switcher defaults',                 // block editor JS
+            'Currency Switcher',                            // block.json title
+        ];
+
+        foreach ($sentinels as $sentinel) {
+            self::assertStringContainsString(
+                'msgid "' . $sentinel . '"',
+                $pot,
+                "POT must catalogue: $sentinel",
+            );
+        }
+
+        self::assertGreaterThan(
+            100,
+            substr_count($pot, "\nmsgid "),
+            'The catalogue lost most of its strings; the extraction excluded too much.',
+        );
+    }
+
+    #[Test]
     public function composerMetadataDeclaresThePhpFloorAndLicence(): void
     {
         $composer = json_decode(

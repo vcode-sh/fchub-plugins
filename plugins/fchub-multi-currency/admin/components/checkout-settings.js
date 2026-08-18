@@ -6,6 +6,7 @@
  */
 
 (() => {
+	const { __ } = window.wp.i18n;
 	window.FchubMcAdmin = window.FchubMcAdmin || {};
 	window.FchubMcAdmin.components = window.FchubMcAdmin.components || {};
 	const components = window.FchubMcAdmin.components;
@@ -18,13 +19,24 @@
 <div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Checkout Disclosure</span>\
-            <div class="form-note">Show a notice at checkout that payment is processed in the base currency.</div>\
+            <span class="setting-label">' +
+			__("Checkout Disclosure", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__(
+				"Show a notice at checkout that payment is processed in the base currency.",
+				"fchub-multi-currency",
+			) +
+			'</div>\
         </div>\
         <div class="setting-fields-inner">\
             <el-radio-group v-model="settings.checkout_disclosure_enabled">\
-                <el-radio label="Enabled" value="yes" />\
-                <el-radio label="Disabled" value="no" />\
+                <el-radio label="' +
+			__("Enabled", "fchub-multi-currency") +
+			'" value="yes" />\
+                <el-radio label="' +
+			__("Disabled", "fchub-multi-currency") +
+			'" value="no" />\
             </el-radio-group>\
         </div>\
     </div>\
@@ -32,8 +44,15 @@
         <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
         <div class="fchub-mc-row">\
             <div class="setting-html-wrapper">\
-                <span class="setting-label">Disclosure Text</span>\
-                <div class="form-note">Supports placeholders: {base_currency}, {display_currency}, {rate}</div>\
+                <span class="setting-label">' +
+			__("Disclosure Text", "fchub-multi-currency") +
+			'</span>\
+                <div class="form-note">' +
+			__(
+				"Supports placeholders: {base_currency}, {display_currency}, {rate}",
+				"fchub-multi-currency",
+			) +
+			'</div>\
             </div>\
             <div class="setting-fields-inner">\
                 <el-input v-model="settings.checkout_disclosure_text" type="textarea" :rows="3" />\
@@ -43,13 +62,24 @@
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Rate Freshness Badge</span>\
-            <div class="form-note">Global gate for the rates-updated badge. When disabled, no surface shows it — including the switcher dropdown footer.</div>\
+            <span class="setting-label">' +
+			__("Rate Freshness Badge", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__(
+				"Global gate for the rates-updated badge. When disabled, no surface shows it — including the switcher dropdown footer.",
+				"fchub-multi-currency",
+			) +
+			'</div>\
         </div>\
         <div class="setting-fields-inner">\
             <el-radio-group v-model="settings.show_rate_freshness_badge">\
-                <el-radio label="Enabled" value="yes" />\
-                <el-radio label="Disabled" value="no" />\
+                <el-radio label="' +
+			__("Enabled", "fchub-multi-currency") +
+			'" value="yes" />\
+                <el-radio label="' +
+			__("Disabled", "fchub-multi-currency") +
+			'" value="no" />\
             </el-radio-group>\
         </div>\
     </div>\

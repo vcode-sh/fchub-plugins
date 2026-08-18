@@ -16,10 +16,27 @@ const SOURCE_FILES = [
 	"multi-currency-admin.js",
 ];
 
-export function loadAdminRuntime({ responses = [], adminConfig = {} } = {}) {
+// Mirrors wp.i18n.sprintf closely enough for the admin surface: positional
+// (%1$s) and sequential (%s, %d) placeholders.
+function sprintf(format, ...args) {
+	let cursor = 0;
+	return format.replace(/%(\d+\$)?[sd]/g, (_match, position) => {
+		const index = position ? Number(position.slice(0, -1)) - 1 : cursor++;
+		return String(args[index]);
+	});
+}
+
+export function loadAdminRuntime({ responses = [], adminConfig = {}, translate = (text) => text } = {}) {
 	const requests = [];
 	let routeFilter;
 	const window = {
+		wp: {
+			i18n: {
+				__: (text, _domain) => translate(text),
+				_n: (single, plural, count, _domain) => translate(count === 1 ? single : plural),
+				sprintf,
+			},
+		},
 		fchubMcAdmin: {
 			nonce: "nonce",
 			rest_url: "https://shop.test/wp-json/fchub-mc/v1/",

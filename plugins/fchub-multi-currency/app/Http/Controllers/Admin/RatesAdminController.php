@@ -50,7 +50,7 @@ final class RatesAdminController
         if (!ProviderRegistry::usesRemoteProvider($optionStore)) {
             return new \WP_REST_Response([
                 'data' => [
-                    'message' => 'Manual rates are saved explicitly and cannot be refreshed.',
+                    'message' => __('Manual rates are saved explicitly and cannot be refreshed.', 'fchub-multi-currency'),
                     'status' => false,
                 ],
             ], 409);
@@ -66,7 +66,7 @@ final class RatesAdminController
         if (!$success) {
             return new \WP_REST_Response([
                 'data' => [
-                    'message' => 'Failed to refresh exchange rates. Check the logs for details.',
+                    'message' => __('Failed to refresh exchange rates. Check the logs for details.', 'fchub-multi-currency'),
                     'status'  => false,
                 ],
             ], 500);
@@ -74,7 +74,7 @@ final class RatesAdminController
 
         return new \WP_REST_Response([
             'data' => [
-                'message' => 'Exchange rates refreshed successfully.',
+                'message' => __('Exchange rates refreshed successfully.', 'fchub-multi-currency'),
                 'status'  => true,
             ],
         ]);
@@ -86,7 +86,7 @@ final class RatesAdminController
         $submittedRates = is_array($params) ? ($params['rates'] ?? null) : null;
         if (!is_array($submittedRates)) {
             return new \WP_REST_Response([
-                'data' => ['message' => 'Provide manual rates as a currency-to-rate object.'],
+                'data' => ['message' => __('Provide manual rates as a currency-to-rate object.', 'fchub-multi-currency')],
             ], 400);
         }
 
@@ -101,7 +101,7 @@ final class RatesAdminController
             ], 422);
         } catch (RuntimeException) {
             return new \WP_REST_Response([
-                'data' => ['message' => 'Manual rates could not be saved.'],
+                'data' => ['message' => __('Manual rates could not be saved.', 'fchub-multi-currency')],
             ], 500);
         }
 
@@ -109,7 +109,7 @@ final class RatesAdminController
 
         return new \WP_REST_Response([
             'data' => [
-                'message' => 'Manual rates saved successfully.',
+                'message' => __('Manual rates saved successfully.', 'fchub-multi-currency'),
                 'status' => true,
                 'base_currency' => $baseCurrency,
                 'rates' => array_map(

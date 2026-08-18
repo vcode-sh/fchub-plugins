@@ -29,7 +29,8 @@ final class CheckoutDisclosureService
         }
 
         $template = $settings['checkout_disclosure_text']
-            ?? 'Your payment will be processed in {base_currency}.';
+            // translators: {base_currency} is a literal placeholder token replaced with the currency code.
+            ?? __('Your payment will be processed in {base_currency}.', 'fchub-multi-currency');
 
         $text = str_replace(
             ['{base_currency}', '{display_currency}', '{rate}'],

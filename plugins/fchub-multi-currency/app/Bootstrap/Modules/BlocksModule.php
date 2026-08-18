@@ -35,6 +35,11 @@ final class BlocksModule implements ModuleContract
             (string) (@filemtime($editorScriptPath) ?: FCHUB_MC_VERSION),
             true,
         );
+        wp_set_script_translations(
+            'fchub-mc-switcher-block-editor-script',
+            'fchub-multi-currency',
+            FCHUB_MC_PATH . 'languages',
+        );
 
         $editorStylePath = FCHUB_MC_PATH . 'blocks/currency-switcher/editor.css';
         wp_register_style(

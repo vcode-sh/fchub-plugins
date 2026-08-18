@@ -20,6 +20,7 @@
 	/* ------------------------------------------------------------------ */
 
 	var config = window.fchubMcAdmin || {};
+	var __ = window.wp.i18n.__;
 
 	function restUrl(path) {
 		return (config.rest_url || "/wp-json/fchub-mc/v1/") + path;
@@ -42,7 +43,9 @@
 		}
 		return fetch(restUrl(path), opts)
 			.catch(() => {
-				throw { message: "Network error. Please check your connection." };
+				throw {
+					message: __("Network error. Please check your connection.", "fchub-multi-currency"),
+				};
 			})
 			.then((res) =>
 				res.json().then((json) => {
@@ -71,14 +74,18 @@
 		},
 		data: () => ({
 			activeTab: "general",
+			i18n: {
+				save: __("Save", "fchub-multi-currency"),
+				saving: __("Saving...", "fchub-multi-currency"),
+			},
 			tabs: [
-				{ name: "general", label: "General" },
-				{ name: "currencies", label: "Currencies" },
-				{ name: "rates", label: "Exchange Rates" },
-				{ name: "switcher", label: "Switcher" },
-				{ name: "checkout", label: "Checkout" },
-				{ name: "crm", label: "CRM" },
-				{ name: "diagnostics", label: "Diagnostics" },
+				{ name: "general", label: __("General", "fchub-multi-currency") },
+				{ name: "currencies", label: __("Currencies", "fchub-multi-currency") },
+				{ name: "rates", label: __("Exchange Rates", "fchub-multi-currency") },
+				{ name: "switcher", label: __("Switcher", "fchub-multi-currency") },
+				{ name: "checkout", label: __("Checkout", "fchub-multi-currency") },
+				{ name: "crm", label: __("CRM", "fchub-multi-currency") },
+				{ name: "diagnostics", label: __("Diagnostics", "fchub-multi-currency") },
 			],
 			loading: true,
 			saving: false,
@@ -97,7 +104,7 @@
 			this.loadSettings();
 			this.loadRates();
 			if (typeof this.changeTitle === "function") {
-				this.changeTitle("Multi-Currency");
+				this.changeTitle(__("Multi-Currency", "fchub-multi-currency"));
 			}
 			document.addEventListener("keydown", this.onKeyDown);
 		},
@@ -119,7 +126,9 @@
 						this.settings = data.settings || data;
 					})
 					.catch((err) => {
-						this.$message.error(err?.message || "Failed to load settings.");
+						this.$message.error(
+							err?.message || __("Failed to load settings.", "fchub-multi-currency"),
+						);
 					})
 					.finally(() => {
 						this.loading = false;
@@ -143,7 +152,9 @@
 						this.manualRates = manualRates;
 					})
 					.catch((err) => {
-						this.$message.error(err?.message || "Failed to load exchange rates.");
+						this.$message.error(
+							err?.message || __("Failed to load exchange rates.", "fchub-multi-currency"),
+						);
 					})
 					.finally(() => {
 						this.ratesLoading = false;
@@ -156,7 +167,9 @@
 						this.diagnostics = data;
 					})
 					.catch((err) => {
-						this.$message.error(err?.message || "Failed to load diagnostics.");
+						this.$message.error(
+							err?.message || __("Failed to load diagnostics.", "fchub-multi-currency"),
+						);
 					})
 					.finally(() => {
 						this.diagLoading = false;
@@ -169,10 +182,12 @@
 						this.diagnostics = Object.assign({}, this.diagnostics, {
 							fluentcrm_fields_status: data.fluentcrm_fields_status,
 						});
-						this.$message.success("FluentCRM fields created.");
+						this.$message.success(__("FluentCRM fields created.", "fchub-multi-currency"));
 					})
 					.catch((err) => {
-						this.$message.error(err?.message || "Could not create the FluentCRM fields.");
+						this.$message.error(
+							err?.message || __("Could not create the FluentCRM fields.", "fchub-multi-currency"),
+						);
 					})
 					.finally(() => {
 						this.crmFieldsCreating = false;
@@ -182,11 +197,11 @@
 				this.ratesLoading = true;
 				request("POST", "admin/rates/refresh")
 					.then(() => {
-						this.$message.success("Rates refreshed.");
+						this.$message.success(__("Rates refreshed.", "fchub-multi-currency"));
 						this.loadRates();
 					})
 					.catch((err) => {
-						this.$message.error(err?.message || "Rate refresh failed.");
+						this.$message.error(err?.message || __("Rate refresh failed.", "fchub-multi-currency"));
 						this.ratesLoading = false;
 					});
 			},
@@ -200,10 +215,12 @@
 							savedRates[rate.quote_currency] = String(rate.rate || "");
 						});
 						this.manualRates = savedRates;
-						this.$message.success("Manual rates saved.");
+						this.$message.success(__("Manual rates saved.", "fchub-multi-currency"));
 					})
 					.catch((err) => {
-						this.$message.error(err?.message || "Manual rates could not be saved.");
+						this.$message.error(
+							err?.message || __("Manual rates could not be saved.", "fchub-multi-currency"),
+						);
 					})
 					.finally(() => {
 						this.manualRatesSaving = false;
@@ -214,11 +231,13 @@
 				request("POST", "admin/settings", this.settings)
 					.then((data) => {
 						this.settings = data.settings || data;
-						this.$message.success("Settings saved.");
+						this.$message.success(__("Settings saved.", "fchub-multi-currency"));
 						return this.loadRates();
 					})
 					.catch((err) => {
-						this.$message.error(err?.message || "Failed to save settings.");
+						this.$message.error(
+							err?.message || __("Failed to save settings.", "fchub-multi-currency"),
+						);
 					})
 					.finally(() => {
 						this.saving = false;
@@ -236,17 +255,21 @@
 <div class="setting-wrap fchub-mc-page">\
     <div class="fct-setting-header">\
         <div class="fct-setting-header-content">\
-            <h3 class="fct-setting-head-title">Multi-Currency</h3>\
+            <h3 class="fct-setting-head-title">' +
+			__("Multi-Currency", "fchub-multi-currency") +
+			'</h3>\
         </div>\
         <div class="fct-setting-header-action">\
             <el-button type="primary" size="small" :loading="saving" @click="saveSettings">\
                 <span v-if="!saving" class="cmd">⌘S</span>\
-                {{ saving ? "Saving..." : "Save" }}\
+                {{ saving ? i18n.saving : i18n.save }}\
             </el-button>\
         </div>\
     </div>\
     <div class="setting-wrap-inner">\
-        <div class="fchub-mc-tabs" role="tablist" aria-label="Multi-Currency settings">\
+        <div class="fchub-mc-tabs" role="tablist" aria-label="' +
+			__("Multi-Currency settings", "fchub-multi-currency") +
+			'">\
             <button v-for="tab in tabs" :key="tab.name" type="button" role="tab" :aria-selected="activeTab === tab.name ? \'true\' : \'false\'" :class="[\'fchub-mc-tabs__item\', { \'is-active\': activeTab === tab.name }]" @click="activeTab = tab.name">{{ tab.label }}</button>\
         </div>\
         <div v-show="activeTab === \'general\'" role="tabpanel">\
@@ -301,7 +324,7 @@
 					component: MultiCurrencyPage,
 					meta: {
 						active_menu: "settings",
-						title: "Multi-Currency",
+						title: __("Multi-Currency", "fchub-multi-currency"),
 					},
 				});
 			}
@@ -359,7 +382,7 @@
 		// Label + chevron: <span class="fct-settings-nav-link-text">Multi-Currency <div class="icon fct-settings-nav-link-icon">chevron</div></span>
 		var labelSpan = document.createElement("span");
 		labelSpan.className = "fct-settings-nav-link-text";
-		labelSpan.textContent = "Multi-Currency";
+		labelSpan.textContent = __("Multi-Currency", "fchub-multi-currency");
 
 		var chevronDiv = document.createElement("div");
 		chevronDiv.className = "icon fct-settings-nav-link-icon";

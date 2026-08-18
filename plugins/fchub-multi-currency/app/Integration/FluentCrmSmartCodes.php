@@ -186,8 +186,8 @@ final class FluentCrmSmartCodes
     {
         return [
             'key'         => 'mc_order',
-            'title'       => 'Multi-Currency Order',
-            'description' => 'Currency and exchange rate values captured on the order.',
+            'title'       => __('Multi-Currency Order', 'fchub-multi-currency'),
+            'description' => __('Currency and exchange rate values captured on the order.', 'fchub-multi-currency'),
             'shortcodes'  => self::getSmartCodeDefinitions(),
         ];
     }
@@ -198,12 +198,12 @@ final class FluentCrmSmartCodes
     private static function getSmartCodeDefinitions(): array
     {
         return [
-            '{{mc_order.display_currency}}' => 'Display Currency Code',
-            '{{mc_order.base_currency}}'    => 'Base Currency Code',
-            '{{mc_order.display_total}}'    => 'Total in Display Currency',
-            '{{mc_order.display_subtotal}}' => 'Subtotal in Display Currency',
-            '{{mc_order.exchange_rate}}'    => 'Exchange Rate Used',
-            '{{mc_order.charged_notice}}'  => 'Checkout Currency Notice',
+            '{{mc_order.display_currency}}' => __('Display Currency Code', 'fchub-multi-currency'),
+            '{{mc_order.base_currency}}'    => __('Base Currency Code', 'fchub-multi-currency'),
+            '{{mc_order.display_total}}'    => __('Total in Display Currency', 'fchub-multi-currency'),
+            '{{mc_order.display_subtotal}}' => __('Subtotal in Display Currency', 'fchub-multi-currency'),
+            '{{mc_order.exchange_rate}}'    => __('Exchange Rate Used', 'fchub-multi-currency'),
+            '{{mc_order.charged_notice}}'  => __('Checkout Currency Notice', 'fchub-multi-currency'),
         ];
     }
 }

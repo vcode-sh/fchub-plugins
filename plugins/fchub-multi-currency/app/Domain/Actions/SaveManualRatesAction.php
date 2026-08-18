@@ -34,21 +34,21 @@ final class SaveManualRatesAction
     {
         $settings = (new OptionStore())->all();
         if (($settings['rate_provider'] ?? 'manual') !== RateProvider::Manual->value) {
-            throw new InvalidArgumentException('Switch the rate provider to Manual rates before saving.');
+            throw new InvalidArgumentException(esc_html__('Switch the rate provider to Manual rates before saving.', 'fchub-multi-currency'));
         }
 
         $baseCurrency = (string) $settings['base_currency'];
         $quoteCurrencies = SelectableCurrencyCodes::fromSettings($settings)->quoteCurrencies();
         if ($quoteCurrencies === []) {
-            throw new InvalidArgumentException('Add at least one display currency before saving manual rates.');
+            throw new InvalidArgumentException(esc_html__('Add at least one display currency before saving manual rates.', 'fchub-multi-currency'));
         }
 
         $submittedRates = self::normalizeKeys($submittedRates);
         if (array_diff($quoteCurrencies, array_keys($submittedRates)) !== []) {
-            throw new InvalidArgumentException('Provide one rate for every configured display currency.');
+            throw new InvalidArgumentException(esc_html__('Provide one rate for every configured display currency.', 'fchub-multi-currency'));
         }
         if (array_diff(array_keys($submittedRates), $quoteCurrencies) !== []) {
-            throw new InvalidArgumentException('Rates may only be saved for configured display currencies.');
+            throw new InvalidArgumentException(esc_html__('Rates may only be saved for configured display currencies.', 'fchub-multi-currency'));
         }
 
         $fetchedAt = gmdate('Y-m-d H:i:s');
@@ -64,7 +64,7 @@ final class SaveManualRatesAction
         }
 
         if (!$this->repository->insertMany($rates)) {
-            throw new RuntimeException('Manual rates could not be saved.');
+            throw new RuntimeException(esc_html__('Manual rates could not be saved.', 'fchub-multi-currency'));
         }
 
         foreach ($rates as $rate) {
@@ -95,7 +95,7 @@ final class SaveManualRatesAction
         foreach ($rates as $code => $rate) {
             $normalizedCode = strtoupper((string) $code);
             if (isset($normalized[$normalizedCode])) {
-                throw new InvalidArgumentException('Rates may only be saved for configured display currencies.');
+                throw new InvalidArgumentException(esc_html__('Rates may only be saved for configured display currencies.', 'fchub-multi-currency'));
             }
             $normalized[$normalizedCode] = $rate;
         }
@@ -107,18 +107,18 @@ final class SaveManualRatesAction
     {
         if (!is_string($rate)) {
             throw new InvalidArgumentException(
-                'Each manual rate must be a positive decimal string with up to 8 decimal places.',
+                esc_html__('Each manual rate must be a positive decimal string with up to 8 decimal places.', 'fchub-multi-currency'),
             );
         }
 
         $rate = trim($rate);
         if (preg_match('/^(?:0|[1-9]\d{0,9})(?:\.\d{1,8})?$/', $rate) !== 1) {
             throw new InvalidArgumentException(
-                'Each manual rate must be a positive decimal string with up to 8 decimal places.',
+                esc_html__('Each manual rate must be a positive decimal string with up to 8 decimal places.', 'fchub-multi-currency'),
             );
         }
         if (preg_match('/[1-9]/', $rate) !== 1) {
-            throw new InvalidArgumentException('Each manual rate must be greater than zero.');
+            throw new InvalidArgumentException(esc_html__('Each manual rate must be greater than zero.', 'fchub-multi-currency'));
         }
 
         [$integer, $fraction] = array_pad(explode('.', $rate, 2), 2, '');

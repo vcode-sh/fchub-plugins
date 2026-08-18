@@ -34,7 +34,7 @@ final class SettingsAdminController
         if (!is_array($params)) {
             return new \WP_REST_Response([
                 'data' => [
-                    'message' => 'Invalid JSON payload.',
+                    'message' => __('Invalid JSON payload.', 'fchub-multi-currency'),
                 ],
             ], 400);
         }
@@ -49,7 +49,7 @@ final class SettingsAdminController
         if (array_key_exists('rate_provider', $params)) {
             $submittedProvider = sanitize_text_field((string) $params['rate_provider']);
             if (RateProvider::tryFrom($submittedProvider) === null) {
-                return self::validationError('Select a valid exchange-rate provider.');
+                return self::validationError(__('Select a valid exchange-rate provider.', 'fchub-multi-currency'));
             }
         }
 
@@ -102,7 +102,7 @@ final class SettingsAdminController
             && trim((string) ($sanitized['rate_provider_api_key'] ?? '')) === '';
 
         if (($provider->requiresApiKey() && $apiKey === '') || $providerChangedWithoutNewKey) {
-            return self::validationError('An API key is required for the selected exchange-rate provider.');
+            return self::validationError(__('An API key is required for the selected exchange-rate provider.', 'fchub-multi-currency'));
         }
 
         $baseCurrency = (string) $optionStore->get('base_currency', 'USD');
@@ -133,7 +133,7 @@ final class SettingsAdminController
 
         return new \WP_REST_Response([
             'data' => [
-                'message'  => 'Settings saved successfully.',
+                'message'  => __('Settings saved successfully.', 'fchub-multi-currency'),
                 'settings' => $optionStore->all(),
             ],
         ]);

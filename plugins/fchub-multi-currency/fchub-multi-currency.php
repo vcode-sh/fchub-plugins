@@ -10,6 +10,7 @@
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: fchub-multi-currency
+ * Domain Path: /languages
  * Requires at least: 7.0
  * Tested up to: 7.0
  * Requires PHP: 8.3
@@ -99,6 +100,11 @@ add_filter('cron_schedules', function (array $schedules): array {
  * init 10) while staying after its constants and autoloader exist.
  */
 add_action('init', function () {
+    // Self-hosted plugins get no wordpress.org language packs; the languages
+    // directory in the ZIP is the delivery channel. Loaded before the
+    // FluentCart guard so the missing-dependency notice translates too.
+    load_plugin_textdomain('fchub-multi-currency', false, dirname(plugin_basename(__FILE__)) . '/languages');
+
     if (!defined('FLUENTCART_VERSION')) {
         return;
     }

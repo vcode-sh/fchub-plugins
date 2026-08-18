@@ -7,6 +7,7 @@
  */
 
 (() => {
+	const { __, sprintf } = window.wp.i18n;
 	window.FchubMcAdmin = window.FchubMcAdmin || {};
 	window.FchubMcAdmin.components = window.FchubMcAdmin.components || {};
 	const components = window.FchubMcAdmin.components;
@@ -39,7 +40,10 @@
 					.map((c) => ({ code: c.code, label: `${c.flag} ${c.code} — ${c.name}` }));
 				options.unshift({
 					code: FOLLOW_BASE,
-					label: `Same as base currency (${base || "store base"}) — recommended`,
+					label: sprintf(
+						__("Same as base currency (%s) — recommended", "fchub-multi-currency"),
+						base || __("store base", "fchub-multi-currency"),
+					),
 				});
 				return options;
 			},
@@ -57,21 +61,39 @@
 <div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Multi-Currency Enabled</span>\
-            <div class="form-note">Master switch for display-layer multi-currency across the store.</div>\
+            <span class="setting-label">' +
+			__("Multi-Currency Enabled", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__(
+				"Master switch for display-layer multi-currency across the store.",
+				"fchub-multi-currency",
+			) +
+			'</div>\
         </div>\
         <div class="setting-fields-inner">\
             <el-radio-group v-model="settings.enabled">\
-                <el-radio label="Enabled" value="yes" />\
-                <el-radio label="Disabled" value="no" />\
+                <el-radio label="' +
+			__("Enabled", "fchub-multi-currency") +
+			'" value="yes" />\
+                <el-radio label="' +
+			__("Disabled", "fchub-multi-currency") +
+			'" value="no" />\
             </el-radio-group>\
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Base Currency</span>\
-            <div class="form-note">Managed in FluentCart Store Setup. Checkout and payment gateways use this currency.</div>\
+            <span class="setting-label">' +
+			__("Base Currency", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__(
+				"Managed in FluentCart Store Setup. Checkout and payment gateways use this currency.",
+				"fchub-multi-currency",
+			) +
+			'</div>\
         </div>\
         <div class="setting-fields-inner">\
             <strong class="fchub-mc-value">{{ settings.base_currency }}</strong>\
@@ -80,11 +102,17 @@
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Default Display Currency</span>\
-            <div class="form-note">Currency shown to visitors before any preference is detected.</div>\
+            <span class="setting-label">' +
+			__("Default Display Currency", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__("Currency shown to visitors before any preference is detected.", "fchub-multi-currency") +
+			'</div>\
         </div>\
         <div class="setting-fields-inner">\
-            <el-select v-model="defaultDisplayModel" filterable placeholder="Select currency" style="max-width:320px">\
+            <el-select v-model="defaultDisplayModel" filterable placeholder="' +
+			__("Select currency", "fchub-multi-currency") +
+			'" style="max-width:320px">\
                 <el-option v-for="c in defaultDisplayOptions" :key="c.code" :label="c.label" :value="c.code" />\
             </el-select>\
         </div>\
@@ -92,13 +120,21 @@
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">URL Parameter</span>\
-            <div class="form-note">Allow currency switching via URL (e.g. ?currency=EUR).</div>\
+            <span class="setting-label">' +
+			__("URL Parameter", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__("Allow currency switching via URL (e.g. ?currency=EUR).", "fchub-multi-currency") +
+			'</div>\
         </div>\
         <div class="setting-fields-inner">\
             <el-radio-group v-model="settings.url_param_enabled">\
-                <el-radio label="Enabled" value="yes" />\
-                <el-radio label="Disabled" value="no" />\
+                <el-radio label="' +
+			__("Enabled", "fchub-multi-currency") +
+			'" value="yes" />\
+                <el-radio label="' +
+			__("Disabled", "fchub-multi-currency") +
+			'" value="no" />\
             </el-radio-group>\
         </div>\
     </div>\
@@ -106,7 +142,9 @@
         <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
         <div class="fchub-mc-row">\
             <div class="setting-html-wrapper">\
-                <span class="setting-label">URL Parameter Key</span>\
+                <span class="setting-label">' +
+			__("URL Parameter Key", "fchub-multi-currency") +
+			'</span>\
             </div>\
             <div class="setting-fields-inner">\
                 <el-input v-model="settings.url_param_key" placeholder="currency" style="max-width:200px" autocomplete="one-time-code" />\
@@ -116,22 +154,40 @@
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Cookie Persistence</span>\
-            <div class="form-note">Remember a guest currency in a cookie and matching browser-storage fallback. Disable this and logged-out visitors cannot keep a currency choice at all — the switch is reported as failed rather than silently ignored.</div>\
+            <span class="setting-label">' +
+			__("Cookie Persistence", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__(
+				"Remember a guest currency in a cookie and matching browser-storage fallback. Disable this and logged-out visitors cannot keep a currency choice at all — the switch is reported as failed rather than silently ignored.",
+				"fchub-multi-currency",
+			) +
+			'</div>\
         </div>\
         <div class="setting-fields-inner">\
             <el-radio-group v-model="settings.cookie_enabled">\
-                <el-radio label="Enabled" value="yes" />\
-                <el-radio label="Disabled" value="no" />\
+                <el-radio label="' +
+			__("Enabled", "fchub-multi-currency") +
+			'" value="yes" />\
+                <el-radio label="' +
+			__("Disabled", "fchub-multi-currency") +
+			'" value="no" />\
             </el-radio-group>\
-            <div v-if="settings.cookie_enabled !== \'yes\'" class="form-note fchub-mc-form-note--warning">Currency switching is now a logged-in-only feature. Guests will be told their preference could not be saved.</div>\
+            <div v-if="settings.cookie_enabled !== \'yes\'" class="form-note fchub-mc-form-note--warning">' +
+			__(
+				"Currency switching is now a logged-in-only feature. Guests will be told their preference could not be saved.",
+				"fchub-multi-currency",
+			) +
+			'</div>\
         </div>\
     </div>\
     <div v-if="settings.cookie_enabled === \'yes\'">\
         <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
         <div class="fchub-mc-row">\
             <div class="setting-html-wrapper">\
-                <span class="setting-label">Cookie Lifetime (days)</span>\
+                <span class="setting-label">' +
+			__("Cookie Lifetime (days)", "fchub-multi-currency") +
+			'</span>\
             </div>\
             <div class="setting-fields-inner">\
                 <el-input-number v-model="settings.cookie_lifetime_days" :min="1" :max="365" />\
@@ -141,39 +197,74 @@
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Account Persistence</span>\
-            <div class="form-note">Remember currency preference in the logged-in user account. Disable this if you want logged-in sessions to respect the default display currency on every fresh visit.</div>\
+            <span class="setting-label">' +
+			__("Account Persistence", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__(
+				"Remember currency preference in the logged-in user account. Disable this if you want logged-in sessions to respect the default display currency on every fresh visit.",
+				"fchub-multi-currency",
+			) +
+			'</div>\
         </div>\
         <div class="setting-fields-inner">\
             <el-radio-group v-model="settings.account_persistence_enabled">\
-                <el-radio label="Enabled" value="yes" />\
-                <el-radio label="Disabled" value="no" />\
+                <el-radio label="' +
+			__("Enabled", "fchub-multi-currency") +
+			'" value="yes" />\
+                <el-radio label="' +
+			__("Disabled", "fchub-multi-currency") +
+			'" value="no" />\
             </el-radio-group>\
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row fchub-mc-coming-soon-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Geolocation <span class="fchub-mc-badge-soon">Coming Soon</span></span>\
-            <div class="form-note">Automatically detect visitor currency based on their country. Requires a geolocation provider.</div>\
+            <span class="setting-label">' +
+			__("Geolocation", "fchub-multi-currency") +
+			' <span class="fchub-mc-badge-soon">' +
+			__("Coming Soon", "fchub-multi-currency") +
+			'</span></span>\
+            <div class="form-note">' +
+			__(
+				"Automatically detect visitor currency based on their country. Requires a geolocation provider.",
+				"fchub-multi-currency",
+			) +
+			'</div>\
         </div>\
         <div class="setting-fields-inner">\
             <el-radio-group v-model="settings.geo_enabled" disabled>\
-                <el-radio label="Enabled" value="yes" />\
-                <el-radio label="Disabled" value="no" />\
+                <el-radio label="' +
+			__("Enabled", "fchub-multi-currency") +
+			'" value="yes" />\
+                <el-radio label="' +
+			__("Disabled", "fchub-multi-currency") +
+			'" value="no" />\
             </el-radio-group>\
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
-            <span class="setting-label">Remove Data on Uninstall</span>\
-            <div class="form-note">If enabled, all tables and settings will be removed when the plugin is uninstalled.</div>\
+            <span class="setting-label">' +
+			__("Remove Data on Uninstall", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__(
+				"If enabled, all tables and settings will be removed when the plugin is uninstalled.",
+				"fchub-multi-currency",
+			) +
+			'</div>\
         </div>\
         <div class="setting-fields-inner">\
             <el-radio-group v-model="settings.uninstall_remove_data">\
-                <el-radio label="Keep data" value="no" />\
-                <el-radio label="Delete all" value="yes" />\
+                <el-radio label="' +
+			__("Keep data", "fchub-multi-currency") +
+			'" value="no" />\
+                <el-radio label="' +
+			__("Delete all", "fchub-multi-currency") +
+			'" value="yes" />\
             </el-radio-group>\
         </div>\
     </div>\

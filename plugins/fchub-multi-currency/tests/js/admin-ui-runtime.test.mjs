@@ -111,10 +111,10 @@ describe("diagnostics rows state their values", () => {
 
 		assert.doesNotMatch(template, /<el-tag/);
 		assert.match(template, /fchub-mc-pill/);
-		assert.match(template, /bcmath_available \? "Available" : "Missing"/);
+		assert.match(template, /bcmath_available \? i18n\.available : i18n\.missing/);
 		assert.match(template, /diagnostics\.fluentcart_version/);
 		assert.match(template, /stale_rates\.length : 0/);
-		assert.match(template, /val \? "On" : "Off"/);
+		assert.match(template, /val \? i18n\.on : i18n\.off/);
 	});
 
 	it("keeps the rates table status out of el-tag too", () => {
@@ -226,5 +226,48 @@ describe("default display currency offers follow-the-base first", () => {
 
 		view.computed.defaultDisplayModel.set.call(state, "__follow_base__");
 		assert.equal(state.settings.default_display_currency, "", "The sentinel never reaches storage.");
+	});
+});
+
+describe("every admin surface string flows through wp.i18n", () => {
+	const mark = (text) => `«${text}»`;
+
+	it("builds each component template through the injected translator", () => {
+		const { window } = loadAdminRuntime({ translate: mark });
+		const sentinels = {
+			GeneralSettings: "Multi-Currency Enabled",
+			CurrencySettings: "Search and add a currency…",
+			SwitcherSettings: "Default Preset",
+			RateSettings: "Rate Provider",
+			CheckoutSettings: "Checkout Disclosure",
+			CrmSettings: "FluentCRM Sync",
+			DiagnosticsView: "Switcher Events",
+		};
+
+		for (const [component, sentinel] of Object.entries(sentinels)) {
+			const template = window.FchubMcAdmin.components[component].template;
+			assert.ok(
+				template.includes(mark(sentinel)),
+				`${component} must pass "${sentinel}" through wp.i18n.__`,
+			);
+		}
+
+		assert.ok(
+			window.FchubMcSwitcherPreview.template.includes(mark("Search currency")),
+			"the preview placeholder must pass through wp.i18n.__",
+		);
+	});
+
+	it("translates the page chrome: tabs, title, and the save action", () => {
+		const { page } = loadAdminRuntime({ translate: mark });
+		const data = page.data();
+
+		for (const tab of data.tabs) {
+			assert.match(tab.label, /^«.*»$/, `tab "${tab.name}" label must be translated`);
+		}
+		assert.equal(data.i18n.save, mark("Save"));
+		assert.equal(data.i18n.saving, mark("Saving..."));
+		assert.ok(page.template.includes(mark("Multi-Currency settings")), "the tablist aria-label must be translated");
+		assert.doesNotMatch(page.template, /"Save"|"Saving\.\.\."/, "no raw save labels left in the template");
 	});
 });

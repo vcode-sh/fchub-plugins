@@ -59,7 +59,7 @@ final class AdminMenu
         wp_register_script(
             'fchub-mc-switcher-preview',
             FCHUB_MC_URL . 'admin/switcher-preview.js',
-            [],
+            ['wp-i18n'],
             (string) (@filemtime($previewJsPath) ?: '1.0.0'),
             true,
         );
@@ -69,7 +69,7 @@ final class AdminMenu
         foreach (self::ADMIN_COMPONENTS as $component) {
             $handle = 'fchub-mc-admin-' . $component;
             $componentPath = FCHUB_MC_PATH . 'admin/components/' . $component . '.js';
-            $deps = ['fchub-mc-switcher-preview'];
+            $deps = ['wp-i18n', 'fchub-mc-switcher-preview'];
 
             if ($component === 'currency-settings') {
                 $deps[] = 'fchub-mc-sortablejs';
@@ -89,10 +89,16 @@ final class AdminMenu
         wp_enqueue_script(
             'fchub-mc-admin',
             FCHUB_MC_URL . 'admin/multi-currency-admin.js',
-            array_merge(['fluent-cart_global_admin_hooks'], $componentHandles),
+            array_merge(['wp-i18n', 'fluent-cart_global_admin_hooks'], $componentHandles),
             (string) filemtime($bundlePath),
             true,
         );
+
+        // Every admin script reads its strings through wp.i18n; point each
+        // handle at the plugin-shipped JED catalogues in languages/.
+        foreach (array_merge(['fchub-mc-switcher-preview'], $componentHandles, ['fchub-mc-admin']) as $handle) {
+            wp_set_script_translations($handle, 'fchub-multi-currency', FCHUB_MC_PATH . 'languages');
+        }
 
         // Settings page CSS (tab strip, currency grid, pills)
         $adminCssPath = FCHUB_MC_PATH . 'admin/multi-currency-admin.css';

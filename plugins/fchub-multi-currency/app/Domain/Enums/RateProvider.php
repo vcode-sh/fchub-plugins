@@ -16,10 +16,10 @@ enum RateProvider: string
     public function label(): string
     {
         return match ($this) {
-            self::ExchangeRateApi   => 'ExchangeRate-API (free tier)',
-            self::OpenExchangeRates => 'Open Exchange Rates',
-            self::Ecb               => 'European Central Bank (EUR base, free)',
-            self::Manual            => 'Manual rates',
+            self::ExchangeRateApi   => __('ExchangeRate-API (free tier)', 'fchub-multi-currency'),
+            self::OpenExchangeRates => __('Open Exchange Rates', 'fchub-multi-currency'),
+            self::Ecb               => __('European Central Bank (EUR base, free)', 'fchub-multi-currency'),
+            self::Manual            => __('Manual rates', 'fchub-multi-currency'),
         };
     }
 

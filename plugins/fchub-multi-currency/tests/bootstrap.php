@@ -712,6 +712,17 @@ if (!function_exists('wp_localize_script')) {
     }
 }
 
+if (!function_exists('wp_set_script_translations')) {
+    function wp_set_script_translations($handle, $domain = 'default', $path = '')
+    {
+        $GLOBALS['wp_script_translations'][$handle] = [
+            'domain' => $domain,
+            'path'   => $path,
+        ];
+        return true;
+    }
+}
+
 if (!function_exists('wp_add_inline_script')) {
     function wp_add_inline_script($handle, $data, $position = 'after')
     {

@@ -43,6 +43,9 @@ final class BlocksModuleTest extends TestCase
         $module->register();
 
         $this->assertArrayHasKey('fchub-mc-switcher-block-editor-script', $GLOBALS['wp_registered_scripts']);
+        $editorTranslations = $GLOBALS['wp_script_translations']['fchub-mc-switcher-block-editor-script'] ?? null;
+        $this->assertIsArray($editorTranslations, 'the editor script must register script translations');
+        $this->assertSame('fchub-multi-currency', $editorTranslations['domain']);
         $this->assertArrayHasKey('fchub-multi-currency/switcher', $GLOBALS['wp_registered_blocks']);
         $this->assertArrayHasKey('fchub-multi-currency/current-currency', $GLOBALS['wp_registered_blocks']);
         $this->assertArrayHasKey('fchub-multi-currency/exchange-rate', $GLOBALS['wp_registered_blocks']);
