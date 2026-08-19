@@ -66,8 +66,6 @@ final class Constants
         'account_persistence_enabled' => 'yes',
         'cookie_lifetime_days'        => 90,
         'geo_enabled'                 => 'no',
-        'geo_provider'                => 'ip_api',
-        'geo_api_key'                 => '',
         'rate_provider'               => 'manual',
         'rate_provider_api_key'       => '',
         'rate_refresh_interval_hrs'   => 6,
