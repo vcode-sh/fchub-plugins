@@ -91,6 +91,27 @@ Separate from browser cookies, this controls whether logged-in users keep their 
 
 This is useful when you want to test or demo the site as an authenticated user without your old preference overriding the configured default display currency.
 
+### Detect from Visitor Locale
+
+On a true first visit — no saved cookie, no account preference, no `?currency=`
+link — the switcher can start on the currency the visitor's own clock implies:
+their browser's timezone maps to a country, the country to one of your offered
+currencies. A visitor in Warsaw sees PLN before touching anything, provided you
+offer PLN.
+
+<Callout type="info" title="Why this runs in the browser">
+The detection never touches your server. The page ships a small map of "which
+timezones imply which of your offered currencies" — a store fact, identical for
+every visitor, so cached pages stay byte-identical and no geolocation service,
+IP lookup, or personal data is involved. The browser reads its own timezone and
+picks from the map at paint time.
+</Callout>
+
+The hint is deliberately timid: it never outranks anything the visitor chose or
+any campaign link, and it is never stored — an explicit switch replaces it
+through the normal persistence path. Unmapped timezones and currencies you do
+not offer fall through to the default display currency. Off by default.
+
 ### Remove Data on Uninstall
 
 Leave this on **Keep data** unless you're absolutely sure you're done with the plugin. When set to **Delete all**, removing the plugin wipes everything — rate history, settings, saved currency preferences. There's no undo.
@@ -269,6 +290,29 @@ After the exchange rate math, how should converted prices be rounded?
 - **Floor** — always rounds down
 - **None** — truncates to the currency's decimal places without rounding (33.337 → 33.33)
 
+### Charm Rounding
+
+After conversion and decimal rounding, optionally snap converted prices to
+selling endings — the psychological-pricing step. Display-only, like every
+converted number: checkout still charges the base currency exactly, and the
+disclosure already calls converted prices approximate.
+
+| Rule | 34.55 becomes | 1722.52 becomes |
+|---|---|---|
+| No charm rounding | 34.55 | 1722.52 |
+| Whole amounts | 35 | 1723 |
+| …99 endings | 34.99 | 1722.99 |
+| …95 endings | 34.95 | 1722.95 |
+| Nearest 5 | 35 | 1725 |
+| Nearest 10 | 30 | 1720 |
+
+The rule applies uniformly to every converted surface — items, ranges, compare
+prices, variant buttons — because a charmed item next to an uncharmed total
+reads as a bug. Zero-decimal currencies collapse the `.99`/`.95` endings to
+whole amounts, free items stay free, and discounts stay negative. Off by
+default (`No charm rounding`), so an untouched store keeps its exact
+conversions.
+
 ### Current Rates
 
 The bottom of the tab shows your live rates — base currency, converted currency, the rate, which provider fetched it, when, and whether it's fresh (green **OK**) or stale.
@@ -386,15 +430,14 @@ That's it. Five steps, five minutes, and your store now speaks multiple currenci
     | `url_param_key` | string | `currency` | URL parameter name |
     | `cookie_enabled` | string | `yes` | Cookie persistence |
     | `cookie_lifetime_days` | int | `90` | Cookie lifetime in days |
-    | `geo_enabled` | string | `no` | Geolocation auto-detect |
-    | `geo_provider` | string | `ip_api` | Geolocation provider slug |
-    | `geo_api_key` | string | `""` | Geolocation API key |
+    | `geo_enabled` | string | `no` | First-visit locale detection (browser-side) |
     | `rate_provider` | string | `manual` | Exchange rate provider |
     | `rate_provider_api_key` | string | `""` | Rate provider API key |
     | `rate_refresh_interval_hrs` | int | `6` | Cron refresh interval (hours) |
     | `stale_threshold_hrs` | int | `24` | Stale rate threshold (hours) |
     | `stale_fallback` | string | `base` | Stale behaviour: `base` or `last_known` |
     | `rounding_mode` | string | `half_up` | Rounding mode |
+    | `charm_rounding` | string | `none` | Charm rounding rule for converted display prices |
     | `checkout_disclosure_enabled` | string | `yes` | Checkout disclosure notice |
     | `checkout_disclosure_text` | string | `Your payment will be processed in {base_currency}.` | Disclosure template |
     | `show_rate_freshness_badge` | string | `yes` | Switcher rate badge |

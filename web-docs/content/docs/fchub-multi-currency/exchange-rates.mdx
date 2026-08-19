@@ -186,6 +186,10 @@ to your settings. These examples use a two-decimal display currency:
 | **Ceil** | Always round up | `12.35` |
 | **Floor** | Always round down | `12.34` |
 
+After decimal rounding, an optional [charm-rounding rule](/docs/fchub-multi-currency/configuration#charm-rounding)
+can snap the converted price to a selling ending — `.99`, `.95`, whole
+amounts, or the nearest 5 or 10. Off by default.
+
 The display currency's **Decimals** value controls the granularity:
 
 | Decimals | Rounds To | Example (input: 12.3456, Half Up) |
