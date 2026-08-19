@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Domain\Services;
 
+use FChubMultiCurrency\Domain\Enums\CharmRounding;
 use FChubMultiCurrency\Domain\Enums\RoundingMode;
 
 defined('ABSPATH') || exit;
@@ -65,17 +66,19 @@ final class RoundingPolicy
             return $amount;
         }
 
-        if ($decimals === 0 && ($rule === 'ending_99' || $rule === 'ending_95')) {
-            $rule = 'whole';
+        $charm = CharmRounding::tryFrom($rule) ?? CharmRounding::None;
+
+        if ($decimals === 0 && ($charm === CharmRounding::Ending99 || $charm === CharmRounding::Ending95)) {
+            $charm = CharmRounding::Whole;
         }
 
-        return match ($rule) {
-            'whole'      => round($amount),
-            'ending_99'  => ceil($amount) - 0.01,
-            'ending_95'  => ceil($amount) - 0.05,
-            'nearest_5'  => round($amount / 5) * 5,
-            'nearest_10' => round($amount / 10) * 10,
-            default      => $amount,
+        return match ($charm) {
+            CharmRounding::None      => $amount,
+            CharmRounding::Whole     => round($amount),
+            CharmRounding::Ending99  => ceil($amount) - 0.01,
+            CharmRounding::Ending95  => ceil($amount) - 0.05,
+            CharmRounding::Nearest5  => round($amount / 5) * 5,
+            CharmRounding::Nearest10 => round($amount / 10) * 10,
         };
     }
 }

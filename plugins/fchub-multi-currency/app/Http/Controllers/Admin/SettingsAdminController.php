@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Http\Controllers\Admin;
 
+use FChubMultiCurrency\Domain\Enums\CharmRounding;
 use FChubMultiCurrency\Domain\Enums\CurrencyPosition;
 use FChubMultiCurrency\Domain\Enums\RateProvider;
 use FChubMultiCurrency\Domain\Enums\RoundingMode;
@@ -85,8 +86,8 @@ final class SettingsAdminController
                 'rounding_mode' => self::sanitizeEnum((string) $value, array_column(RoundingMode::cases(), 'value'), 'half_up'),
                 'charm_rounding' => self::sanitizeEnum(
                     (string) $value,
-                    ['none', 'whole', 'ending_99', 'ending_95', 'nearest_5', 'nearest_10'],
-                    'none',
+                    array_column(CharmRounding::cases(), 'value'),
+                    CharmRounding::None->value,
                 ),
                 'cookie_lifetime_days' => max(1, min(365, (int) $value)),
                 'rate_refresh_interval_hrs' => max(1, min(168, (int) $value)),

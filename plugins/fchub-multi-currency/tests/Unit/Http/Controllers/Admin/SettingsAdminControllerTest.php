@@ -244,6 +244,23 @@ final class SettingsAdminControllerTest extends TestCase
         self::assertFalse(wp_next_scheduled('fchub_mc_refresh_rates'));
     }
 
+    /**
+     * The sanitizer's vocabulary is derived from the CharmRounding enum, so
+     * a rule added to the maths can never be silently unreachable through
+     * the settings surface.
+     */
+    #[Test]
+    public function testEveryCharmRuleTheEnumKnowsSurvivesTheSanitizer(): void
+    {
+        foreach (\FChubMultiCurrency\Domain\Enums\CharmRounding::cases() as $rule) {
+            $request = new \WP_REST_Request('POST', '/');
+            $request->set_json_params(['charm_rounding' => $rule->value]);
+            $settings = (new SettingsAdminController())->save($request)->get_data()['data']['settings'];
+
+            $this->assertSame($rule->value, $settings['charm_rounding']);
+        }
+    }
+
     #[Test]
     public function testCharmRoundingAcceptsKnownRulesAndDegradesUnknownOnes(): void
     {
