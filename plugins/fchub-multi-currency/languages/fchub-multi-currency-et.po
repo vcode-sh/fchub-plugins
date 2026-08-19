@@ -5,7 +5,7 @@ msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
 "currency\n"
-"POT-Creation-Date: 2026-08-19T09:45:38+00:00\n"
+"POT-Creation-Date: 2026-08-19T15:13:39+00:00\n"
 "PO-Revision-Date: 2026-08-19 02:17+0300\n"
 "Last-Translator: \n"
 "Language-Team: Estonian\n"
@@ -365,11 +365,11 @@ msgstr "Vigane JSON-andmestik."
 msgid "Select a valid exchange-rate provider."
 msgstr "Vali kehtiv vahetuskursi pakkuja."
 
-#: app/Http/Controllers/Admin/SettingsAdminController.php:105
+#: app/Http/Controllers/Admin/SettingsAdminController.php:110
 msgid "An API key is required for the selected exchange-rate provider."
 msgstr "Valitud vahetuskursi pakkuja jaoks on vaja API-võtit."
 
-#: app/Http/Controllers/Admin/SettingsAdminController.php:136
+#: app/Http/Controllers/Admin/SettingsAdminController.php:141
 msgid "Settings saved successfully."
 msgstr "Seaded salvestati."
 
@@ -900,7 +900,10 @@ msgid ""
 "On a first visit with no saved preference, show the offered currency implied "
 "by the visitor's timezone. Runs entirely in the browser — no lookup service, "
 "nothing stored until they choose."
-msgstr "Esimesel külastusel ilma salvestatud eelistuseta kuvatakse pakutav valuuta, millele viitab külastaja ajavöönd. Töötab täielikult brauseris — ilma päringuteenuseta, midagi ei salvestata enne, kui külastaja valib."
+msgstr ""
+"Esimesel külastusel ilma salvestatud eelistuseta kuvatakse pakutav valuuta, "
+"millele viitab külastaja ajavöönd. Töötab täielikult brauseris — ilma "
+"päringuteenuseta, midagi ei salvestata enne, kui külastaja valib."
 
 #: admin/components/general-settings.js:249
 msgid "Remove Data on Uninstall"
@@ -995,52 +998,86 @@ msgstr "Ümardamisviis"
 msgid "How converted prices are rounded."
 msgstr "Kuidas teisendatud hindu ümardatakse."
 
-#: admin/components/rate-settings.js:162
+#: admin/components/rate-settings.js:164
+msgid "Charm Rounding"
+msgstr "Psühholoogiline ümardamine"
+
+#: admin/components/rate-settings.js:167
+msgid ""
+"Round converted display prices to selling endings. Display-only, like every "
+"converted price; checkout still charges the base currency exactly."
+msgstr "Ümardab kuvatavad konverteeritud hinnad müügilõppudeks. Ainult kuvamiseks, nagu iga konverteeritud hind; makse võetakse endiselt täpselt baasvaluutas."
+
+#: admin/components/rate-settings.js:176
+msgid "No charm rounding"
+msgstr "Ilma psühholoogilise ümardamiseta"
+
+#: admin/components/rate-settings.js:179
+msgid "Whole amounts (35)"
+msgstr "Täissummad (35)"
+
+#: admin/components/rate-settings.js:182
+msgid "…99 endings (34.99)"
+msgstr "…99 lõpud (34.99)"
+
+#: admin/components/rate-settings.js:185
+msgid "…95 endings (34.95)"
+msgstr "…95 lõpud (34.95)"
+
+#: admin/components/rate-settings.js:188
+msgid "Nearest 5 (35)"
+msgstr "Lähima 5-ni (35)"
+
+#: admin/components/rate-settings.js:191
+msgid "Nearest 10 (30)"
+msgstr "Lähima 10-ni (30)"
+
+#: admin/components/rate-settings.js:198
 msgid "Manual Rates"
 msgstr "Käsitsi määratud kursid"
 
-#: admin/components/rate-settings.js:165
+#: admin/components/rate-settings.js:201
 msgid "Save the provider change before entering manual rates."
 msgstr ""
 "Enne käsitsi määratud kursside sisestamist salvesta kursipakkuja muudatus."
 
-#: admin/components/rate-settings.js:168
+#: admin/components/rate-settings.js:204
 msgid "Add and save at least one display currency first."
 msgstr "Lisa ja salvesta esmalt vähemalt üks kuvamisvaluuta."
 
-#: admin/components/rate-settings.js:181
+#: admin/components/rate-settings.js:217
 msgid "Current Rates"
 msgstr "Praegused kursid"
 
-#: admin/components/rate-settings.js:184
+#: admin/components/rate-settings.js:220
 msgid "Save Manual Rates"
 msgstr "Salvesta käsitsi määratud kursid"
 
-#: admin/components/rate-settings.js:187
+#: admin/components/rate-settings.js:223
 msgid "Refresh Now"
 msgstr "Värskenda kohe"
 
-#: admin/components/rate-settings.js:192
+#: admin/components/rate-settings.js:228
 msgid "Base"
 msgstr "Põhivaluuta"
 
-#: admin/components/rate-settings.js:195
+#: admin/components/rate-settings.js:231
 msgid "Quote"
 msgstr "Noteerimisvaluuta"
 
-#: admin/components/rate-settings.js:198
+#: admin/components/rate-settings.js:234
 msgid "Rate"
 msgstr "Kurss"
 
-#: admin/components/rate-settings.js:201
+#: admin/components/rate-settings.js:237
 msgid "Provider"
 msgstr "Pakkuja"
 
-#: admin/components/rate-settings.js:204
+#: admin/components/rate-settings.js:240
 msgid "Fetched"
 msgstr "Hangitud"
 
-#: admin/components/rate-settings.js:207
+#: admin/components/rate-settings.js:243
 msgid "Status"
 msgstr "Olek"
 

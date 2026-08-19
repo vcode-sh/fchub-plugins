@@ -5,7 +5,7 @@ msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
 "currency\n"
-"POT-Creation-Date: 2026-08-19T09:45:38+00:00\n"
+"POT-Creation-Date: 2026-08-19T15:13:39+00:00\n"
 "PO-Revision-Date: 2026-08-19 00:35+0300\n"
 "Last-Translator: \n"
 "Language-Team: French\n"
@@ -373,12 +373,12 @@ msgstr "Charge utile JSON non valide."
 msgid "Select a valid exchange-rate provider."
 msgstr "Sélectionnez un fournisseur de taux de change valide."
 
-#: app/Http/Controllers/Admin/SettingsAdminController.php:105
+#: app/Http/Controllers/Admin/SettingsAdminController.php:110
 msgid "An API key is required for the selected exchange-rate provider."
 msgstr ""
 "Une clé API est requise pour le fournisseur de taux de change sélectionné."
 
-#: app/Http/Controllers/Admin/SettingsAdminController.php:136
+#: app/Http/Controllers/Admin/SettingsAdminController.php:141
 msgid "Settings saved successfully."
 msgstr "Les réglages ont bien été enregistrés."
 
@@ -919,7 +919,11 @@ msgid ""
 "On a first visit with no saved preference, show the offered currency implied "
 "by the visitor's timezone. Runs entirely in the browser — no lookup service, "
 "nothing stored until they choose."
-msgstr "Lors d'une première visite sans préférence enregistrée, affiche la devise proposée qu'implique le fuseau horaire du visiteur. S'exécute entièrement dans le navigateur — aucun service de recherche, rien n'est enregistré tant qu'il n'a pas choisi."
+msgstr ""
+"Lors d'une première visite sans préférence enregistrée, affiche la devise "
+"proposée qu'implique le fuseau horaire du visiteur. S'exécute entièrement "
+"dans le navigateur — aucun service de recherche, rien n'est enregistré tant "
+"qu'il n'a pas choisi."
 
 #: admin/components/general-settings.js:249
 msgid "Remove Data on Uninstall"
@@ -1017,52 +1021,86 @@ msgstr "Mode d’arrondi"
 msgid "How converted prices are rounded."
 msgstr "Méthode d’arrondi des prix convertis."
 
-#: admin/components/rate-settings.js:162
+#: admin/components/rate-settings.js:164
+msgid "Charm Rounding"
+msgstr "Arrondi psychologique"
+
+#: admin/components/rate-settings.js:167
+msgid ""
+"Round converted display prices to selling endings. Display-only, like every "
+"converted price; checkout still charges the base currency exactly."
+msgstr "Arrondit les prix convertis affichés à des terminaisons commerciales. Affichage uniquement, comme tout prix converti ; le paiement reste débité exactement dans la devise de base."
+
+#: admin/components/rate-settings.js:176
+msgid "No charm rounding"
+msgstr "Pas d'arrondi psychologique"
+
+#: admin/components/rate-settings.js:179
+msgid "Whole amounts (35)"
+msgstr "Montants entiers (35)"
+
+#: admin/components/rate-settings.js:182
+msgid "…99 endings (34.99)"
+msgstr "Terminaisons …99 (34.99)"
+
+#: admin/components/rate-settings.js:185
+msgid "…95 endings (34.95)"
+msgstr "Terminaisons …95 (34.95)"
+
+#: admin/components/rate-settings.js:188
+msgid "Nearest 5 (35)"
+msgstr "Au 5 le plus proche (35)"
+
+#: admin/components/rate-settings.js:191
+msgid "Nearest 10 (30)"
+msgstr "Au 10 le plus proche (30)"
+
+#: admin/components/rate-settings.js:198
 msgid "Manual Rates"
 msgstr "Taux manuels"
 
-#: admin/components/rate-settings.js:165
+#: admin/components/rate-settings.js:201
 msgid "Save the provider change before entering manual rates."
 msgstr ""
 "Enregistrez le changement de fournisseur avant de saisir des taux manuels."
 
-#: admin/components/rate-settings.js:168
+#: admin/components/rate-settings.js:204
 msgid "Add and save at least one display currency first."
 msgstr "Commencez par ajouter et enregistrer au moins une devise d’affichage."
 
-#: admin/components/rate-settings.js:181
+#: admin/components/rate-settings.js:217
 msgid "Current Rates"
 msgstr "Taux actuels"
 
-#: admin/components/rate-settings.js:184
+#: admin/components/rate-settings.js:220
 msgid "Save Manual Rates"
 msgstr "Enregistrer les taux manuels"
 
-#: admin/components/rate-settings.js:187
+#: admin/components/rate-settings.js:223
 msgid "Refresh Now"
 msgstr "Actualiser maintenant"
 
-#: admin/components/rate-settings.js:192
+#: admin/components/rate-settings.js:228
 msgid "Base"
 msgstr "Base"
 
-#: admin/components/rate-settings.js:195
+#: admin/components/rate-settings.js:231
 msgid "Quote"
 msgstr "Cotation"
 
-#: admin/components/rate-settings.js:198
+#: admin/components/rate-settings.js:234
 msgid "Rate"
 msgstr "Taux"
 
-#: admin/components/rate-settings.js:201
+#: admin/components/rate-settings.js:237
 msgid "Provider"
 msgstr "Fournisseur"
 
-#: admin/components/rate-settings.js:204
+#: admin/components/rate-settings.js:240
 msgid "Fetched"
 msgstr "Récupéré le"
 
-#: admin/components/rate-settings.js:207
+#: admin/components/rate-settings.js:243
 msgid "Status"
 msgstr "État"
 

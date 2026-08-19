@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-19T09:45:38+00:00\n"
+"POT-Creation-Date: 2026-08-19T15:13:39+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: fchub-multi-currency\n"
@@ -357,11 +357,11 @@ msgstr ""
 msgid "Select a valid exchange-rate provider."
 msgstr ""
 
-#: app/Http/Controllers/Admin/SettingsAdminController.php:105
+#: app/Http/Controllers/Admin/SettingsAdminController.php:110
 msgid "An API key is required for the selected exchange-rate provider."
 msgstr ""
 
-#: app/Http/Controllers/Admin/SettingsAdminController.php:136
+#: app/Http/Controllers/Admin/SettingsAdminController.php:141
 msgid "Settings saved successfully."
 msgstr ""
 
@@ -939,51 +939,83 @@ msgstr ""
 msgid "How converted prices are rounded."
 msgstr ""
 
-#: admin/components/rate-settings.js:162
-msgid "Manual Rates"
+#: admin/components/rate-settings.js:164
+msgid "Charm Rounding"
 msgstr ""
 
-#: admin/components/rate-settings.js:165
-msgid "Save the provider change before entering manual rates."
+#: admin/components/rate-settings.js:167
+msgid "Round converted display prices to selling endings. Display-only, like every converted price; checkout still charges the base currency exactly."
 msgstr ""
 
-#: admin/components/rate-settings.js:168
-msgid "Add and save at least one display currency first."
+#: admin/components/rate-settings.js:176
+msgid "No charm rounding"
 msgstr ""
 
-#: admin/components/rate-settings.js:181
-msgid "Current Rates"
+#: admin/components/rate-settings.js:179
+msgid "Whole amounts (35)"
 msgstr ""
 
-#: admin/components/rate-settings.js:184
-msgid "Save Manual Rates"
+#: admin/components/rate-settings.js:182
+msgid "…99 endings (34.99)"
 msgstr ""
 
-#: admin/components/rate-settings.js:187
-msgid "Refresh Now"
+#: admin/components/rate-settings.js:185
+msgid "…95 endings (34.95)"
 msgstr ""
 
-#: admin/components/rate-settings.js:192
-msgid "Base"
+#: admin/components/rate-settings.js:188
+msgid "Nearest 5 (35)"
 msgstr ""
 
-#: admin/components/rate-settings.js:195
-msgid "Quote"
+#: admin/components/rate-settings.js:191
+msgid "Nearest 10 (30)"
 msgstr ""
 
 #: admin/components/rate-settings.js:198
-msgid "Rate"
+msgid "Manual Rates"
 msgstr ""
 
 #: admin/components/rate-settings.js:201
-msgid "Provider"
+msgid "Save the provider change before entering manual rates."
 msgstr ""
 
 #: admin/components/rate-settings.js:204
+msgid "Add and save at least one display currency first."
+msgstr ""
+
+#: admin/components/rate-settings.js:217
+msgid "Current Rates"
+msgstr ""
+
+#: admin/components/rate-settings.js:220
+msgid "Save Manual Rates"
+msgstr ""
+
+#: admin/components/rate-settings.js:223
+msgid "Refresh Now"
+msgstr ""
+
+#: admin/components/rate-settings.js:228
+msgid "Base"
+msgstr ""
+
+#: admin/components/rate-settings.js:231
+msgid "Quote"
+msgstr ""
+
+#: admin/components/rate-settings.js:234
+msgid "Rate"
+msgstr ""
+
+#: admin/components/rate-settings.js:237
+msgid "Provider"
+msgstr ""
+
+#: admin/components/rate-settings.js:240
 msgid "Fetched"
 msgstr ""
 
-#: admin/components/rate-settings.js:207
+#: admin/components/rate-settings.js:243
 msgid "Status"
 msgstr ""
 

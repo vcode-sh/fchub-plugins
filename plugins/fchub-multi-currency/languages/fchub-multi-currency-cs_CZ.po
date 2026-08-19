@@ -5,7 +5,7 @@ msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
 "currency\n"
-"POT-Creation-Date: 2026-08-19T09:45:38+00:00\n"
+"POT-Creation-Date: 2026-08-19T15:13:39+00:00\n"
 "PO-Revision-Date: 2026-08-19 00:00+0300\n"
 "Last-Translator: \n"
 "Language-Team: Czech\n"
@@ -369,11 +369,11 @@ msgstr "Neplatná data JSON."
 msgid "Select a valid exchange-rate provider."
 msgstr "Vyberte platného poskytovatele směnných kurzů."
 
-#: app/Http/Controllers/Admin/SettingsAdminController.php:105
+#: app/Http/Controllers/Admin/SettingsAdminController.php:110
 msgid "An API key is required for the selected exchange-rate provider."
 msgstr "Vybraný poskytovatel směnných kurzů vyžaduje klíč API."
 
-#: app/Http/Controllers/Admin/SettingsAdminController.php:136
+#: app/Http/Controllers/Admin/SettingsAdminController.php:141
 msgid "Settings saved successfully."
 msgstr "Nastavení bylo úspěšně uloženo."
 
@@ -905,7 +905,10 @@ msgid ""
 "On a first visit with no saved preference, show the offered currency implied "
 "by the visitor's timezone. Runs entirely in the browser — no lookup service, "
 "nothing stored until they choose."
-msgstr "Při první návštěvě bez uložené preference zobrazí nabízenou měnu odvozenou z časového pásma návštěvníka. Běží výhradně v prohlížeči — žádná externí služba, nic se neukládá, dokud si návštěvník nevybere."
+msgstr ""
+"Při první návštěvě bez uložené preference zobrazí nabízenou měnu odvozenou z "
+"časového pásma návštěvníka. Běží výhradně v prohlížeči — žádná externí "
+"služba, nic se neukládá, dokud si návštěvník nevybere."
 
 #: admin/components/general-settings.js:249
 msgid "Remove Data on Uninstall"
@@ -1001,51 +1004,85 @@ msgstr "Způsob zaokrouhlení"
 msgid "How converted prices are rounded."
 msgstr "Jak se zaokrouhlují přepočtené ceny."
 
-#: admin/components/rate-settings.js:162
+#: admin/components/rate-settings.js:164
+msgid "Charm Rounding"
+msgstr "Psychologické zaokrouhlování"
+
+#: admin/components/rate-settings.js:167
+msgid ""
+"Round converted display prices to selling endings. Display-only, like every "
+"converted price; checkout still charges the base currency exactly."
+msgstr "Zaokrouhlujte zobrazované převedené ceny na prodejní koncovky. Pouze pro zobrazení, jako každá převedená cena; platba se stále účtuje přesně v základní měně."
+
+#: admin/components/rate-settings.js:176
+msgid "No charm rounding"
+msgstr "Bez psychologického zaokrouhlování"
+
+#: admin/components/rate-settings.js:179
+msgid "Whole amounts (35)"
+msgstr "Celé částky (35)"
+
+#: admin/components/rate-settings.js:182
+msgid "…99 endings (34.99)"
+msgstr "Koncovky …99 (34.99)"
+
+#: admin/components/rate-settings.js:185
+msgid "…95 endings (34.95)"
+msgstr "Koncovky …95 (34.95)"
+
+#: admin/components/rate-settings.js:188
+msgid "Nearest 5 (35)"
+msgstr "Na nejbližších 5 (35)"
+
+#: admin/components/rate-settings.js:191
+msgid "Nearest 10 (30)"
+msgstr "Na nejbližších 10 (30)"
+
+#: admin/components/rate-settings.js:198
 msgid "Manual Rates"
 msgstr "Ruční kurzy"
 
-#: admin/components/rate-settings.js:165
+#: admin/components/rate-settings.js:201
 msgid "Save the provider change before entering manual rates."
 msgstr "Před zadáním ručních kurzů uložte změnu poskytovatele."
 
-#: admin/components/rate-settings.js:168
+#: admin/components/rate-settings.js:204
 msgid "Add and save at least one display currency first."
 msgstr "Nejprve přidejte a uložte alespoň jednu zobrazovanou měnu."
 
-#: admin/components/rate-settings.js:181
+#: admin/components/rate-settings.js:217
 msgid "Current Rates"
 msgstr "Aktuální kurzy"
 
-#: admin/components/rate-settings.js:184
+#: admin/components/rate-settings.js:220
 msgid "Save Manual Rates"
 msgstr "Uložit ruční kurzy"
 
-#: admin/components/rate-settings.js:187
+#: admin/components/rate-settings.js:223
 msgid "Refresh Now"
 msgstr "Aktualizovat nyní"
 
-#: admin/components/rate-settings.js:192
+#: admin/components/rate-settings.js:228
 msgid "Base"
 msgstr "Základní měna"
 
-#: admin/components/rate-settings.js:195
+#: admin/components/rate-settings.js:231
 msgid "Quote"
 msgstr "Kotovaná měna"
 
-#: admin/components/rate-settings.js:198
+#: admin/components/rate-settings.js:234
 msgid "Rate"
 msgstr "Kurz"
 
-#: admin/components/rate-settings.js:201
+#: admin/components/rate-settings.js:237
 msgid "Provider"
 msgstr "Poskytovatel"
 
-#: admin/components/rate-settings.js:204
+#: admin/components/rate-settings.js:240
 msgid "Fetched"
 msgstr "Načteno"
 
-#: admin/components/rate-settings.js:207
+#: admin/components/rate-settings.js:243
 msgid "Status"
 msgstr "Stav"
 
