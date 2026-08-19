@@ -290,6 +290,10 @@
 	pointer-events: none;
 }
 
+.fchub-mc-coming-soon-row .el-radio__original:disabled {
+	opacity: 0;
+}
+
 .fchub-mc-badge-soon {
 	display: inline-block;
 	font-size: 10px;
