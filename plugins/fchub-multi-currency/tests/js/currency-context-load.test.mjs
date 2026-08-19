@@ -129,3 +129,99 @@ describe("label runtime at page load, without the projection runtime", () => {
 		assert.equal(dom.usdOption.getAttribute("aria-selected"), "false");
 	});
 });
+
+/**
+ * The guarantee issue #72's reporter verified by hand: the currency a visitor
+ * chose rides inside FluentCart's own checkout form. Two moments matter — the
+ * page paint, and the capture-phase submit listener that corrects the field
+ * an instant before FluentCart serialises the form. Break either and orders
+ * record the cache-warmer's currency, not the customer's.
+ */
+describe("checkout field carries the browser's currency", () => {
+	function checkoutField(initial = "") {
+		return { value: initial };
+	}
+
+	function loadWithSubmitCapture({ config, fchubMc, documentFields = [] }) {
+		let submitListener = null;
+		const sandbox = {
+			window: { fchubMcConfig: config, fchubMc },
+			document: {
+				readyState: "complete",
+				addEventListener(type, handler, capture) {
+					if (type === "submit" && capture === true) submitListener = handler;
+				},
+				querySelectorAll: (selector) =>
+					selector === "[data-fchub-mc-checkout-currency]" ? documentFields : [],
+			},
+			console,
+		};
+
+		vm.runInNewContext(contextSource, sandbox, { filename: "currency-context.js" });
+
+		return { sandbox, submit: (target) => submitListener?.({ target }) };
+	}
+
+	function configWithTable() {
+		const config = {
+			baseCurrency: "USD",
+			currencyTable: {
+				USD: { symbol: "$", displayCurrencyName: "US Dollar" },
+				EUR: { symbol: "€", displayCurrencyName: "Euro" },
+				PLN: { symbol: "zł", displayCurrencyName: "Polish Złoty" },
+			},
+		};
+		const fchubMc = {
+			currentCurrency: () => "EUR",
+			select: (code) => {
+				if (!Object.hasOwn(config.currencyTable, code)) return false;
+				Object.assign(config, config.currencyTable[code], {
+					displayCurrency: code,
+					isBaseDisplay: code === "USD",
+				});
+				return true;
+			},
+		};
+		return { config, fchubMc };
+	}
+
+	it("stamps the resolved currency into checkout fields at paint time", () => {
+		const { config, fchubMc } = configWithTable();
+		const field = checkoutField("USD");
+
+		loadWithSubmitCapture({ config, fchubMc, documentFields: [field] });
+
+		assert.equal(field.value, "EUR", "The server-rendered base value is corrected on paint.");
+	});
+
+	it("corrects the submitted form's field an instant before FluentCart reads it", () => {
+		const { config, fchubMc } = configWithTable();
+		const { submit } = loadWithSubmitCapture({ config, fchubMc });
+
+		fchubMc.select("PLN");
+		const staleField = checkoutField("EUR");
+		const form = {
+			querySelectorAll: (selector) =>
+				selector === "[data-fchub-mc-checkout-currency]" ? [staleField] : [],
+		};
+
+		submit(form);
+
+		assert.equal(staleField.value, "PLN", "The order records what the customer is looking at.");
+	});
+
+	it("leaves the field alone when nothing valid is selected", () => {
+		const { config, fchubMc } = configWithTable();
+		config.displayCurrency = undefined;
+		fchubMc.currentCurrency = () => "";
+		const { submit } = loadWithSubmitCapture({ config, fchubMc });
+
+		const field = checkoutField("USD");
+		submit({
+			querySelectorAll: (selector) =>
+				selector === "[data-fchub-mc-checkout-currency]" ? [field] : [],
+		});
+
+		assert.equal(field.value, "USD", "No resolved currency, no rewrite.");
+	});
+});

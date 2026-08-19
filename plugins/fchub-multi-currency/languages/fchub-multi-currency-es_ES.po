@@ -3,17 +3,18 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-currency\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
+"currency\n"
+"POT-Creation-Date: 2026-08-19T05:50:59+00:00\n"
+"PO-Revision-Date: 2026-08-18 21:01+0000\n"
 "Last-Translator: \n"
 "Language-Team: Spanish (Spain)\n"
+"Language: es_ES\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-18T19:36:27+00:00\n"
-"PO-Revision-Date: 2026-08-18 21:01+0000\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: fchub-multi-currency\n"
-"Language: es_ES\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #. Plugin Name of the plugin
@@ -30,8 +31,12 @@ msgstr "https://fchub.co/docs/fchub-multi-currency"
 
 #. Description of the plugin
 #: fchub-multi-currency.php
-msgid "Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure"
-msgstr "Sistema multidivisa en la capa de presentación para FluentCart, con gestión de tipos de cambio y aviso durante el pago"
+msgid ""
+"Display-layer multi-currency for FluentCart with exchange rate management "
+"and checkout disclosure"
+msgstr ""
+"Sistema multidivisa en la capa de presentación para FluentCart, con gestión "
+"de tipos de cambio y aviso durante el pago"
 
 #. Author of the plugin
 #: fchub-multi-currency.php
@@ -49,11 +54,16 @@ msgstr "Muestrario de divisas"
 
 #: app/Bootstrap/Modules/BlocksModule.php:83
 msgid "A ready-made showcase of the full currency block family."
-msgstr "Un muestrario listo para usar con toda la familia de bloques de divisas."
+msgstr ""
+"Un muestrario listo para usar con toda la familia de bloques de divisas."
 
 #: app/Bootstrap/Modules/DiagnosticsModule.php:71
-msgid "FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics page or trigger a manual refresh."
-msgstr "FCHub Multi-Currency: algunos tipos de cambio están desactualizados. Consulta la página de diagnóstico o inicia una actualización manual."
+msgid ""
+"FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics "
+"page or trigger a manual refresh."
+msgstr ""
+"FCHub Multi-Currency: algunos tipos de cambio están desactualizados. "
+"Consulta la página de diagnóstico o inicia una actualización manual."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:37
 msgid "Switch the rate provider to Manual rates before saving."
@@ -61,27 +71,36 @@ msgstr "Cambia el proveedor a Tipos de cambio manuales antes de guardar."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:43
 msgid "Add at least one display currency before saving manual rates."
-msgstr "Añade al menos una divisa de visualización antes de guardar los tipos de cambio manuales."
+msgstr ""
+"Añade al menos una divisa de visualización antes de guardar los tipos de "
+"cambio manuales."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:48
 msgid "Provide one rate for every configured display currency."
-msgstr "Indica un tipo de cambio para cada divisa de visualización configurada."
+msgstr ""
+"Indica un tipo de cambio para cada divisa de visualización configurada."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:51
 #: app/Domain/Actions/SaveManualRatesAction.php:98
 msgid "Rates may only be saved for configured display currencies."
-msgstr "Solo se pueden guardar tipos de cambio para las divisas de visualización configuradas."
+msgstr ""
+"Solo se pueden guardar tipos de cambio para las divisas de visualización "
+"configuradas."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:67
 #: app/Http/Controllers/Admin/RatesAdminController.php:104
-#: admin/multi-currency-admin.js:222
+#: admin/multi-currency-page.js:222
 msgid "Manual rates could not be saved."
 msgstr "No se han podido guardar los tipos de cambio manuales."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:110
 #: app/Domain/Actions/SaveManualRatesAction.php:117
-msgid "Each manual rate must be a positive decimal string with up to 8 decimal places."
-msgstr "Cada tipo de cambio manual debe ser un número decimal positivo con un máximo de 8 decimales."
+msgid ""
+"Each manual rate must be a positive decimal string with up to 8 decimal "
+"places."
+msgstr ""
+"Cada tipo de cambio manual debe ser un número decimal positivo con un máximo "
+"de 8 decimales."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:121
 msgid "Each manual rate must be greater than zero."
@@ -191,7 +210,8 @@ msgstr "Estás viendo los precios en %1$s. El pago se realizará en %2$s."
 #: app/Frontend/CurrencyContextPresentation.php:227
 #, php-format
 msgid "Prices shown in %1$s are approximate. Checkout is charged in %2$s."
-msgstr "Los precios mostrados en %1$s son aproximados. El pago se cobrará en %2$s."
+msgstr ""
+"Los precios mostrados en %1$s son aproximados. El pago se cobrará en %2$s."
 
 #: app/Frontend/CurrencyContextPresentation.php:56
 #: app/Frontend/CurrencyContextPresentation.php:326
@@ -322,11 +342,15 @@ msgstr "Tipo de cambio del último pedido"
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:53
 msgid "Manual rates are saved explicitly and cannot be refreshed."
-msgstr "Los tipos de cambio manuales se guardan de forma explícita y no se pueden actualizar."
+msgstr ""
+"Los tipos de cambio manuales se guardan de forma explícita y no se pueden "
+"actualizar."
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:69
 msgid "Failed to refresh exchange rates. Check the logs for details."
-msgstr "No se han podido actualizar los tipos de cambio. Consulta los registros para obtener más información."
+msgstr ""
+"No se han podido actualizar los tipos de cambio. Consulta los registros para "
+"obtener más información."
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:77
 msgid "Exchange rates refreshed successfully."
@@ -334,7 +358,9 @@ msgstr "Los tipos de cambio se han actualizado correctamente."
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:89
 msgid "Provide manual rates as a currency-to-rate object."
-msgstr "Indica los tipos de cambio manuales como un objeto de divisa a tipo de cambio."
+msgstr ""
+"Indica los tipos de cambio manuales como un objeto de divisa a tipo de "
+"cambio."
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:112
 msgid "Manual rates saved successfully."
@@ -351,7 +377,8 @@ msgstr "Selecciona un proveedor de tipos de cambio válido."
 
 #: app/Http/Controllers/Admin/SettingsAdminController.php:105
 msgid "An API key is required for the selected exchange-rate provider."
-msgstr "El proveedor de tipos de cambio seleccionado requiere una clave de API."
+msgstr ""
+"El proveedor de tipos de cambio seleccionado requiere una clave de API."
 
 #: app/Http/Controllers/Admin/SettingsAdminController.php:136
 msgid "Settings saved successfully."
@@ -375,24 +402,41 @@ msgid "Currency code is required."
 msgstr "El código de divisa es obligatorio."
 
 #: app/Http/Controllers/Pub/ContextController.php:144
-msgid "This currency cannot be selected because no usable exchange rate is available. Please try again later."
-msgstr "No se puede seleccionar esta divisa porque no hay ningún tipo de cambio válido disponible. Inténtalo de nuevo más tarde."
+msgid ""
+"This currency cannot be selected because no usable exchange rate is "
+"available. Please try again later."
+msgstr ""
+"No se puede seleccionar esta divisa porque no hay ningún tipo de cambio "
+"válido disponible. Inténtalo de nuevo más tarde."
 
 #: app/Http/Controllers/Pub/ContextController.php:177
-msgid "Currency preference could not be saved because both cookie and account persistence are disabled."
-msgstr "No se ha podido guardar la preferencia de divisa porque están desactivados tanto el guardado en cookies como en la cuenta."
+msgid ""
+"Currency preference could not be saved because both cookie and account "
+"persistence are disabled."
+msgstr ""
+"No se ha podido guardar la preferencia de divisa porque están desactivados "
+"tanto el guardado en cookies como en la cuenta."
 
 #: app/Http/Controllers/Pub/ContextController.php:181
-msgid "Currency preference could not be saved. Cookie persistence is disabled, so logged-out visitors cannot keep a currency choice."
-msgstr "No se ha podido guardar la preferencia de divisa. El almacenamiento en cookies está desactivado, por lo que los visitantes que no hayan iniciado sesión no pueden conservar la divisa elegida."
+msgid ""
+"Currency preference could not be saved. Cookie persistence is disabled, so "
+"logged-out visitors cannot keep a currency choice."
+msgstr ""
+"No se ha podido guardar la preferencia de divisa. El almacenamiento en "
+"cookies está desactivado, por lo que los visitantes que no hayan iniciado "
+"sesión no pueden conservar la divisa elegida."
 
 #: app/Http/Controllers/Pub/ContextController.php:204
 msgid "Currency preference saved."
 msgstr "La preferencia de divisa se ha guardado."
 
 #: app/Integration/AddonsRegistration.php:24
-msgid "Display-layer multi-currency with exchange rate management and checkout disclosure."
-msgstr "Sistema multidivisa en la capa de presentación, con gestión de tipos de cambio y aviso durante el pago."
+msgid ""
+"Display-layer multi-currency with exchange rate management and checkout "
+"disclosure."
+msgstr ""
+"Sistema multidivisa en la capa de presentación, con gestión de tipos de "
+"cambio y aviso durante el pago."
 
 #: app/Integration/FluentCrmSmartCodes.php:189
 msgid "Multi-Currency Order"
@@ -445,7 +489,9 @@ msgstr "Activar Multi-Currency"
 #: app/Integration/MultiCurrencySettings.php:46
 #: admin/components/general-settings.js:68
 msgid "Master switch for display-layer multi-currency across the store."
-msgstr "Interruptor principal del sistema multidivisa en la capa de presentación de toda la tienda."
+msgstr ""
+"Interruptor principal del sistema multidivisa en la capa de presentación de "
+"toda la tienda."
 
 #: app/Integration/MultiCurrencySettings.php:48
 #: app/Integration/MultiCurrencySettings.php:57
@@ -468,8 +514,10 @@ msgstr "Aviso durante el pago"
 
 #: app/Integration/MultiCurrencySettings.php:55
 #: admin/components/checkout-settings.js:26
-msgid "Show a notice at checkout that payment is processed in the base currency."
-msgstr "Muestra durante el pago un aviso de que este se procesa en la divisa base."
+msgid ""
+"Show a notice at checkout that payment is processed in the base currency."
+msgstr ""
+"Muestra durante el pago un aviso de que este se procesa en la divisa base."
 
 #: app/Integration/MultiCurrencySettings.php:63
 #: admin/components/crm-settings.js:23
@@ -486,15 +534,17 @@ msgstr "Ajustes completos"
 
 #: app/Integration/MultiCurrencySettings.php:73
 msgid "Configure currencies, exchange rates, checkout disclosure, and more."
-msgstr "Configura las divisas, los tipos de cambio, el aviso durante el pago y mucho más."
+msgstr ""
+"Configura las divisas, los tipos de cambio, el aviso durante el pago y mucho "
+"más."
 
 #: app/Integration/MultiCurrencySettings.php:98
 msgid "Multi-Currency settings saved."
 msgstr "Los ajustes de Multi-Currency se han guardado."
 
-#: app/Support/AdminMenu.php:19 admin/multi-currency-admin.js:107
-#: admin/multi-currency-admin.js:259 admin/multi-currency-admin.js:327
-#: admin/multi-currency-admin.js:385
+#: app/Support/AdminMenu.php:19 admin/multi-currency-page.js:107
+#: admin/multi-currency-page.js:259 admin/multi-currency-page.js:327
+#: admin/multi-currency-page.js:385
 msgid "Multi-Currency"
 msgstr "Multi-Currency"
 
@@ -506,7 +556,8 @@ msgstr "Cada %d horas"
 
 #: fchub-multi-currency.php:175
 msgid "FCHub Multi-Currency requires FluentCart to be installed and activated."
-msgstr "FCHub Multi-Currency requiere que FluentCart esté instalado y activado."
+msgstr ""
+"FCHub Multi-Currency requiere que FluentCart esté instalado y activado."
 
 #: admin/components/checkout-settings.js:35
 #: admin/components/checkout-settings.js:78 admin/components/crm-settings.js:35
@@ -534,19 +585,27 @@ msgstr "Texto del aviso"
 
 #: admin/components/checkout-settings.js:51
 msgid "Supports placeholders: {base_currency}, {display_currency}, {rate}"
-msgstr "Admite marcadores de posición: {base_currency}, {display_currency}, {rate}"
+msgstr ""
+"Admite marcadores de posición: {base_currency}, {display_currency}, {rate}"
 
 #: admin/components/checkout-settings.js:66
 msgid "Rate Freshness Badge"
 msgstr "Indicador de actualización de los tipos de cambio"
 
 #: admin/components/checkout-settings.js:69
-msgid "Global gate for the rates-updated badge. When disabled, no surface shows it — including the switcher dropdown footer."
-msgstr "Control global del indicador de actualización de los tipos de cambio. Si se desactiva, no se mostrará en ninguna parte, incluido el pie del desplegable del selector."
+msgid ""
+"Global gate for the rates-updated badge. When disabled, no surface shows it "
+"— including the switcher dropdown footer."
+msgstr ""
+"Control global del indicador de actualización de los tipos de cambio. Si se "
+"desactiva, no se mostrará en ninguna parte, incluido el pie del desplegable "
+"del selector."
 
 #: admin/components/crm-settings.js:26
 msgid "Tag contacts and update custom fields based on currency preference."
-msgstr "Etiqueta los contactos y actualiza los campos personalizados según la preferencia de divisa."
+msgstr ""
+"Etiqueta los contactos y actualiza los campos personalizados según la "
+"preferencia de divisa."
 
 #: admin/components/crm-settings.js:48
 msgid "Auto-create Tags"
@@ -586,7 +645,9 @@ msgstr "Sincronización con FluentCommunity"
 
 #: admin/components/crm-settings.js:123
 msgid "Sync currency preference to FluentCommunity user meta."
-msgstr "Sincroniza la preferencia de divisa con los metadatos de usuario de FluentCommunity."
+msgstr ""
+"Sincroniza la preferencia de divisa con los metadatos de usuario de "
+"FluentCommunity."
 
 #: admin/components/currency-settings.js:113
 msgid "Search and add a currency…"
@@ -665,8 +726,11 @@ msgid "Right space (100 $)"
 msgstr "Derecha con espacio (100 $)"
 
 #: admin/components/currency-settings.js:225
-msgid "No display currencies added yet. Use the picker above to add currencies."
-msgstr "Todavía no se ha añadido ninguna divisa de visualización. Utiliza el selector de arriba para añadir divisas."
+msgid ""
+"No display currencies added yet. Use the picker above to add currencies."
+msgstr ""
+"Todavía no se ha añadido ninguna divisa de visualización. Utiliza el "
+"selector de arriba para añadir divisas."
 
 #: admin/components/diagnostics-view.js:24
 msgid "Available"
@@ -781,8 +845,12 @@ msgid "Multi-Currency Enabled"
 msgstr "Multi-Currency activado"
 
 #: admin/components/general-settings.js:92
-msgid "Managed in FluentCart Store Setup. Checkout and payment gateways use this currency."
-msgstr "Se gestiona en la configuración de la tienda de FluentCart. El proceso de pago y las pasarelas utilizan esta divisa."
+msgid ""
+"Managed in FluentCart Store Setup. Checkout and payment gateways use this "
+"currency."
+msgstr ""
+"Se gestiona en la configuración de la tienda de FluentCart. El proceso de "
+"pago y las pasarelas utilizan esta divisa."
 
 #: admin/components/general-settings.js:106
 msgid "Default Display Currency"
@@ -790,7 +858,9 @@ msgstr "Divisa de visualización predeterminada"
 
 #: admin/components/general-settings.js:109
 msgid "Currency shown to visitors before any preference is detected."
-msgstr "Divisa que se muestra a los visitantes antes de detectar cualquier preferencia."
+msgstr ""
+"Divisa que se muestra a los visitantes antes de detectar cualquier "
+"preferencia."
 
 #: admin/components/general-settings.js:124
 msgid "URL Parameter"
@@ -809,12 +879,24 @@ msgid "Cookie Persistence"
 msgstr "Guardado en cookie"
 
 #: admin/components/general-settings.js:161
-msgid "Remember a guest currency in a cookie and matching browser-storage fallback. Disable this and logged-out visitors cannot keep a currency choice at all — the switch is reported as failed rather than silently ignored."
-msgstr "Recuerda la divisa de un invitado en una cookie y, como alternativa, en el almacenamiento correspondiente del navegador. Si lo desactivas, los visitantes que no hayan iniciado sesión no podrán conservar ninguna divisa elegida: el cambio se notificará como fallido en lugar de ignorarse sin aviso."
+msgid ""
+"Remember a guest currency in a cookie and matching browser-storage fallback. "
+"Disable this and logged-out visitors cannot keep a currency choice at all — "
+"the switch is reported as failed rather than silently ignored."
+msgstr ""
+"Recuerda la divisa de un invitado en una cookie y, como alternativa, en el "
+"almacenamiento correspondiente del navegador. Si lo desactivas, los "
+"visitantes que no hayan iniciado sesión no podrán conservar ninguna divisa "
+"elegida: el cambio se notificará como fallido en lugar de ignorarse sin "
+"aviso."
 
 #: admin/components/general-settings.js:177
-msgid "Currency switching is now a logged-in-only feature. Guests will be told their preference could not be saved."
-msgstr "Ahora solo los usuarios que hayan iniciado sesión pueden cambiar de divisa. Se informará a los invitados de que no se ha podido guardar su preferencia."
+msgid ""
+"Currency switching is now a logged-in-only feature. Guests will be told "
+"their preference could not be saved."
+msgstr ""
+"Ahora solo los usuarios que hayan iniciado sesión pueden cambiar de divisa. "
+"Se informará a los invitados de que no se ha podido guardar su preferencia."
 
 #: admin/components/general-settings.js:189
 msgid "Cookie Lifetime (days)"
@@ -825,24 +907,38 @@ msgid "Account Persistence"
 msgstr "Guardado en la cuenta"
 
 #: admin/components/general-settings.js:204
-msgid "Remember currency preference in the logged-in user account. Disable this if you want logged-in sessions to respect the default display currency on every fresh visit."
-msgstr "Recuerda la preferencia de divisa en la cuenta del usuario que haya iniciado sesión. Desactívalo si quieres que cada nueva visita de un usuario conectado utilice la divisa de visualización predeterminada."
+msgid ""
+"Remember currency preference in the logged-in user account. Disable this if "
+"you want logged-in sessions to respect the default display currency on every "
+"fresh visit."
+msgstr ""
+"Recuerda la preferencia de divisa en la cuenta del usuario que haya iniciado "
+"sesión. Desactívalo si quieres que cada nueva visita de un usuario conectado "
+"utilice la divisa de visualización predeterminada."
 
 #: admin/components/general-settings.js:227
 msgid "Coming Soon"
 msgstr "Próximamente"
 
 #: admin/components/general-settings.js:230
-msgid "Automatically detect visitor currency based on their country. Requires a geolocation provider."
-msgstr "Detecta automáticamente la divisa del visitante según su país. Requiere un proveedor de geolocalización."
+msgid ""
+"Automatically detect visitor currency based on their country. Requires a "
+"geolocation provider."
+msgstr ""
+"Detecta automáticamente la divisa del visitante según su país. Requiere un "
+"proveedor de geolocalización."
 
 #: admin/components/general-settings.js:251
 msgid "Remove Data on Uninstall"
 msgstr "Eliminar los datos al desinstalar"
 
 #: admin/components/general-settings.js:254
-msgid "If enabled, all tables and settings will be removed when the plugin is uninstalled."
-msgstr "Si se activa, se eliminarán todas las tablas y los ajustes al desinstalar el plugin."
+msgid ""
+"If enabled, all tables and settings will be removed when the plugin is "
+"uninstalled."
+msgstr ""
+"Si se activa, se eliminarán todas las tablas y los ajustes al desinstalar el "
+"plugin."
 
 #: admin/components/general-settings.js:263
 msgid "Keep data"
@@ -866,7 +962,9 @@ msgstr "Todavía no se ha guardado ningún tipo de cambio manual."
 
 #: admin/components/rate-settings.js:31
 msgid "No exchange rates yet. Add display currencies and trigger a refresh."
-msgstr "Todavía no hay tipos de cambio. Añade divisas de visualización e inicia una actualización."
+msgstr ""
+"Todavía no hay tipos de cambio. Añade divisas de visualización e inicia una "
+"actualización."
 
 #: admin/components/rate-settings.js:43
 msgid "Rate Provider"
@@ -898,7 +996,9 @@ msgstr "Umbral de desactualización (horas)"
 
 #: admin/components/rate-settings.js:102
 msgid "Rates older than this will trigger an admin warning."
-msgstr "Los tipos de cambio con una antigüedad superior a este valor generarán un aviso para el administrador."
+msgstr ""
+"Los tipos de cambio con una antigüedad superior a este valor generarán un "
+"aviso para el administrador."
 
 #: admin/components/rate-settings.js:113
 msgid "Stale Rate Fallback"
@@ -930,7 +1030,8 @@ msgstr "Tipos de cambio manuales"
 
 #: admin/components/rate-settings.js:165
 msgid "Save the provider change before entering manual rates."
-msgstr "Guarda el cambio de proveedor antes de introducir tipos de cambio manuales."
+msgstr ""
+"Guarda el cambio de proveedor antes de introducir tipos de cambio manuales."
 
 #: admin/components/rate-settings.js:168
 msgid "Add and save at least one display currency first."
@@ -978,7 +1079,9 @@ msgstr "Preajuste predeterminado"
 
 #: admin/components/switcher-settings.js:51
 msgid "Visual style used by switcher blocks that inherit global defaults."
-msgstr "Estilo visual que utilizan los bloques del selector que heredan los valores predeterminados globales."
+msgstr ""
+"Estilo visual que utilizan los bloques del selector que heredan los valores "
+"predeterminados globales."
 
 #: admin/components/switcher-settings.js:60
 #: blocks/currency-switcher/editor.js:406
@@ -1114,8 +1217,11 @@ msgid "Favorite Currencies"
 msgstr "Divisas favoritas"
 
 #: admin/components/switcher-settings.js:194
-msgid "Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
-msgstr "Códigos ISO separados por comas y fijados encima del resto; por ejemplo: EUR, USD, GBP"
+msgid ""
+"Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
+msgstr ""
+"Códigos ISO separados por comas y fijados encima del resto; por ejemplo: "
+"EUR, USD, GBP"
 
 #: admin/components/switcher-settings.js:204
 #: blocks/currency-switcher/editor.js:521
@@ -1129,7 +1235,9 @@ msgstr "Valores de diseño predeterminados"
 
 #: admin/components/switcher-settings.js:216
 msgid "Baseline geometry for inheriting switcher blocks."
-msgstr "Dimensiones básicas de los bloques del selector que heredan los valores globales."
+msgstr ""
+"Dimensiones básicas de los bloques del selector que heredan los valores "
+"globales."
 
 #: admin/components/switcher-settings.js:222
 #: blocks/currency-switcher/editor.js:593
@@ -1209,8 +1317,15 @@ msgid "Footer Context"
 msgstr "Información del pie"
 
 #: admin/components/switcher-settings.js:290
-msgid "Optional trust-building context shown at the bottom of the dropdown. The freshness badge also requires the global Rate Freshness Badge gate on the Checkout tab."
-msgstr "Información opcional que aporta confianza y se muestra al final del desplegable. El indicador de actualización también requiere que esté activado el control global «Indicador de actualización de los tipos de cambio» en la pestaña Pago."
+msgid ""
+"Optional trust-building context shown at the bottom of the dropdown. The "
+"freshness badge also requires the global Rate Freshness Badge gate on the "
+"Checkout tab."
+msgstr ""
+"Información opcional que aporta confianza y se muestra al final del "
+"desplegable. El indicador de actualización también requiere que esté "
+"activado el control global «Indicador de actualización de los tipos de "
+"cambio» en la pestaña Pago."
 
 #: admin/components/switcher-settings.js:298
 msgid "Freshness badge"
@@ -1224,87 +1339,87 @@ msgstr "Valor del tipo de cambio"
 msgid "Checkout context"
 msgstr "Información sobre el pago"
 
-#: admin/multi-currency-admin.js:47
+#: admin/multi-currency-page.js:47
 msgid "Network error. Please check your connection."
 msgstr "Error de red. Comprueba tu conexión."
 
-#: admin/multi-currency-admin.js:78
+#: admin/multi-currency-page.js:78
 msgid "Save"
 msgstr "Guardar"
 
-#: admin/multi-currency-admin.js:79
+#: admin/multi-currency-page.js:79
 msgid "Saving..."
 msgstr "Guardando…"
 
-#: admin/multi-currency-admin.js:82
+#: admin/multi-currency-page.js:82
 msgid "General"
 msgstr "General"
 
-#: admin/multi-currency-admin.js:83
+#: admin/multi-currency-page.js:83
 msgid "Currencies"
 msgstr "Divisas"
 
-#: admin/multi-currency-admin.js:84
+#: admin/multi-currency-page.js:84
 msgid "Exchange Rates"
 msgstr "Tipos de cambio"
 
-#: admin/multi-currency-admin.js:85
+#: admin/multi-currency-page.js:85
 msgid "Switcher"
 msgstr "Selector"
 
-#: admin/multi-currency-admin.js:86
+#: admin/multi-currency-page.js:86
 msgid "Checkout"
 msgstr "Pago"
 
-#: admin/multi-currency-admin.js:87
+#: admin/multi-currency-page.js:87
 msgid "CRM"
 msgstr "CRM"
 
-#: admin/multi-currency-admin.js:88
+#: admin/multi-currency-page.js:88
 msgid "Diagnostics"
 msgstr "Diagnóstico"
 
-#: admin/multi-currency-admin.js:130
+#: admin/multi-currency-page.js:130
 msgid "Failed to load settings."
 msgstr "No se han podido cargar los ajustes."
 
-#: admin/multi-currency-admin.js:156
+#: admin/multi-currency-page.js:156
 msgid "Failed to load exchange rates."
 msgstr "No se han podido cargar los tipos de cambio."
 
-#: admin/multi-currency-admin.js:171
+#: admin/multi-currency-page.js:171
 msgid "Failed to load diagnostics."
 msgstr "No se ha podido cargar el diagnóstico."
 
-#: admin/multi-currency-admin.js:185
+#: admin/multi-currency-page.js:185
 msgid "FluentCRM fields created."
 msgstr "Se han creado los campos de FluentCRM."
 
-#: admin/multi-currency-admin.js:189
+#: admin/multi-currency-page.js:189
 msgid "Could not create the FluentCRM fields."
 msgstr "No se han podido crear los campos de FluentCRM."
 
-#: admin/multi-currency-admin.js:200
+#: admin/multi-currency-page.js:200
 msgid "Rates refreshed."
 msgstr "Los tipos de cambio se han actualizado."
 
-#: admin/multi-currency-admin.js:204
+#: admin/multi-currency-page.js:204
 msgid "Rate refresh failed."
 msgstr "No se han podido actualizar los tipos de cambio."
 
-#: admin/multi-currency-admin.js:218
+#: admin/multi-currency-page.js:218
 msgid "Manual rates saved."
 msgstr "Los tipos de cambio manuales se han guardado."
 
-#: admin/multi-currency-admin.js:234
+#: admin/multi-currency-page.js:234
 msgid "Settings saved."
 msgstr "Los ajustes se han guardado."
 
-#: admin/multi-currency-admin.js:239
+#: admin/multi-currency-page.js:239
 msgid "Failed to save settings."
 msgstr "No se han podido guardar los ajustes."
 
-#: admin/multi-currency-admin.js:271
+#: admin/multi-currency-page.js:271
 msgid "Multi-Currency settings"
 msgstr "Ajustes de Multi-Currency"
 
@@ -1328,8 +1443,12 @@ msgstr[1] "%s minutos"
 
 #. translators: %1$s is the number of currencies shown, %2$s the total configured.
 #: admin/switcher-preview.js:118
-msgid "Showing %1$s of %2$s currencies. The full list appears on the frontend — this is just a taste."
-msgstr "Se muestran %1$s de %2$s divisas. La lista completa aparece en la tienda — esto es solo una muestra."
+msgid ""
+"Showing %1$s of %2$s currencies. The full list appears on the frontend — "
+"this is just a taste."
+msgstr ""
+"Se muestran %1$s de %2$s divisas. La lista completa aparece en la tienda — "
+"esto es solo una muestra."
 
 #: admin/switcher-preview.js:179
 msgid "Display prices only. Checkout charged in %s."
@@ -1337,7 +1456,9 @@ msgstr "Solo se muestran los precios en esta divisa. El pago se cobrará en %s."
 
 #: admin/switcher-preview.js:182
 msgid "Display prices only. Checkout is charged in the store currency."
-msgstr "Solo se muestran los precios en esta divisa. El pago se cobrará en la divisa de la tienda."
+msgstr ""
+"Solo se muestran los precios en esta divisa. El pago se cobrará en la divisa "
+"de la tienda."
 
 #: admin/switcher-preview.js:206
 msgid "Preview"
@@ -1356,8 +1477,13 @@ msgid "Label"
 msgstr "Etiqueta"
 
 #: blocks/currency-switcher/editor.js:391
-msgid "This block inherits its switcher behavior from the global defaults in Multi-Currency settings. Only the label stays instance-specific."
-msgstr "Este bloque hereda el comportamiento del selector de los valores globales de los ajustes de Multi-Currency. Solo la etiqueta es específica de esta instancia."
+msgid ""
+"This block inherits its switcher behavior from the global defaults in Multi-"
+"Currency settings. Only the label stays instance-specific."
+msgstr ""
+"Este bloque hereda el comportamiento del selector de los valores globales de "
+"los ajustes de Multi-Currency. Solo la etiqueta es específica de esta "
+"instancia."
 
 #: blocks/currency-switcher/editor.js:401
 #: blocks/currency-switcher/editor.js:403
@@ -1460,8 +1586,12 @@ msgid "Right"
 msgstr "Derecha"
 
 #: blocks/currency-switcher/editor.js:625
-msgid "Editor preview uses your actual configured currencies and current global switcher defaults."
-msgstr "La vista previa del editor utiliza las divisas que tienes configuradas y los valores globales actuales del selector."
+msgid ""
+"Editor preview uses your actual configured currencies and current global "
+"switcher defaults."
+msgstr ""
+"La vista previa del editor utiliza las divisas que tienes configuradas y los "
+"valores globales actuales del selector."
 
 #: blocks/currency-switcher/editor.js:676
 msgid "Rates updated 2 hours ago"
@@ -1473,7 +1603,8 @@ msgstr "1 EUR = 1,1000 USD"
 
 #: blocks/currency-switcher/editor.js:683
 msgid "Display prices only. Checkout is charged in EUR."
-msgstr "Solo se muestran los precios en esta divisa. El pago se cobrará en EUR."
+msgstr ""
+"Solo se muestran los precios en esta divisa. El pago se cobrará en EUR."
 
 #: blocks/currency-switcher/editor.js:702
 msgid "Header Compact"
@@ -1481,7 +1612,8 @@ msgstr "Cabecera compacta"
 
 #: blocks/currency-switcher/editor.js:702
 msgid "Flag and code only, tuned for narrow header space."
-msgstr "Solo bandera y código, optimizado para el espacio reducido de una cabecera."
+msgstr ""
+"Solo bandera y código, optimizado para el espacio reducido de una cabecera."
 
 #: blocks/currency-switcher/editor.js:718
 msgid "Footer Descriptive"
@@ -1497,7 +1629,9 @@ msgstr "Móvil a anchura completa"
 
 #: blocks/currency-switcher/editor.js:731
 msgid "Full-width mobile-friendly switcher with room for more context."
-msgstr "Selector a anchura completa, adaptado a móviles y con espacio para más información."
+msgstr ""
+"Selector a anchura completa, adaptado a móviles y con espacio para más "
+"información."
 
 #: blocks/currency-switcher/editor.js:809
 #: blocks/currency-switcher/editor.js:852
@@ -1559,8 +1693,11 @@ msgstr "Aviso sobre el contexto de la divisa"
 
 #: blocks/currency-context-notice/block.json
 msgctxt "block description"
-msgid "Show a currency context note such as display currency vs checkout currency."
-msgstr "Muestra una nota sobre el contexto de la divisa, como la divisa de visualización frente a la divisa de pago."
+msgid ""
+"Show a currency context note such as display currency vs checkout currency."
+msgstr ""
+"Muestra una nota sobre el contexto de la divisa, como la divisa de "
+"visualización frente a la divisa de pago."
 
 #: blocks/currency-context-notice/block.json blocks/currency-current/block.json
 #: blocks/currency-selector-buttons/block.json
@@ -1592,7 +1729,8 @@ msgstr "Divisa actual"
 #: blocks/currency-current/block.json
 msgctxt "block description"
 msgid "Display the visitor's current display currency in compact form."
-msgstr "Muestra de forma compacta la divisa de visualización actual del visitante."
+msgstr ""
+"Muestra de forma compacta la divisa de visualización actual del visitante."
 
 #: blocks/currency-current/block.json
 msgctxt "block keyword"
@@ -1616,8 +1754,12 @@ msgstr "Botones de selección de divisa"
 
 #: blocks/currency-selector-buttons/block.json
 msgctxt "block description"
-msgid "A button-group alternative to the dropdown switcher for stores with a few main currencies."
-msgstr "Una alternativa al selector desplegable en forma de grupo de botones para tiendas con unas pocas divisas principales."
+msgid ""
+"A button-group alternative to the dropdown switcher for stores with a few "
+"main currencies."
+msgstr ""
+"Una alternativa al selector desplegable en forma de grupo de botones para "
+"tiendas con unas pocas divisas principales."
 
 #: blocks/currency-selector-buttons/block.json
 msgctxt "block keyword"
@@ -1641,8 +1783,12 @@ msgstr "Selector de divisa"
 
 #: blocks/currency-switcher/block.json
 msgctxt "block description"
-msgid "Display the FCHub Multi-Currency switcher in posts, pages, templates, and template parts."
-msgstr "Muestra el selector de FCHub Multi-Currency en entradas, páginas, plantillas y partes de plantilla."
+msgid ""
+"Display the FCHub Multi-Currency switcher in posts, pages, templates, and "
+"template parts."
+msgstr ""
+"Muestra el selector de FCHub Multi-Currency en entradas, páginas, plantillas "
+"y partes de plantilla."
 
 #: blocks/currency-switcher/block.json
 msgctxt "block keyword"
@@ -1696,8 +1842,12 @@ msgstr "Tipo de cambio"
 
 #: blocks/exchange-rate/block.json
 msgctxt "block description"
-msgid "Display the current exchange rate between the store base currency and the visitor display currency."
-msgstr "Muestra el tipo de cambio actual entre la divisa base de la tienda y la divisa de visualización del visitante."
+msgid ""
+"Display the current exchange rate between the store base currency and the "
+"visitor display currency."
+msgstr ""
+"Muestra el tipo de cambio actual entre la divisa base de la tienda y la "
+"divisa de visualización del visitante."
 
 #: blocks/exchange-rate/block.json
 msgctxt "block keyword"

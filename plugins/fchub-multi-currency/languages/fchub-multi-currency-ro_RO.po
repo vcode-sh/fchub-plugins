@@ -3,24 +3,24 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-currency\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
+"currency\n"
+"POT-Creation-Date: 2026-08-19T05:50:59+00:00\n"
+"PO-Revision-Date: 2026-08-19 02:51+0300\n"
 "Last-Translator: \n"
 "Language-Team: Romanian\n"
 "Language: ro_RO\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-18T19:36:27+00:00\n"
-"PO-Revision-Date: 2026-08-19 02:51+0300\n"
-"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : (n==0 || (n%100>0 && n%100<20)) ? 1 : 2);\n"
+"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : (n==0 || (n%100>0 && "
+"n%100<20)) ? 1 : 2);\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: fchub-multi-currency\n"
 
 #. Plugin Name of the plugin
-#: fchub-multi-currency.php
-#: app/Bootstrap/Modules/BlocksModule.php:77
-#: app/GDPR/PersonalDataHandler.php:24
-#: app/GDPR/PersonalDataHandler.php:34
+#: fchub-multi-currency.php app/Bootstrap/Modules/BlocksModule.php:77
+#: app/GDPR/PersonalDataHandler.php:24 app/GDPR/PersonalDataHandler.php:34
 #: app/Integration/AddonsRegistration.php:23
 msgid "FCHub Multi-Currency"
 msgstr "FCHub Multi-Currency"
@@ -32,8 +32,12 @@ msgstr "https://fchub.co/docs/fchub-multi-currency"
 
 #. Description of the plugin
 #: fchub-multi-currency.php
-msgid "Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure"
-msgstr "Afișarea prețurilor în mai multe monede pentru FluentCart, cu gestionarea cursurilor valutare și informare la finalizarea comenzii"
+msgid ""
+"Display-layer multi-currency for FluentCart with exchange rate management "
+"and checkout disclosure"
+msgstr ""
+"Afișarea prețurilor în mai multe monede pentru FluentCart, cu gestionarea "
+"cursurilor valutare și informare la finalizarea comenzii"
 
 #. Author of the plugin
 #: fchub-multi-currency.php
@@ -51,11 +55,16 @@ msgstr "Prezentare pentru monede"
 
 #: app/Bootstrap/Modules/BlocksModule.php:83
 msgid "A ready-made showcase of the full currency block family."
-msgstr "O prezentare gata de folosit a întregii familii de blocuri pentru monede."
+msgstr ""
+"O prezentare gata de folosit a întregii familii de blocuri pentru monede."
 
 #: app/Bootstrap/Modules/DiagnosticsModule.php:71
-msgid "FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics page or trigger a manual refresh."
-msgstr "FCHub Multi-Currency: unele cursuri valutare nu mai sunt actualizate. Verifică pagina de diagnosticare sau pornește o actualizare manuală."
+msgid ""
+"FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics "
+"page or trigger a manual refresh."
+msgstr ""
+"FCHub Multi-Currency: unele cursuri valutare nu mai sunt actualizate. "
+"Verifică pagina de diagnosticare sau pornește o actualizare manuală."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:37
 msgid "Switch the rate provider to Manual rates before saving."
@@ -63,7 +72,8 @@ msgstr "Înainte de salvare, selectează Cursuri manuale ca furnizor de cursuri.
 
 #: app/Domain/Actions/SaveManualRatesAction.php:43
 msgid "Add at least one display currency before saving manual rates."
-msgstr "Adaugă cel puțin o monedă de afișare înainte de a salva cursurile manuale."
+msgstr ""
+"Adaugă cel puțin o monedă de afișare înainte de a salva cursurile manuale."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:48
 msgid "Provide one rate for every configured display currency."
@@ -76,26 +86,28 @@ msgstr "Cursurile pot fi salvate numai pentru monedele de afișare configurate."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:67
 #: app/Http/Controllers/Admin/RatesAdminController.php:104
-#: admin/multi-currency-admin.js:222
+#: admin/multi-currency-page.js:222
 msgid "Manual rates could not be saved."
 msgstr "Cursurile manuale nu au putut fi salvate."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:110
 #: app/Domain/Actions/SaveManualRatesAction.php:117
-msgid "Each manual rate must be a positive decimal string with up to 8 decimal places."
-msgstr "Fiecare curs manual trebuie să fie un număr zecimal pozitiv, cu cel mult 8 zecimale."
+msgid ""
+"Each manual rate must be a positive decimal string with up to 8 decimal "
+"places."
+msgstr ""
+"Fiecare curs manual trebuie să fie un număr zecimal pozitiv, cu cel mult 8 "
+"zecimale."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:121
 msgid "Each manual rate must be greater than zero."
 msgstr "Fiecare curs manual trebuie să fie mai mare decât zero."
 
-#: app/Domain/Enums/RateProvider.php:19
-#: admin/components/rate-settings.js:52
+#: app/Domain/Enums/RateProvider.php:19 admin/components/rate-settings.js:52
 msgid "ExchangeRate-API (free tier)"
 msgstr "ExchangeRate-API (plan gratuit)"
 
-#: app/Domain/Enums/RateProvider.php:20
-#: admin/components/rate-settings.js:55
+#: app/Domain/Enums/RateProvider.php:20 admin/components/rate-settings.js:55
 msgid "Open Exchange Rates"
 msgstr "Open Exchange Rates"
 
@@ -103,8 +115,7 @@ msgstr "Open Exchange Rates"
 msgid "European Central Bank (EUR base, free)"
 msgstr "Banca Centrală Europeană (cu bază EUR, gratuit)"
 
-#: app/Domain/Enums/RateProvider.php:22
-#: admin/components/rate-settings.js:61
+#: app/Domain/Enums/RateProvider.php:22 admin/components/rate-settings.js:61
 msgid "Manual rates"
 msgstr "Cursuri manuale"
 
@@ -129,28 +140,23 @@ msgstr "Geolocalizare"
 msgid "Store default"
 msgstr "Valoarea implicită a magazinului"
 
-#: app/Domain/Enums/RoundingMode.php:20
-#: admin/components/rate-settings.js:143
+#: app/Domain/Enums/RoundingMode.php:20 admin/components/rate-settings.js:143
 msgid "Truncate (no rounding)"
 msgstr "Trunchiere (fără rotunjire)"
 
-#: app/Domain/Enums/RoundingMode.php:21
-#: admin/components/rate-settings.js:146
+#: app/Domain/Enums/RoundingMode.php:21 admin/components/rate-settings.js:146
 msgid "Round half up (standard)"
 msgstr "Rotunjire la jumătate în sus (standard)"
 
-#: app/Domain/Enums/RoundingMode.php:22
-#: admin/components/rate-settings.js:149
+#: app/Domain/Enums/RoundingMode.php:22 admin/components/rate-settings.js:149
 msgid "Round half down"
 msgstr "Rotunjire la jumătate în jos"
 
-#: app/Domain/Enums/RoundingMode.php:23
-#: admin/components/rate-settings.js:152
+#: app/Domain/Enums/RoundingMode.php:23 admin/components/rate-settings.js:152
 msgid "Always round up"
 msgstr "Rotunjire întotdeauna în sus"
 
-#: app/Domain/Enums/RoundingMode.php:24
-#: admin/components/rate-settings.js:155
+#: app/Domain/Enums/RoundingMode.php:24 admin/components/rate-settings.js:155
 msgid "Always round down"
 msgstr "Rotunjire întotdeauna în jos"
 
@@ -164,7 +170,7 @@ msgstr "Plata va fi procesată în {base_currency}."
 #: app/Frontend/CurrencyContextPresentation.php:36
 #: app/Frontend/CurrencyContextPresentation.php:312
 #: admin/switcher-preview.js:163
-#, php-format,js-format
+#, php-format
 msgid "Rates updated %s ago"
 msgstr "Cursuri actualizate acum %s"
 
@@ -175,7 +181,7 @@ msgstr "Cursuri actualizate acum %s"
 #: app/Frontend/CurrencyContextPresentation.php:201
 #: app/Frontend/CurrencyContextPresentation.php:332
 #: admin/switcher-preview.js:169
-#, php-format,js-format
+#, php-format
 msgid "1 %1$s = %2$s %3$s"
 msgstr "1 %1$s = %2$s %3$s"
 
@@ -243,7 +249,7 @@ msgstr[2] "%s min"
 #. translators: %s is a number of hours.
 #: app/Frontend/CurrencyContextPresentation.php:125
 #: admin/switcher-preview.js:63
-#, php-format,js-format
+#, php-format
 msgid "%s hour"
 msgid_plural "%s hours"
 msgstr[0] "%s oră"
@@ -253,7 +259,7 @@ msgstr[2] "%s de ore"
 #. translators: %s is a number of days.
 #: app/Frontend/CurrencyContextPresentation.php:127
 #: admin/switcher-preview.js:64
-#, php-format,js-format
+#, php-format
 msgid "%s day"
 msgid_plural "%s days"
 msgstr[0] "%s zi"
@@ -263,7 +269,7 @@ msgstr[2] "%s de zile"
 #. translators: %s is a number of weeks.
 #: app/Frontend/CurrencyContextPresentation.php:129
 #: admin/switcher-preview.js:65
-#, php-format,js-format
+#, php-format
 msgid "%s week"
 msgid_plural "%s weeks"
 msgstr[0] "%s săptămână"
@@ -288,8 +294,7 @@ msgstr[0] "%s an"
 msgstr[1] "%s ani"
 msgstr[2] "%s de ani"
 
-#: app/Frontend/CurrencySwitcherRenderer.php:310
-#: admin/switcher-preview.js:222
+#: app/Frontend/CurrencySwitcherRenderer.php:310 admin/switcher-preview.js:222
 #: blocks/currency-switcher/editor.js:655
 msgid "Search currency"
 msgstr "Caută o monedă"
@@ -339,11 +344,13 @@ msgstr "Cursul valutar al ultimei comenzi"
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:53
 msgid "Manual rates are saved explicitly and cannot be refreshed."
-msgstr "Cursurile manuale sunt salvate explicit și nu pot fi actualizate automat."
+msgstr ""
+"Cursurile manuale sunt salvate explicit și nu pot fi actualizate automat."
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:69
 msgid "Failed to refresh exchange rates. Check the logs for details."
-msgstr "Actualizarea cursurilor valutare a eșuat. Verifică jurnalele pentru detalii."
+msgstr ""
+"Actualizarea cursurilor valutare a eșuat. Verifică jurnalele pentru detalii."
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:77
 msgid "Exchange rates refreshed successfully."
@@ -368,7 +375,8 @@ msgstr "Selectează un furnizor valid de cursuri valutare."
 
 #: app/Http/Controllers/Admin/SettingsAdminController.php:105
 msgid "An API key is required for the selected exchange-rate provider."
-msgstr "Este necesară o cheie API pentru furnizorul de cursuri valutare selectat."
+msgstr ""
+"Este necesară o cheie API pentru furnizorul de cursuri valutare selectat."
 
 #: app/Http/Controllers/Admin/SettingsAdminController.php:136
 msgid "Settings saved successfully."
@@ -392,24 +400,41 @@ msgid "Currency code is required."
 msgstr "Codul monedei este obligatoriu."
 
 #: app/Http/Controllers/Pub/ContextController.php:144
-msgid "This currency cannot be selected because no usable exchange rate is available. Please try again later."
-msgstr "Această monedă nu poate fi selectată deoarece nu este disponibil niciun curs valutar utilizabil. Încearcă din nou mai târziu."
+msgid ""
+"This currency cannot be selected because no usable exchange rate is "
+"available. Please try again later."
+msgstr ""
+"Această monedă nu poate fi selectată deoarece nu este disponibil niciun curs "
+"valutar utilizabil. Încearcă din nou mai târziu."
 
 #: app/Http/Controllers/Pub/ContextController.php:177
-msgid "Currency preference could not be saved because both cookie and account persistence are disabled."
-msgstr "Preferința privind moneda nu a putut fi salvată deoarece sunt dezactivate atât salvarea în cookie, cât și salvarea în cont."
+msgid ""
+"Currency preference could not be saved because both cookie and account "
+"persistence are disabled."
+msgstr ""
+"Preferința privind moneda nu a putut fi salvată deoarece sunt dezactivate "
+"atât salvarea în cookie, cât și salvarea în cont."
 
 #: app/Http/Controllers/Pub/ContextController.php:181
-msgid "Currency preference could not be saved. Cookie persistence is disabled, so logged-out visitors cannot keep a currency choice."
-msgstr "Preferința privind moneda nu a putut fi salvată. Salvarea în cookie este dezactivată, prin urmare vizitatorii neautentificați nu își pot păstra alegerea monedei."
+msgid ""
+"Currency preference could not be saved. Cookie persistence is disabled, so "
+"logged-out visitors cannot keep a currency choice."
+msgstr ""
+"Preferința privind moneda nu a putut fi salvată. Salvarea în cookie este "
+"dezactivată, prin urmare vizitatorii neautentificați nu își pot păstra "
+"alegerea monedei."
 
 #: app/Http/Controllers/Pub/ContextController.php:204
 msgid "Currency preference saved."
 msgstr "Preferința privind moneda a fost salvată."
 
 #: app/Integration/AddonsRegistration.php:24
-msgid "Display-layer multi-currency with exchange rate management and checkout disclosure."
-msgstr "Afișarea prețurilor în mai multe monede, cu gestionarea cursurilor valutare și informare la finalizarea comenzii."
+msgid ""
+"Display-layer multi-currency with exchange rate management and checkout "
+"disclosure."
+msgstr ""
+"Afișarea prețurilor în mai multe monede, cu gestionarea cursurilor valutare "
+"și informare la finalizarea comenzii."
 
 #: app/Integration/FluentCrmSmartCodes.php:189
 msgid "Multi-Currency Order"
@@ -462,7 +487,9 @@ msgstr "Activează Multi-Currency"
 #: app/Integration/MultiCurrencySettings.php:46
 #: admin/components/general-settings.js:68
 msgid "Master switch for display-layer multi-currency across the store."
-msgstr "Comutator principal pentru afișarea prețurilor în mai multe monede în întregul magazin."
+msgstr ""
+"Comutator principal pentru afișarea prețurilor în mai multe monede în "
+"întregul magazin."
 
 #: app/Integration/MultiCurrencySettings.php:48
 #: app/Integration/MultiCurrencySettings.php:57
@@ -485,8 +512,11 @@ msgstr "Informare la finalizarea comenzii"
 
 #: app/Integration/MultiCurrencySettings.php:55
 #: admin/components/checkout-settings.js:26
-msgid "Show a notice at checkout that payment is processed in the base currency."
-msgstr "Afișează la finalizarea comenzii o informare că plata este procesată în moneda de bază."
+msgid ""
+"Show a notice at checkout that payment is processed in the base currency."
+msgstr ""
+"Afișează la finalizarea comenzii o informare că plata este procesată în "
+"moneda de bază."
 
 #: app/Integration/MultiCurrencySettings.php:63
 #: admin/components/crm-settings.js:23
@@ -495,7 +525,8 @@ msgstr "Sincronizare cu FluentCRM"
 
 #: app/Integration/MultiCurrencySettings.php:64
 msgid "Tag contacts in FluentCRM based on their currency preference."
-msgstr "Etichetează contactele în FluentCRM pe baza preferinței lor privind moneda."
+msgstr ""
+"Etichetează contactele în FluentCRM pe baza preferinței lor privind moneda."
 
 #: app/Integration/MultiCurrencySettings.php:72
 msgid "Full Settings"
@@ -503,17 +534,17 @@ msgstr "Toate setările"
 
 #: app/Integration/MultiCurrencySettings.php:73
 msgid "Configure currencies, exchange rates, checkout disclosure, and more."
-msgstr "Configurează monedele, cursurile valutare, informarea la finalizarea comenzii și altele."
+msgstr ""
+"Configurează monedele, cursurile valutare, informarea la finalizarea "
+"comenzii și altele."
 
 #: app/Integration/MultiCurrencySettings.php:98
 msgid "Multi-Currency settings saved."
 msgstr "Setările Multi-Currency au fost salvate."
 
-#: app/Support/AdminMenu.php:19
-#: admin/multi-currency-admin.js:107
-#: admin/multi-currency-admin.js:259
-#: admin/multi-currency-admin.js:327
-#: admin/multi-currency-admin.js:385
+#: app/Support/AdminMenu.php:19 admin/multi-currency-page.js:107
+#: admin/multi-currency-page.js:259 admin/multi-currency-page.js:327
+#: admin/multi-currency-page.js:385
 msgid "Multi-Currency"
 msgstr "Multi-Currency"
 
@@ -525,13 +556,12 @@ msgstr "La fiecare %d ore"
 
 #: fchub-multi-currency.php:175
 msgid "FCHub Multi-Currency requires FluentCart to be installed and activated."
-msgstr "FCHub Multi-Currency necesită ca FluentCart să fie instalat și activat."
+msgstr ""
+"FCHub Multi-Currency necesită ca FluentCart să fie instalat și activat."
 
 #: admin/components/checkout-settings.js:35
-#: admin/components/checkout-settings.js:78
-#: admin/components/crm-settings.js:35
-#: admin/components/crm-settings.js:129
-#: admin/components/general-settings.js:77
+#: admin/components/checkout-settings.js:78 admin/components/crm-settings.js:35
+#: admin/components/crm-settings.js:129 admin/components/general-settings.js:77
 #: admin/components/general-settings.js:133
 #: admin/components/general-settings.js:170
 #: admin/components/general-settings.js:213
@@ -540,10 +570,8 @@ msgid "Enabled"
 msgstr "Activat"
 
 #: admin/components/checkout-settings.js:38
-#: admin/components/checkout-settings.js:81
-#: admin/components/crm-settings.js:38
-#: admin/components/crm-settings.js:132
-#: admin/components/general-settings.js:80
+#: admin/components/checkout-settings.js:81 admin/components/crm-settings.js:38
+#: admin/components/crm-settings.js:132 admin/components/general-settings.js:80
 #: admin/components/general-settings.js:136
 #: admin/components/general-settings.js:173
 #: admin/components/general-settings.js:216
@@ -564,12 +592,19 @@ msgid "Rate Freshness Badge"
 msgstr "Indicator de actualizare a cursurilor"
 
 #: admin/components/checkout-settings.js:69
-msgid "Global gate for the rates-updated badge. When disabled, no surface shows it — including the switcher dropdown footer."
-msgstr "Setare globală pentru indicatorul de actualizare a cursurilor. Când este dezactivată, indicatorul nu apare nicăieri — nici măcar în subsolul listei derulante a selectorului."
+msgid ""
+"Global gate for the rates-updated badge. When disabled, no surface shows it "
+"— including the switcher dropdown footer."
+msgstr ""
+"Setare globală pentru indicatorul de actualizare a cursurilor. Când este "
+"dezactivată, indicatorul nu apare nicăieri — nici măcar în subsolul listei "
+"derulante a selectorului."
 
 #: admin/components/crm-settings.js:26
 msgid "Tag contacts and update custom fields based on currency preference."
-msgstr "Etichetează contactele și actualizează câmpurile personalizate pe baza preferinței privind moneda."
+msgstr ""
+"Etichetează contactele și actualizează câmpurile personalizate pe baza "
+"preferinței privind moneda."
 
 #: admin/components/crm-settings.js:48
 msgid "Auto-create Tags"
@@ -609,7 +644,9 @@ msgstr "Sincronizare cu FluentCommunity"
 
 #: admin/components/crm-settings.js:123
 msgid "Sync currency preference to FluentCommunity user meta."
-msgstr "Sincronizează preferința privind moneda cu metadatele utilizatorului din FluentCommunity."
+msgstr ""
+"Sincronizează preferința privind moneda cu metadatele utilizatorului din "
+"FluentCommunity."
 
 #: admin/components/currency-settings.js:113
 msgid "Search and add a currency…"
@@ -688,8 +725,11 @@ msgid "Right space (100 $)"
 msgstr "Dreapta, cu spațiu (100 $)"
 
 #: admin/components/currency-settings.js:225
-msgid "No display currencies added yet. Use the picker above to add currencies."
-msgstr "Nu ai adăugat încă monede de afișare. Folosește selectorul de mai sus pentru a adăuga monede."
+msgid ""
+"No display currencies added yet. Use the picker above to add currencies."
+msgstr ""
+"Nu ai adăugat încă monede de afișare. Folosește selectorul de mai sus pentru "
+"a adăuga monede."
 
 #: admin/components/diagnostics-view.js:24
 msgid "Available"
@@ -792,7 +832,6 @@ msgid "No diagnostics data."
 msgstr "Nu există date de diagnosticare."
 
 #: admin/components/general-settings.js:44
-#, js-format
 msgid "Same as base currency (%s) — recommended"
 msgstr "La fel ca moneda de bază (%s) — recomandat"
 
@@ -805,8 +844,12 @@ msgid "Multi-Currency Enabled"
 msgstr "Multi-Currency este activ"
 
 #: admin/components/general-settings.js:92
-msgid "Managed in FluentCart Store Setup. Checkout and payment gateways use this currency."
-msgstr "Este gestionată în Configurarea magazinului FluentCart. Finalizarea comenzii și gateway-urile de plată folosesc această monedă."
+msgid ""
+"Managed in FluentCart Store Setup. Checkout and payment gateways use this "
+"currency."
+msgstr ""
+"Este gestionată în Configurarea magazinului FluentCart. Finalizarea comenzii "
+"și gateway-urile de plată folosesc această monedă."
 
 #: admin/components/general-settings.js:106
 msgid "Default Display Currency"
@@ -833,12 +876,24 @@ msgid "Cookie Persistence"
 msgstr "Salvare în cookie"
 
 #: admin/components/general-settings.js:161
-msgid "Remember a guest currency in a cookie and matching browser-storage fallback. Disable this and logged-out visitors cannot keep a currency choice at all — the switch is reported as failed rather than silently ignored."
-msgstr "Reține moneda aleasă de un vizitator într-un cookie și, ca soluție de rezervă, în spațiul de stocare al browserului. Dacă dezactivezi această opțiune, vizitatorii neautentificați nu își pot păstra deloc alegerea monedei — schimbarea va fi raportată ca eșuată, nu ignorată în tăcere."
+msgid ""
+"Remember a guest currency in a cookie and matching browser-storage fallback. "
+"Disable this and logged-out visitors cannot keep a currency choice at all — "
+"the switch is reported as failed rather than silently ignored."
+msgstr ""
+"Reține moneda aleasă de un vizitator într-un cookie și, ca soluție de "
+"rezervă, în spațiul de stocare al browserului. Dacă dezactivezi această "
+"opțiune, vizitatorii neautentificați nu își pot păstra deloc alegerea "
+"monedei — schimbarea va fi raportată ca eșuată, nu ignorată în tăcere."
 
 #: admin/components/general-settings.js:177
-msgid "Currency switching is now a logged-in-only feature. Guests will be told their preference could not be saved."
-msgstr "Schimbarea monedei este disponibilă acum numai utilizatorilor autentificați. Vizitatorii neautentificați vor fi informați că preferința lor nu a putut fi salvată."
+msgid ""
+"Currency switching is now a logged-in-only feature. Guests will be told "
+"their preference could not be saved."
+msgstr ""
+"Schimbarea monedei este disponibilă acum numai utilizatorilor autentificați. "
+"Vizitatorii neautentificați vor fi informați că preferința lor nu a putut fi "
+"salvată."
 
 #: admin/components/general-settings.js:189
 msgid "Cookie Lifetime (days)"
@@ -849,24 +904,39 @@ msgid "Account Persistence"
 msgstr "Salvare în cont"
 
 #: admin/components/general-settings.js:204
-msgid "Remember currency preference in the logged-in user account. Disable this if you want logged-in sessions to respect the default display currency on every fresh visit."
-msgstr "Reține preferința privind moneda în contul utilizatorului autentificat. Dezactivează această opțiune dacă vrei ca sesiunile utilizatorilor autentificați să folosească moneda de afișare implicită la fiecare vizită nouă."
+msgid ""
+"Remember currency preference in the logged-in user account. Disable this if "
+"you want logged-in sessions to respect the default display currency on every "
+"fresh visit."
+msgstr ""
+"Reține preferința privind moneda în contul utilizatorului autentificat. "
+"Dezactivează această opțiune dacă vrei ca sesiunile utilizatorilor "
+"autentificați să folosească moneda de afișare implicită la fiecare vizită "
+"nouă."
 
 #: admin/components/general-settings.js:227
 msgid "Coming Soon"
 msgstr "În curând"
 
 #: admin/components/general-settings.js:230
-msgid "Automatically detect visitor currency based on their country. Requires a geolocation provider."
-msgstr "Detectează automat moneda vizitatorului în funcție de țară. Necesită un furnizor de geolocalizare."
+msgid ""
+"Automatically detect visitor currency based on their country. Requires a "
+"geolocation provider."
+msgstr ""
+"Detectează automat moneda vizitatorului în funcție de țară. Necesită un "
+"furnizor de geolocalizare."
 
 #: admin/components/general-settings.js:251
 msgid "Remove Data on Uninstall"
 msgstr "Elimină datele la dezinstalare"
 
 #: admin/components/general-settings.js:254
-msgid "If enabled, all tables and settings will be removed when the plugin is uninstalled."
-msgstr "Dacă activezi această opțiune, toate tabelele și setările vor fi eliminate la dezinstalarea pluginului."
+msgid ""
+"If enabled, all tables and settings will be removed when the plugin is "
+"uninstalled."
+msgstr ""
+"Dacă activezi această opțiune, toate tabelele și setările vor fi eliminate "
+"la dezinstalarea pluginului."
 
 #: admin/components/general-settings.js:263
 msgid "Keep data"
@@ -890,7 +960,9 @@ msgstr "Nu ai salvat încă niciun curs manual."
 
 #: admin/components/rate-settings.js:31
 msgid "No exchange rates yet. Add display currencies and trigger a refresh."
-msgstr "Nu există încă niciun curs valutar. Adaugă monede de afișare și pornește o actualizare."
+msgstr ""
+"Nu există încă niciun curs valutar. Adaugă monede de afișare și pornește o "
+"actualizare."
 
 #: admin/components/rate-settings.js:43
 msgid "Rate Provider"
@@ -922,7 +994,9 @@ msgstr "Prag de expirare (ore)"
 
 #: admin/components/rate-settings.js:102
 msgid "Rates older than this will trigger an admin warning."
-msgstr "Cursurile mai vechi decât acest prag vor declanșa o avertizare în panoul de administrare."
+msgstr ""
+"Cursurile mai vechi decât acest prag vor declanșa o avertizare în panoul de "
+"administrare."
 
 #: admin/components/rate-settings.js:113
 msgid "Stale Rate Fallback"
@@ -954,7 +1028,8 @@ msgstr "Cursuri manuale"
 
 #: admin/components/rate-settings.js:165
 msgid "Save the provider change before entering manual rates."
-msgstr "Salvează schimbarea furnizorului înainte de a introduce cursuri manuale."
+msgstr ""
+"Salvează schimbarea furnizorului înainte de a introduce cursuri manuale."
 
 #: admin/components/rate-settings.js:168
 msgid "Add and save at least one display currency first."
@@ -1002,7 +1077,9 @@ msgstr "Presetare implicită"
 
 #: admin/components/switcher-settings.js:51
 msgid "Visual style used by switcher blocks that inherit global defaults."
-msgstr "Stilul vizual folosit de blocurile selectorului care moștenesc setările implicite globale."
+msgstr ""
+"Stilul vizual folosit de blocurile selectorului care moștenesc setările "
+"implicite globale."
 
 #: admin/components/switcher-settings.js:60
 #: blocks/currency-switcher/editor.js:406
@@ -1138,8 +1215,11 @@ msgid "Favorite Currencies"
 msgstr "Monede favorite"
 
 #: admin/components/switcher-settings.js:194
-msgid "Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
-msgstr "Coduri ISO separate prin virgulă și fixate deasupra celorlalte, de exemplu: EUR, USD, GBP"
+msgid ""
+"Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
+msgstr ""
+"Coduri ISO separate prin virgulă și fixate deasupra celorlalte, de exemplu: "
+"EUR, USD, GBP"
 
 #: admin/components/switcher-settings.js:204
 #: blocks/currency-switcher/editor.js:521
@@ -1153,7 +1233,8 @@ msgstr "Setări implicite de aspect"
 
 #: admin/components/switcher-settings.js:216
 msgid "Baseline geometry for inheriting switcher blocks."
-msgstr "Dimensiunile de bază pentru blocurile selectorului care moștenesc setările."
+msgstr ""
+"Dimensiunile de bază pentru blocurile selectorului care moștenesc setările."
 
 #: admin/components/switcher-settings.js:222
 #: blocks/currency-switcher/editor.js:593
@@ -1233,8 +1314,15 @@ msgid "Footer Context"
 msgstr "Context în subsolul listei"
 
 #: admin/components/switcher-settings.js:290
-msgid "Optional trust-building context shown at the bottom of the dropdown. The freshness badge also requires the global Rate Freshness Badge gate on the Checkout tab."
-msgstr "Context opțional, menit să inspire încredere, afișat în partea de jos a listei derulante. Indicatorul de actualizare necesită și activarea setării globale „Indicator de actualizare a cursurilor” din fila „Finalizare comandă”."
+msgid ""
+"Optional trust-building context shown at the bottom of the dropdown. The "
+"freshness badge also requires the global Rate Freshness Badge gate on the "
+"Checkout tab."
+msgstr ""
+"Context opțional, menit să inspire încredere, afișat în partea de jos a "
+"listei derulante. Indicatorul de actualizare necesită și activarea setării "
+"globale „Indicator de actualizare a cursurilor” din fila „Finalizare "
+"comandă”."
 
 #: admin/components/switcher-settings.js:298
 msgid "Freshness badge"
@@ -1248,87 +1336,87 @@ msgstr "Valoarea cursului"
 msgid "Checkout context"
 msgstr "Contextul finalizării comenzii"
 
-#: admin/multi-currency-admin.js:47
+#: admin/multi-currency-page.js:47
 msgid "Network error. Please check your connection."
 msgstr "Eroare de rețea. Verifică conexiunea."
 
-#: admin/multi-currency-admin.js:78
+#: admin/multi-currency-page.js:78
 msgid "Save"
 msgstr "Salvează"
 
-#: admin/multi-currency-admin.js:79
+#: admin/multi-currency-page.js:79
 msgid "Saving..."
 msgstr "Se salvează…"
 
-#: admin/multi-currency-admin.js:82
+#: admin/multi-currency-page.js:82
 msgid "General"
 msgstr "Generale"
 
-#: admin/multi-currency-admin.js:83
+#: admin/multi-currency-page.js:83
 msgid "Currencies"
 msgstr "Monede"
 
-#: admin/multi-currency-admin.js:84
+#: admin/multi-currency-page.js:84
 msgid "Exchange Rates"
 msgstr "Cursuri valutare"
 
-#: admin/multi-currency-admin.js:85
+#: admin/multi-currency-page.js:85
 msgid "Switcher"
 msgstr "Selector"
 
-#: admin/multi-currency-admin.js:86
+#: admin/multi-currency-page.js:86
 msgid "Checkout"
 msgstr "Finalizare comandă"
 
-#: admin/multi-currency-admin.js:87
+#: admin/multi-currency-page.js:87
 msgid "CRM"
 msgstr "CRM"
 
-#: admin/multi-currency-admin.js:88
+#: admin/multi-currency-page.js:88
 msgid "Diagnostics"
 msgstr "Diagnosticare"
 
-#: admin/multi-currency-admin.js:130
+#: admin/multi-currency-page.js:130
 msgid "Failed to load settings."
 msgstr "Setările nu au putut fi încărcate."
 
-#: admin/multi-currency-admin.js:156
+#: admin/multi-currency-page.js:156
 msgid "Failed to load exchange rates."
 msgstr "Cursurile valutare nu au putut fi încărcate."
 
-#: admin/multi-currency-admin.js:171
+#: admin/multi-currency-page.js:171
 msgid "Failed to load diagnostics."
 msgstr "Datele de diagnosticare nu au putut fi încărcate."
 
-#: admin/multi-currency-admin.js:185
+#: admin/multi-currency-page.js:185
 msgid "FluentCRM fields created."
 msgstr "Câmpurile FluentCRM au fost create."
 
-#: admin/multi-currency-admin.js:189
+#: admin/multi-currency-page.js:189
 msgid "Could not create the FluentCRM fields."
 msgstr "Câmpurile FluentCRM nu au putut fi create."
 
-#: admin/multi-currency-admin.js:200
+#: admin/multi-currency-page.js:200
 msgid "Rates refreshed."
 msgstr "Cursurile au fost actualizate."
 
-#: admin/multi-currency-admin.js:204
+#: admin/multi-currency-page.js:204
 msgid "Rate refresh failed."
 msgstr "Actualizarea cursurilor a eșuat."
 
-#: admin/multi-currency-admin.js:218
+#: admin/multi-currency-page.js:218
 msgid "Manual rates saved."
 msgstr "Cursurile manuale au fost salvate."
 
-#: admin/multi-currency-admin.js:234
+#: admin/multi-currency-page.js:234
 msgid "Settings saved."
 msgstr "Setările au fost salvate."
 
-#: admin/multi-currency-admin.js:239
+#: admin/multi-currency-page.js:239
 msgid "Failed to save settings."
 msgstr "Setările nu au putut fi salvate."
 
-#: admin/multi-currency-admin.js:271
+#: admin/multi-currency-page.js:271
 msgid "Multi-Currency settings"
 msgstr "Setări Multi-Currency"
 
@@ -1345,7 +1433,6 @@ msgid "British Pound"
 msgstr "Liră sterlină"
 
 #: admin/switcher-preview.js:62
-#, js-format
 msgid "%s minute"
 msgid_plural "%s minutes"
 msgstr[0] "%s minut"
@@ -1354,12 +1441,14 @@ msgstr[2] "%s de minute"
 
 #. translators: %1$s is the number of currencies shown, %2$s the total configured.
 #: admin/switcher-preview.js:118
-#, js-format
-msgid "Showing %1$s of %2$s currencies. The full list appears on the frontend — this is just a taste."
-msgstr "Afișare: %1$s din %2$s monede. Lista completă apare în magazin — aici este doar o mostră."
+msgid ""
+"Showing %1$s of %2$s currencies. The full list appears on the frontend — "
+"this is just a taste."
+msgstr ""
+"Afișare: %1$s din %2$s monede. Lista completă apare în magazin — aici este "
+"doar o mostră."
 
 #: admin/switcher-preview.js:179
-#, js-format
 msgid "Display prices only. Checkout charged in %s."
 msgstr "Doar afișarea prețurilor. Plata se face în %s."
 
@@ -1384,8 +1473,12 @@ msgid "Label"
 msgstr "Etichetă"
 
 #: blocks/currency-switcher/editor.js:391
-msgid "This block inherits its switcher behavior from the global defaults in Multi-Currency settings. Only the label stays instance-specific."
-msgstr "Acest bloc folosește comportamentul implicit global al selectorului din setările Multi-Currency. Doar eticheta este specifică acestui bloc."
+msgid ""
+"This block inherits its switcher behavior from the global defaults in Multi-"
+"Currency settings. Only the label stays instance-specific."
+msgstr ""
+"Acest bloc folosește comportamentul implicit global al selectorului din "
+"setările Multi-Currency. Doar eticheta este specifică acestui bloc."
 
 #: blocks/currency-switcher/editor.js:401
 #: blocks/currency-switcher/editor.js:403
@@ -1488,8 +1581,12 @@ msgid "Right"
 msgstr "Dreapta"
 
 #: blocks/currency-switcher/editor.js:625
-msgid "Editor preview uses your actual configured currencies and current global switcher defaults."
-msgstr "Previzualizarea din editor folosește monedele configurate efectiv și setările implicite globale actuale ale selectorului."
+msgid ""
+"Editor preview uses your actual configured currencies and current global "
+"switcher defaults."
+msgstr ""
+"Previzualizarea din editor folosește monedele configurate efectiv și "
+"setările implicite globale actuale ale selectorului."
 
 #: blocks/currency-switcher/editor.js:676
 msgid "Rates updated 2 hours ago"
@@ -1509,7 +1606,8 @@ msgstr "Antet compact"
 
 #: blocks/currency-switcher/editor.js:702
 msgid "Flag and code only, tuned for narrow header space."
-msgstr "Afișează doar steagul și codul, potrivite pentru spațiul îngust din antet."
+msgstr ""
+"Afișează doar steagul și codul, potrivite pentru spațiul îngust din antet."
 
 #: blocks/currency-switcher/editor.js:718
 msgid "Footer Descriptive"
@@ -1525,7 +1623,9 @@ msgstr "Lățime completă pe mobil"
 
 #: blocks/currency-switcher/editor.js:731
 msgid "Full-width mobile-friendly switcher with room for more context."
-msgstr "Selector adaptat pentru mobil, pe lățime completă, cu spațiu pentru mai mult context."
+msgstr ""
+"Selector adaptat pentru mobil, pe lățime completă, cu spațiu pentru mai mult "
+"context."
 
 #: blocks/currency-switcher/editor.js:809
 #: blocks/currency-switcher/editor.js:852
@@ -1587,14 +1687,15 @@ msgstr "Notă privind contextul monedei"
 
 #: blocks/currency-context-notice/block.json
 msgctxt "block description"
-msgid "Show a currency context note such as display currency vs checkout currency."
-msgstr "Afișează o notă despre contextul monedei, de exemplu diferența dintre moneda de afișare și moneda folosită la finalizarea comenzii."
+msgid ""
+"Show a currency context note such as display currency vs checkout currency."
+msgstr ""
+"Afișează o notă despre contextul monedei, de exemplu diferența dintre moneda "
+"de afișare și moneda folosită la finalizarea comenzii."
 
-#: blocks/currency-context-notice/block.json
-#: blocks/currency-current/block.json
+#: blocks/currency-context-notice/block.json blocks/currency-current/block.json
 #: blocks/currency-selector-buttons/block.json
-#: blocks/currency-switcher/block.json
-#: blocks/exchange-rate/block.json
+#: blocks/currency-switcher/block.json blocks/exchange-rate/block.json
 msgctxt "block keyword"
 msgid "currency"
 msgstr "monedă"
@@ -1622,7 +1723,9 @@ msgstr "Moneda curentă"
 #: blocks/currency-current/block.json
 msgctxt "block description"
 msgid "Display the visitor's current display currency in compact form."
-msgstr "Afișează într-o formă compactă moneda în care vizitatorul vede acum prețurile."
+msgstr ""
+"Afișează într-o formă compactă moneda în care vizitatorul vede acum "
+"prețurile."
 
 #: blocks/currency-current/block.json
 msgctxt "block keyword"
@@ -1634,8 +1737,7 @@ msgctxt "block keyword"
 msgid "display"
 msgstr "afișare"
 
-#: blocks/currency-current/block.json
-#: blocks/currency-switcher/block.json
+#: blocks/currency-current/block.json blocks/currency-switcher/block.json
 msgctxt "block keyword"
 msgid "money"
 msgstr "bani"
@@ -1647,8 +1749,12 @@ msgstr "Butoane pentru selectarea monedei"
 
 #: blocks/currency-selector-buttons/block.json
 msgctxt "block description"
-msgid "A button-group alternative to the dropdown switcher for stores with a few main currencies."
-msgstr "O alternativă la selectorul cu listă derulantă, sub forma unui grup de butoane, pentru magazinele cu doar câteva monede principale."
+msgid ""
+"A button-group alternative to the dropdown switcher for stores with a few "
+"main currencies."
+msgstr ""
+"O alternativă la selectorul cu listă derulantă, sub forma unui grup de "
+"butoane, pentru magazinele cu doar câteva monede principale."
 
 #: blocks/currency-selector-buttons/block.json
 msgctxt "block keyword"
@@ -1672,8 +1778,12 @@ msgstr "Selector de monedă"
 
 #: blocks/currency-switcher/block.json
 msgctxt "block description"
-msgid "Display the FCHub Multi-Currency switcher in posts, pages, templates, and template parts."
-msgstr "Afișează selectorul FCHub Multi-Currency în articole, pagini, șabloane și părți de șablon."
+msgid ""
+"Display the FCHub Multi-Currency switcher in posts, pages, templates, and "
+"template parts."
+msgstr ""
+"Afișează selectorul FCHub Multi-Currency în articole, pagini, șabloane și "
+"părți de șablon."
 
 #: blocks/currency-switcher/block.json
 msgctxt "block keyword"
@@ -1685,8 +1795,7 @@ msgctxt "block keyword"
 msgid "multi-currency"
 msgstr "monede multiple"
 
-#: blocks/currency-switcher/block.json
-#: blocks/exchange-rate/block.json
+#: blocks/currency-switcher/block.json blocks/exchange-rate/block.json
 msgctxt "block keyword"
 msgid "exchange"
 msgstr "schimb"
@@ -1728,8 +1837,12 @@ msgstr "Curs valutar"
 
 #: blocks/exchange-rate/block.json
 msgctxt "block description"
-msgid "Display the current exchange rate between the store base currency and the visitor display currency."
-msgstr "Afișează cursul valutar actual dintre moneda de bază a magazinului și moneda de afișare a vizitatorului."
+msgid ""
+"Display the current exchange rate between the store base currency and the "
+"visitor display currency."
+msgstr ""
+"Afișează cursul valutar actual dintre moneda de bază a magazinului și moneda "
+"de afișare a vizitatorului."
 
 #: blocks/exchange-rate/block.json
 msgctxt "block keyword"

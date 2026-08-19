@@ -5,16 +5,16 @@ msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
 "currency\n"
+"POT-Creation-Date: 2026-08-19T05:50:59+00:00\n"
+"PO-Revision-Date: 2026-08-19 02:22+0300\n"
 "Last-Translator: \n"
 "Language-Team: Finnish\n"
+"Language: fi\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-18T19:36:27+00:00\n"
-"PO-Revision-Date: 2026-08-19 02:22+0300\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: fchub-multi-currency\n"
-"Language: fi\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #. Plugin Name of the plugin
@@ -34,7 +34,9 @@ msgstr "https://fchub.co/docs/fchub-multi-currency"
 msgid ""
 "Display-layer multi-currency for FluentCart with exchange rate management "
 "and checkout disclosure"
-msgstr "FluentCartin hintojen näyttämiseen tarkoitettu monivaluuttaisuus, valuuttakurssien hallinta ja kassan valuuttailmoitus"
+msgstr ""
+"FluentCartin hintojen näyttämiseen tarkoitettu monivaluuttaisuus, "
+"valuuttakurssien hallinta ja kassan valuuttailmoitus"
 
 #. Author of the plugin
 #: fchub-multi-currency.php
@@ -58,7 +60,9 @@ msgstr "Valmis esittely koko valuuttalohkoperheestä."
 msgid ""
 "FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics "
 "page or trigger a manual refresh."
-msgstr "FCHub Multi-Currency: Osa valuuttakursseista on vanhentunut. Tarkista diagnostiikkasivu tai päivitä kurssit manuaalisesti."
+msgstr ""
+"FCHub Multi-Currency: Osa valuuttakursseista on vanhentunut. Tarkista "
+"diagnostiikkasivu tai päivitä kurssit manuaalisesti."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:37
 msgid "Switch the rate provider to Manual rates before saving."
@@ -66,7 +70,9 @@ msgstr "Vaihda kurssipalveluksi Manuaaliset kurssit ennen tallentamista."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:43
 msgid "Add at least one display currency before saving manual rates."
-msgstr "Lisää vähintään yksi näyttövaluutta ennen manuaalisten kurssien tallentamista."
+msgstr ""
+"Lisää vähintään yksi näyttövaluutta ennen manuaalisten kurssien "
+"tallentamista."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:48
 msgid "Provide one rate for every configured display currency."
@@ -79,7 +85,7 @@ msgstr "Kursseja voi tallentaa vain määritetyille näyttövaluutoille."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:67
 #: app/Http/Controllers/Admin/RatesAdminController.php:104
-#: admin/multi-currency-admin.js:222
+#: admin/multi-currency-page.js:222
 msgid "Manual rates could not be saved."
 msgstr "Manuaalisia kursseja ei voitu tallentaa."
 
@@ -88,7 +94,9 @@ msgstr "Manuaalisia kursseja ei voitu tallentaa."
 msgid ""
 "Each manual rate must be a positive decimal string with up to 8 decimal "
 "places."
-msgstr "Jokaisen manuaalisen kurssin on oltava positiivinen desimaaliluku merkkijonona, jossa on enintään 8 desimaalia."
+msgstr ""
+"Jokaisen manuaalisen kurssin on oltava positiivinen desimaaliluku "
+"merkkijonona, jossa on enintään 8 desimaalia."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:121
 msgid "Each manual rate must be greater than zero."
@@ -198,7 +206,9 @@ msgstr "Hinnat näytetään valuutassa %1$s. Maksu veloitetaan valuutassa %2$s."
 #: app/Frontend/CurrencyContextPresentation.php:227
 #, php-format
 msgid "Prices shown in %1$s are approximate. Checkout is charged in %2$s."
-msgstr "Valuutassa %1$s näytettävät hinnat ovat likimääräisiä. Maksu veloitetaan valuutassa %2$s."
+msgstr ""
+"Valuutassa %1$s näytettävät hinnat ovat likimääräisiä. Maksu veloitetaan "
+"valuutassa %2$s."
 
 #: app/Frontend/CurrencyContextPresentation.php:56
 #: app/Frontend/CurrencyContextPresentation.php:326
@@ -211,7 +221,8 @@ msgstr "Perusvaluutta on parhaillaan käytössä."
 #: app/Frontend/CurrencyContextPresentation.php:351
 #, php-format
 msgid "Display prices only. Checkout is charged in %s."
-msgstr "Valuutta koskee vain näytettäviä hintoja. Maksu veloitetaan valuutassa %s."
+msgstr ""
+"Valuutta koskee vain näytettäviä hintoja. Maksu veloitetaan valuutassa %s."
 
 #: app/Frontend/CurrencyContextPresentation.php:59
 #: app/Frontend/CurrencyContextPresentation.php:345
@@ -329,7 +340,9 @@ msgstr "Viimeisimmän tilauksen valuuttakurssi"
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:53
 msgid "Manual rates are saved explicitly and cannot be refreshed."
-msgstr "Manuaaliset kurssit tallennetaan erikseen, eikä niitä voi päivittää automaattisesti."
+msgstr ""
+"Manuaaliset kurssit tallennetaan erikseen, eikä niitä voi päivittää "
+"automaattisesti."
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:69
 msgid "Failed to refresh exchange rates. Check the logs for details."
@@ -341,7 +354,9 @@ msgstr "Valuuttakurssit päivitettiin."
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:89
 msgid "Provide manual rates as a currency-to-rate object."
-msgstr "Anna manuaaliset kurssit oliona, jonka avaimet ovat valuuttakoodeja ja arvot valuuttakursseja."
+msgstr ""
+"Anna manuaaliset kurssit oliona, jonka avaimet ovat valuuttakoodeja ja arvot "
+"valuuttakursseja."
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:112
 msgid "Manual rates saved successfully."
@@ -385,19 +400,26 @@ msgstr "Valuuttakoodi on pakollinen."
 msgid ""
 "This currency cannot be selected because no usable exchange rate is "
 "available. Please try again later."
-msgstr "Tätä valuuttaa ei voi valita, koska sille ei ole käytettävissä kelvollista valuuttakurssia. Yritä myöhemmin uudelleen."
+msgstr ""
+"Tätä valuuttaa ei voi valita, koska sille ei ole käytettävissä kelvollista "
+"valuuttakurssia. Yritä myöhemmin uudelleen."
 
 #: app/Http/Controllers/Pub/ContextController.php:177
 msgid ""
 "Currency preference could not be saved because both cookie and account "
 "persistence are disabled."
-msgstr "Valuuttavalintaa ei voitu tallentaa, koska tallennus evästeeseen ja käyttäjätilille on poistettu käytöstä."
+msgstr ""
+"Valuuttavalintaa ei voitu tallentaa, koska tallennus evästeeseen ja "
+"käyttäjätilille on poistettu käytöstä."
 
 #: app/Http/Controllers/Pub/ContextController.php:181
 msgid ""
 "Currency preference could not be saved. Cookie persistence is disabled, so "
 "logged-out visitors cannot keep a currency choice."
-msgstr "Valuuttavalintaa ei voitu tallentaa. Tallennus evästeeseen on poistettu käytöstä, joten kirjautumattomien vierailijoiden valuuttavalintaa ei voida säilyttää."
+msgstr ""
+"Valuuttavalintaa ei voitu tallentaa. Tallennus evästeeseen on poistettu "
+"käytöstä, joten kirjautumattomien vierailijoiden valuuttavalintaa ei voida "
+"säilyttää."
 
 #: app/Http/Controllers/Pub/ContextController.php:204
 msgid "Currency preference saved."
@@ -407,7 +429,9 @@ msgstr "Valuuttavalinta tallennettiin."
 msgid ""
 "Display-layer multi-currency with exchange rate management and checkout "
 "disclosure."
-msgstr "Hintojen näyttämiseen tarkoitettu monivaluuttaisuus, valuuttakurssien hallinta ja kassan valuuttailmoitus."
+msgstr ""
+"Hintojen näyttämiseen tarkoitettu monivaluuttaisuus, valuuttakurssien "
+"hallinta ja kassan valuuttailmoitus."
 
 #: app/Integration/FluentCrmSmartCodes.php:189
 msgid "Multi-Currency Order"
@@ -494,7 +518,8 @@ msgstr "FluentCRM-synkronointi"
 
 #: app/Integration/MultiCurrencySettings.php:64
 msgid "Tag contacts in FluentCRM based on their currency preference."
-msgstr "Merkitse yhteystiedot FluentCRM-tunnisteilla valuuttavalinnan perusteella."
+msgstr ""
+"Merkitse yhteystiedot FluentCRM-tunnisteilla valuuttavalinnan perusteella."
 
 #: app/Integration/MultiCurrencySettings.php:72
 msgid "Full Settings"
@@ -502,15 +527,16 @@ msgstr "Kaikki asetukset"
 
 #: app/Integration/MultiCurrencySettings.php:73
 msgid "Configure currencies, exchange rates, checkout disclosure, and more."
-msgstr "Määritä valuutat, valuuttakurssit, kassan valuuttailmoitus ja muut asetukset."
+msgstr ""
+"Määritä valuutat, valuuttakurssit, kassan valuuttailmoitus ja muut asetukset."
 
 #: app/Integration/MultiCurrencySettings.php:98
 msgid "Multi-Currency settings saved."
 msgstr "Monivaluuttaisuuden asetukset tallennettiin."
 
-#: app/Support/AdminMenu.php:19 admin/multi-currency-admin.js:107
-#: admin/multi-currency-admin.js:259 admin/multi-currency-admin.js:327
-#: admin/multi-currency-admin.js:385
+#: app/Support/AdminMenu.php:19 admin/multi-currency-page.js:107
+#: admin/multi-currency-page.js:259 admin/multi-currency-page.js:327
+#: admin/multi-currency-page.js:385
 msgid "Multi-Currency"
 msgstr "Monivaluuttaisuus"
 
@@ -522,7 +548,9 @@ msgstr "%d tunnin välein"
 
 #: fchub-multi-currency.php:175
 msgid "FCHub Multi-Currency requires FluentCart to be installed and activated."
-msgstr "FCHub Multi-Currency edellyttää, että FluentCart on asennettu ja otettu käyttöön."
+msgstr ""
+"FCHub Multi-Currency edellyttää, että FluentCart on asennettu ja otettu "
+"käyttöön."
 
 #: admin/components/checkout-settings.js:35
 #: admin/components/checkout-settings.js:78 admin/components/crm-settings.js:35
@@ -560,11 +588,15 @@ msgstr "Kurssin ajantasaisuustunniste"
 msgid ""
 "Global gate for the rates-updated badge. When disabled, no surface shows it "
 "— including the switcher dropdown footer."
-msgstr "Ajantasaisuustunnisteen yleisasetus. Kun se on pois käytöstä, tunnistetta ei näytetä missään — ei myöskään valuutanvaihtimen pudotusvalikon alareunassa."
+msgstr ""
+"Ajantasaisuustunnisteen yleisasetus. Kun se on pois käytöstä, tunnistetta ei "
+"näytetä missään — ei myöskään valuutanvaihtimen pudotusvalikon alareunassa."
 
 #: admin/components/crm-settings.js:26
 msgid "Tag contacts and update custom fields based on currency preference."
-msgstr "Merkitse yhteystiedot tunnisteilla ja päivitä mukautetut kentät valuuttavalinnan perusteella."
+msgstr ""
+"Merkitse yhteystiedot tunnisteilla ja päivitä mukautetut kentät "
+"valuuttavalinnan perusteella."
 
 #: admin/components/crm-settings.js:48
 msgid "Auto-create Tags"
@@ -685,7 +717,9 @@ msgstr "Oikealla välilyönnillä (100 $)"
 #: admin/components/currency-settings.js:225
 msgid ""
 "No display currencies added yet. Use the picker above to add currencies."
-msgstr "Näyttövaluuttoja ei ole vielä lisätty. Lisää valuuttoja yllä olevalla valitsimella."
+msgstr ""
+"Näyttövaluuttoja ei ole vielä lisätty. Lisää valuuttoja yllä olevalla "
+"valitsimella."
 
 #: admin/components/diagnostics-view.js:24
 msgid "Available"
@@ -803,7 +837,9 @@ msgstr "Monivaluuttaisuus käytössä"
 msgid ""
 "Managed in FluentCart Store Setup. Checkout and payment gateways use this "
 "currency."
-msgstr "Hallitaan FluentCartin kaupan asetuksissa. Kassa ja maksutavat käyttävät tätä valuuttaa."
+msgstr ""
+"Hallitaan FluentCartin kaupan asetuksissa. Kassa ja maksutavat käyttävät "
+"tätä valuuttaa."
 
 #: admin/components/general-settings.js:106
 msgid "Default Display Currency"
@@ -811,7 +847,9 @@ msgstr "Oletusnäyttövaluutta"
 
 #: admin/components/general-settings.js:109
 msgid "Currency shown to visitors before any preference is detected."
-msgstr "Valuutta, joka näytetään vierailijoille ennen kuin heidän valuuttavalintansa tunnistetaan."
+msgstr ""
+"Valuutta, joka näytetään vierailijoille ennen kuin heidän valuuttavalintansa "
+"tunnistetaan."
 
 #: admin/components/general-settings.js:124
 msgid "URL Parameter"
@@ -819,7 +857,8 @@ msgstr "URL-parametri"
 
 #: admin/components/general-settings.js:127
 msgid "Allow currency switching via URL (e.g. ?currency=EUR)."
-msgstr "Salli valuutan vaihtaminen URL-parametrilla (esimerkiksi ?currency=EUR)."
+msgstr ""
+"Salli valuutan vaihtaminen URL-parametrilla (esimerkiksi ?currency=EUR)."
 
 #: admin/components/general-settings.js:146
 msgid "URL Parameter Key"
@@ -834,13 +873,19 @@ msgid ""
 "Remember a guest currency in a cookie and matching browser-storage fallback. "
 "Disable this and logged-out visitors cannot keep a currency choice at all — "
 "the switch is reported as failed rather than silently ignored."
-msgstr "Tallenna vierailijan valuuttavalinta evästeeseen ja varmuuskopiona selaimen tallennustilaan. Jos poistat tämän käytöstä, kirjautumattomien vierailijoiden valuuttavalintaa ei voida säilyttää lainkaan — vaihto ilmoitetaan epäonnistuneeksi eikä sitä ohiteta huomaamatta."
+msgstr ""
+"Tallenna vierailijan valuuttavalinta evästeeseen ja varmuuskopiona selaimen "
+"tallennustilaan. Jos poistat tämän käytöstä, kirjautumattomien "
+"vierailijoiden valuuttavalintaa ei voida säilyttää lainkaan — vaihto "
+"ilmoitetaan epäonnistuneeksi eikä sitä ohiteta huomaamatta."
 
 #: admin/components/general-settings.js:177
 msgid ""
 "Currency switching is now a logged-in-only feature. Guests will be told "
 "their preference could not be saved."
-msgstr "Valuutan vaihtaminen on nyt mahdollista vain kirjautuneille käyttäjille. Vierailijalle ilmoitetaan, ettei valintaa voitu tallentaa."
+msgstr ""
+"Valuutan vaihtaminen on nyt mahdollista vain kirjautuneille käyttäjille. "
+"Vierailijalle ilmoitetaan, ettei valintaa voitu tallentaa."
 
 #: admin/components/general-settings.js:189
 msgid "Cookie Lifetime (days)"
@@ -855,7 +900,10 @@ msgid ""
 "Remember currency preference in the logged-in user account. Disable this if "
 "you want logged-in sessions to respect the default display currency on every "
 "fresh visit."
-msgstr "Tallenna valuuttavalinta kirjautuneen käyttäjän tilille. Poista tämä käytöstä, jos haluat oletusnäyttövaluutan olevan käytössä kirjautuneen käyttäjän jokaisella uudella vierailulla."
+msgstr ""
+"Tallenna valuuttavalinta kirjautuneen käyttäjän tilille. Poista tämä "
+"käytöstä, jos haluat oletusnäyttövaluutan olevan käytössä kirjautuneen "
+"käyttäjän jokaisella uudella vierailulla."
 
 #: admin/components/general-settings.js:227
 msgid "Coming Soon"
@@ -865,7 +913,9 @@ msgstr "Tulossa pian"
 msgid ""
 "Automatically detect visitor currency based on their country. Requires a "
 "geolocation provider."
-msgstr "Tunnista vierailijan valuutta automaattisesti maan perusteella. Edellyttää sijaintipalvelua."
+msgstr ""
+"Tunnista vierailijan valuutta automaattisesti maan perusteella. Edellyttää "
+"sijaintipalvelua."
 
 #: admin/components/general-settings.js:251
 msgid "Remove Data on Uninstall"
@@ -875,7 +925,9 @@ msgstr "Poista tiedot asennuksen poistamisen yhteydessä"
 msgid ""
 "If enabled, all tables and settings will be removed when the plugin is "
 "uninstalled."
-msgstr "Kun tämä on käytössä, kaikki taulut ja asetukset poistetaan lisäosan asennuksen poistamisen yhteydessä."
+msgstr ""
+"Kun tämä on käytössä, kaikki taulut ja asetukset poistetaan lisäosan "
+"asennuksen poistamisen yhteydessä."
 
 #: admin/components/general-settings.js:263
 msgid "Keep data"
@@ -899,7 +951,9 @@ msgstr "Manuaalisia kursseja ei ole vielä tallennettu."
 
 #: admin/components/rate-settings.js:31
 msgid "No exchange rates yet. Add display currencies and trigger a refresh."
-msgstr "Valuuttakursseja ei ole vielä saatavilla. Lisää näyttövaluuttoja ja käynnistä päivitys."
+msgstr ""
+"Valuuttakursseja ei ole vielä saatavilla. Lisää näyttövaluuttoja ja "
+"käynnistä päivitys."
 
 #: admin/components/rate-settings.js:43
 msgid "Rate Provider"
@@ -963,7 +1017,8 @@ msgstr "Manuaaliset kurssit"
 
 #: admin/components/rate-settings.js:165
 msgid "Save the provider change before entering manual rates."
-msgstr "Tallenna kurssipalvelun muutos ennen manuaalisten kurssien syöttämistä."
+msgstr ""
+"Tallenna kurssipalvelun muutos ennen manuaalisten kurssien syöttämistä."
 
 #: admin/components/rate-settings.js:168
 msgid "Add and save at least one display currency first."
@@ -1011,7 +1066,8 @@ msgstr "Oletuksena käytettävä esiasetus"
 
 #: admin/components/switcher-settings.js:51
 msgid "Visual style used by switcher blocks that inherit global defaults."
-msgstr "Yleiset oletusasetukset perivien valuutanvaihdinlohkojen visuaalinen tyyli."
+msgstr ""
+"Yleiset oletusasetukset perivien valuutanvaihdinlohkojen visuaalinen tyyli."
 
 #: admin/components/switcher-settings.js:60
 #: blocks/currency-switcher/editor.js:406
@@ -1149,7 +1205,9 @@ msgstr "Suosikkivaluutat"
 #: admin/components/switcher-settings.js:194
 msgid ""
 "Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
-msgstr "Pilkulla erotetut ISO-koodit kiinnitetään muiden yläpuolelle, esimerkiksi EUR, USD, GBP"
+msgstr ""
+"Pilkulla erotetut ISO-koodit kiinnitetään muiden yläpuolelle, esimerkiksi "
+"EUR, USD, GBP"
 
 #: admin/components/switcher-settings.js:204
 #: blocks/currency-switcher/editor.js:521
@@ -1247,7 +1305,10 @@ msgid ""
 "Optional trust-building context shown at the bottom of the dropdown. The "
 "freshness badge also requires the global Rate Freshness Badge gate on the "
 "Checkout tab."
-msgstr "Pudotusvalikon alaosassa näytettävät valinnaiset lisätiedot lisäävät luottamusta. Ajantasaisuustunniste edellyttää lisäksi, että kurssin ajantasaisuustunniste on otettu käyttöön Kassa-välilehdellä."
+msgstr ""
+"Pudotusvalikon alaosassa näytettävät valinnaiset lisätiedot lisäävät "
+"luottamusta. Ajantasaisuustunniste edellyttää lisäksi, että kurssin "
+"ajantasaisuustunniste on otettu käyttöön Kassa-välilehdellä."
 
 #: admin/components/switcher-settings.js:298
 msgid "Freshness badge"
@@ -1261,87 +1322,87 @@ msgstr "Kurssiarvo"
 msgid "Checkout context"
 msgstr "Kassan valuuttatieto"
 
-#: admin/multi-currency-admin.js:47
+#: admin/multi-currency-page.js:47
 msgid "Network error. Please check your connection."
 msgstr "Verkkovirhe. Tarkista internetyhteys."
 
-#: admin/multi-currency-admin.js:78
+#: admin/multi-currency-page.js:78
 msgid "Save"
 msgstr "Tallenna"
 
-#: admin/multi-currency-admin.js:79
+#: admin/multi-currency-page.js:79
 msgid "Saving..."
 msgstr "Tallennetaan…"
 
-#: admin/multi-currency-admin.js:82
+#: admin/multi-currency-page.js:82
 msgid "General"
 msgstr "Yleiset"
 
-#: admin/multi-currency-admin.js:83
+#: admin/multi-currency-page.js:83
 msgid "Currencies"
 msgstr "Valuutat"
 
-#: admin/multi-currency-admin.js:84
+#: admin/multi-currency-page.js:84
 msgid "Exchange Rates"
 msgstr "Valuuttakurssit"
 
-#: admin/multi-currency-admin.js:85
+#: admin/multi-currency-page.js:85
 msgid "Switcher"
 msgstr "Valuutanvaihdin"
 
-#: admin/multi-currency-admin.js:86
+#: admin/multi-currency-page.js:86
 msgid "Checkout"
 msgstr "Kassa"
 
-#: admin/multi-currency-admin.js:87
+#: admin/multi-currency-page.js:87
 msgid "CRM"
 msgstr "CRM"
 
-#: admin/multi-currency-admin.js:88
+#: admin/multi-currency-page.js:88
 msgid "Diagnostics"
 msgstr "Diagnostiikka"
 
-#: admin/multi-currency-admin.js:130
+#: admin/multi-currency-page.js:130
 msgid "Failed to load settings."
 msgstr "Asetusten lataaminen epäonnistui."
 
-#: admin/multi-currency-admin.js:156
+#: admin/multi-currency-page.js:156
 msgid "Failed to load exchange rates."
 msgstr "Valuuttakurssien lataaminen epäonnistui."
 
-#: admin/multi-currency-admin.js:171
+#: admin/multi-currency-page.js:171
 msgid "Failed to load diagnostics."
 msgstr "Diagnostiikan lataaminen epäonnistui."
 
-#: admin/multi-currency-admin.js:185
+#: admin/multi-currency-page.js:185
 msgid "FluentCRM fields created."
 msgstr "FluentCRM-kentät luotiin."
 
-#: admin/multi-currency-admin.js:189
+#: admin/multi-currency-page.js:189
 msgid "Could not create the FluentCRM fields."
 msgstr "FluentCRM-kenttiä ei voitu luoda."
 
-#: admin/multi-currency-admin.js:200
+#: admin/multi-currency-page.js:200
 msgid "Rates refreshed."
 msgstr "Kurssit päivitettiin."
 
-#: admin/multi-currency-admin.js:204
+#: admin/multi-currency-page.js:204
 msgid "Rate refresh failed."
 msgstr "Kurssien päivitys epäonnistui."
 
-#: admin/multi-currency-admin.js:218
+#: admin/multi-currency-page.js:218
 msgid "Manual rates saved."
 msgstr "Manuaaliset kurssit tallennettiin."
 
-#: admin/multi-currency-admin.js:234
+#: admin/multi-currency-page.js:234
 msgid "Settings saved."
 msgstr "Asetukset tallennettiin."
 
-#: admin/multi-currency-admin.js:239
+#: admin/multi-currency-page.js:239
 msgid "Failed to save settings."
 msgstr "Asetusten tallentaminen epäonnistui."
 
-#: admin/multi-currency-admin.js:271
+#: admin/multi-currency-page.js:271
 msgid "Multi-Currency settings"
 msgstr "Monivaluuttaisuuden asetukset"
 
@@ -1368,15 +1429,20 @@ msgstr[1] "%s minuuttia"
 msgid ""
 "Showing %1$s of %2$s currencies. The full list appears on the frontend — "
 "this is just a taste."
-msgstr "Valuutoista näytetään %1$s/%2$s. Koko luettelo näkyy sivustolla — tässä on vain pieni näyte."
+msgstr ""
+"Valuutoista näytetään %1$s/%2$s. Koko luettelo näkyy sivustolla — tässä on "
+"vain pieni näyte."
 
 #: admin/switcher-preview.js:179
 msgid "Display prices only. Checkout charged in %s."
-msgstr "Valuutta koskee vain näytettäviä hintoja. Maksu veloitetaan valuutassa %s."
+msgstr ""
+"Valuutta koskee vain näytettäviä hintoja. Maksu veloitetaan valuutassa %s."
 
 #: admin/switcher-preview.js:182
 msgid "Display prices only. Checkout is charged in the store currency."
-msgstr "Valuutta koskee vain näytettäviä hintoja. Maksu veloitetaan kaupan valuutassa."
+msgstr ""
+"Valuutta koskee vain näytettäviä hintoja. Maksu veloitetaan kaupan "
+"valuutassa."
 
 #: admin/switcher-preview.js:206
 msgid "Preview"
@@ -1398,7 +1464,9 @@ msgstr "Selite"
 msgid ""
 "This block inherits its switcher behavior from the global defaults in Multi-"
 "Currency settings. Only the label stays instance-specific."
-msgstr "Tämä lohko perii valuutanvaihtimen toiminnan Monivaluuttaisuus-asetusten yleisistä oletuksista. Vain selite määritetään lohkokohtaisesti."
+msgstr ""
+"Tämä lohko perii valuutanvaihtimen toiminnan Monivaluuttaisuus-asetusten "
+"yleisistä oletuksista. Vain selite määritetään lohkokohtaisesti."
 
 #: blocks/currency-switcher/editor.js:401
 #: blocks/currency-switcher/editor.js:403
@@ -1504,7 +1572,9 @@ msgstr "Oikealle"
 msgid ""
 "Editor preview uses your actual configured currencies and current global "
 "switcher defaults."
-msgstr "Muokkaimen esikatselu käyttää määrittämiäsi valuuttoja ja valuutanvaihtimen nykyisiä yleisiä oletusasetuksia."
+msgstr ""
+"Muokkaimen esikatselu käyttää määrittämiäsi valuuttoja ja valuutanvaihtimen "
+"nykyisiä yleisiä oletusasetuksia."
 
 #: blocks/currency-switcher/editor.js:676
 msgid "Rates updated 2 hours ago"
@@ -1516,7 +1586,8 @@ msgstr "1 EUR = 1,1000 USD"
 
 #: blocks/currency-switcher/editor.js:683
 msgid "Display prices only. Checkout is charged in EUR."
-msgstr "Valuutta koskee vain näytettäviä hintoja. Maksu veloitetaan valuutassa EUR."
+msgstr ""
+"Valuutta koskee vain näytettäviä hintoja. Maksu veloitetaan valuutassa EUR."
 
 #: blocks/currency-switcher/editor.js:702
 msgid "Header Compact"
@@ -1532,7 +1603,9 @@ msgstr "Kuvaileva alatunniste"
 
 #: blocks/currency-switcher/editor.js:718
 msgid "A more descriptive switcher for footer or utility content."
-msgstr "Tarkemmat tiedot sisältävä valuutanvaihdin alatunnisteeseen tai muuhun täydentävään sisältöön."
+msgstr ""
+"Tarkemmat tiedot sisältävä valuutanvaihdin alatunnisteeseen tai muuhun "
+"täydentävään sisältöön."
 
 #: blocks/currency-switcher/editor.js:731
 msgid "Mobile Full Width"
@@ -1540,7 +1613,8 @@ msgstr "Täysleveä mobiilissa"
 
 #: blocks/currency-switcher/editor.js:731
 msgid "Full-width mobile-friendly switcher with room for more context."
-msgstr "Mobiiliystävällinen täysleveä valuutanvaihdin, jossa on tilaa lisätiedoille."
+msgstr ""
+"Mobiiliystävällinen täysleveä valuutanvaihdin, jossa on tilaa lisätiedoille."
 
 #: blocks/currency-switcher/editor.js:809
 #: blocks/currency-switcher/editor.js:852
@@ -1604,7 +1678,8 @@ msgstr "Valuuttatietojen ilmoitus"
 msgctxt "block description"
 msgid ""
 "Show a currency context note such as display currency vs checkout currency."
-msgstr "Näytä valuuttoja koskeva ilmoitus, kuten näyttövaluutan ja kassavaluutan ero."
+msgstr ""
+"Näytä valuuttoja koskeva ilmoitus, kuten näyttövaluutan ja kassavaluutan ero."
 
 #: blocks/currency-context-notice/block.json blocks/currency-current/block.json
 #: blocks/currency-selector-buttons/block.json
@@ -1663,7 +1738,9 @@ msgctxt "block description"
 msgid ""
 "A button-group alternative to the dropdown switcher for stores with a few "
 "main currencies."
-msgstr "Vaihtoehto pudotusvalikolle: painikeryhmä kaupoille, joissa on muutama päävaluutta."
+msgstr ""
+"Vaihtoehto pudotusvalikolle: painikeryhmä kaupoille, joissa on muutama "
+"päävaluutta."
 
 #: blocks/currency-selector-buttons/block.json
 msgctxt "block keyword"
@@ -1690,7 +1767,9 @@ msgctxt "block description"
 msgid ""
 "Display the FCHub Multi-Currency switcher in posts, pages, templates, and "
 "template parts."
-msgstr "Näytä FCHub Multi-Currency -valuutanvaihdin artikkeleissa, sivuilla, sivupohjissa ja sivupohjan osissa."
+msgstr ""
+"Näytä FCHub Multi-Currency -valuutanvaihdin artikkeleissa, sivuilla, "
+"sivupohjissa ja sivupohjan osissa."
 
 #: blocks/currency-switcher/block.json
 msgctxt "block keyword"
@@ -1747,7 +1826,9 @@ msgctxt "block description"
 msgid ""
 "Display the current exchange rate between the store base currency and the "
 "visitor display currency."
-msgstr "Näytä kaupan perusvaluutan ja vierailijan näyttövaluutan välinen nykyinen valuuttakurssi."
+msgstr ""
+"Näytä kaupan perusvaluutan ja vierailijan näyttövaluutan välinen nykyinen "
+"valuuttakurssi."
 
 #: blocks/exchange-rate/block.json
 msgctxt "block keyword"

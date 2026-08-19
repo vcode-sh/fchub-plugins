@@ -124,6 +124,39 @@ final class WordPressOrgPackageTest extends TestCase
         );
     }
 
+    /**
+     * wp-cli's make-json (i18n-command ≤ 2.12) matches script names against
+     * the unescaped pattern "/.min.js$/", so a name like "…admin.js" is
+     * treated as a minified artifact and its JED translation file is written
+     * under an md5 WordPress never computes — that script's translations
+     * silently vanish. No translatable script may carry a name the buggy
+     * pattern matches unless it genuinely is a .min.js artifact.
+     */
+    #[Test]
+    public function translatableScriptNamesSurviveMakeJson(): void
+    {
+        $scripts = array_merge(
+            glob($this->pluginRoot . '/admin/*.js') ?: [],
+            glob($this->pluginRoot . '/admin/components/*.js') ?: [],
+            glob($this->pluginRoot . '/blocks/*/*.js') ?: [],
+        );
+
+        self::assertNotEmpty($scripts);
+
+        foreach ($scripts as $script) {
+            $name = basename($script);
+            if (str_ends_with($name, '.min.js')) {
+                continue;
+            }
+
+            self::assertDoesNotMatchRegularExpression(
+                '/.min.js$/',
+                $name,
+                "$name would be mangled by wp i18n make-json; rename it so its JED file matches what WordPress loads.",
+            );
+        }
+    }
+
     #[Test]
     public function composerMetadataDeclaresThePhpFloorAndLicence(): void
     {

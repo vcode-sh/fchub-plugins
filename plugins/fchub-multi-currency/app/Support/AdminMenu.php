@@ -41,7 +41,7 @@ final class AdminMenu
 
     public static function enqueueAssets(): void
     {
-        $bundlePath = FCHUB_MC_PATH . 'admin/multi-currency-admin.js';
+        $bundlePath = FCHUB_MC_PATH . 'admin/multi-currency-page.js';
 
         if (!file_exists($bundlePath)) {
             return;
@@ -88,7 +88,7 @@ final class AdminMenu
 
         wp_enqueue_script(
             'fchub-mc-admin',
-            FCHUB_MC_URL . 'admin/multi-currency-admin.js',
+            FCHUB_MC_URL . 'admin/multi-currency-page.js',
             array_merge(['wp-i18n', 'fluent-cart_global_admin_hooks'], $componentHandles),
             (string) filemtime($bundlePath),
             true,

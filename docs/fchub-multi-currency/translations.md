@@ -86,6 +86,15 @@ From `plugins/fchub-multi-currency/`:
   the suite.
 - `AdminMenuTest` / `BlocksModuleTest` — every JS handle keeps its `wp-i18n`
   dependency and script-translations registration.
+- `WordPressOrgPackageTest::translatableScriptNamesSurviveMakeJson` — no
+  translatable script name may match the unescaped pattern `/.min.js$/`.
+  wp-cli's `make-json` (i18n-command ≤ 2.12) treats such names — `…admin.js`
+  qualifies, `d` + `min` + any char + `js` — as minified artifacts and writes
+  their JED file under an md5 WordPress never computes, silently dropping
+  that script's translations. This is why the settings entry file is
+  `admin/multi-currency-page.js`, not `…-admin.js`. After renaming any
+  script, regenerate the POT and `msgmerge` every `.po` so their `#:`
+  references follow; stale references reproduce the mangled file names.
 - `admin-ui-runtime.test.mjs` ("every admin surface string flows through
   wp.i18n") — loads the SPA with a marking translator and asserts per
   component that strings pass through it.

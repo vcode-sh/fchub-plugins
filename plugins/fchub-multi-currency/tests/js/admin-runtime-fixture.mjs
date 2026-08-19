@@ -13,7 +13,7 @@ const SOURCE_FILES = [
 	"components/checkout-settings.js",
 	"components/crm-settings.js",
 	"components/diagnostics-view.js",
-	"multi-currency-admin.js",
+	"multi-currency-page.js",
 ];
 
 // Mirrors wp.i18n.sprintf closely enough for the admin surface: positional

@@ -5,18 +5,18 @@ msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
 "currency\n"
+"POT-Creation-Date: 2026-08-19T05:50:59+00:00\n"
+"PO-Revision-Date: 2026-08-19 02:50+0300\n"
 "Last-Translator: \n"
 "Language-Team: Latvian\n"
+"Language: lv\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-18T19:36:27+00:00\n"
-"PO-Revision-Date: 2026-08-19 02:50+0300\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: fchub-multi-currency\n"
-"Language: lv\n"
-"Plural-Forms: nplurals=3; plural=(n % 10 == 0 || n % 100 >= 11 && n % 100 "
-"<= 19) ? 0 : ((n % 10 == 1 && n % 100 != 11) ? 1 : 2);\n"
+"Plural-Forms: nplurals=3; plural=(n % 10 == 0 || n % 100 >= 11 && n % 100 <= "
+"19) ? 0 : ((n % 10 == 1 && n % 100 != 11) ? 1 : 2);\n"
 
 #. Plugin Name of the plugin
 #: fchub-multi-currency.php app/Bootstrap/Modules/BlocksModule.php:77
@@ -35,7 +35,9 @@ msgstr "https://fchub.co/docs/fchub-multi-currency"
 msgid ""
 "Display-layer multi-currency for FluentCart with exchange rate management "
 "and checkout disclosure"
-msgstr "Vairāku valūtu attēlojums FluentCart veikaliem ar valūtas kursu pārvaldību un norēķinu paziņojumu"
+msgstr ""
+"Vairāku valūtu attēlojums FluentCart veikaliem ar valūtas kursu pārvaldību "
+"un norēķinu paziņojumu"
 
 #. Author of the plugin
 #: fchub-multi-currency.php
@@ -59,7 +61,9 @@ msgstr "Gatavs visu valūtas bloku veidu pārskats."
 msgid ""
 "FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics "
 "page or trigger a manual refresh."
-msgstr "FCHub Multi-Currency: daži valūtas kursi ir novecojuši. Pārbaudiet diagnostikas lapu vai palaidiet manuālu atjaunināšanu."
+msgstr ""
+"FCHub Multi-Currency: daži valūtas kursi ir novecojuši. Pārbaudiet "
+"diagnostikas lapu vai palaidiet manuālu atjaunināšanu."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:37
 msgid "Switch the rate provider to Manual rates before saving."
@@ -67,7 +71,8 @@ msgstr "Pirms saglabāšanas kā valūtas kursu avotu izvēlieties manuālos kur
 
 #: app/Domain/Actions/SaveManualRatesAction.php:43
 msgid "Add at least one display currency before saving manual rates."
-msgstr "Pirms manuālo kursu saglabāšanas pievienojiet vismaz vienu attēlojuma valūtu."
+msgstr ""
+"Pirms manuālo kursu saglabāšanas pievienojiet vismaz vienu attēlojuma valūtu."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:48
 msgid "Provide one rate for every configured display currency."
@@ -80,7 +85,7 @@ msgstr "Kursus var saglabāt tikai konfigurētajām attēlojuma valūtām."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:67
 #: app/Http/Controllers/Admin/RatesAdminController.php:104
-#: admin/multi-currency-admin.js:222
+#: admin/multi-currency-page.js:222
 msgid "Manual rates could not be saved."
 msgstr "Manuālos kursus neizdevās saglabāt."
 
@@ -89,7 +94,9 @@ msgstr "Manuālos kursus neizdevās saglabāt."
 msgid ""
 "Each manual rate must be a positive decimal string with up to 8 decimal "
 "places."
-msgstr "Katram manuālajam kursam jābūt pozitīvam decimālskaitlim ar ne vairāk kā 8 zīmēm aiz komata."
+msgstr ""
+"Katram manuālajam kursam jābūt pozitīvam decimālskaitlim ar ne vairāk kā 8 "
+"zīmēm aiz komata."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:121
 msgid "Each manual rate must be greater than zero."
@@ -199,7 +206,9 @@ msgstr "Cenas tiek rādītas valūtā %1$s. Norēķini notiek valūtā %2$s."
 #: app/Frontend/CurrencyContextPresentation.php:227
 #, php-format
 msgid "Prices shown in %1$s are approximate. Checkout is charged in %2$s."
-msgstr "Valūtā %1$s norādītās cenas ir aptuvenas. Maksājums tiek iekasēts valūtā %2$s."
+msgstr ""
+"Valūtā %1$s norādītās cenas ir aptuvenas. Maksājums tiek iekasēts valūtā "
+"%2$s."
 
 #: app/Frontend/CurrencyContextPresentation.php:56
 #: app/Frontend/CurrencyContextPresentation.php:326
@@ -212,7 +221,8 @@ msgstr "Pašlaik tiek izmantota pamatvalūta."
 #: app/Frontend/CurrencyContextPresentation.php:351
 #, php-format
 msgid "Display prices only. Checkout is charged in %s."
-msgstr "Valūta paredzēta tikai cenu attēlošanai. Maksājums tiek iekasēts valūtā %s."
+msgstr ""
+"Valūta paredzēta tikai cenu attēlošanai. Maksājums tiek iekasēts valūtā %s."
 
 #: app/Frontend/CurrencyContextPresentation.php:59
 #: app/Frontend/CurrencyContextPresentation.php:345
@@ -336,11 +346,13 @@ msgstr "Pēdējā pasūtījuma valūtas kurss"
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:53
 msgid "Manual rates are saved explicitly and cannot be refreshed."
-msgstr "Manuālie kursi tiek saglabāti tieši, un tos nevar atjaunināt automātiski."
+msgstr ""
+"Manuālie kursi tiek saglabāti tieši, un tos nevar atjaunināt automātiski."
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:69
 msgid "Failed to refresh exchange rates. Check the logs for details."
-msgstr "Neizdevās atjaunināt valūtas kursus. Plašāku informāciju skatiet žurnālos."
+msgstr ""
+"Neizdevās atjaunināt valūtas kursus. Plašāku informāciju skatiet žurnālos."
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:77
 msgid "Exchange rates refreshed successfully."
@@ -392,19 +404,25 @@ msgstr "Valūtas kods ir obligāts."
 msgid ""
 "This currency cannot be selected because no usable exchange rate is "
 "available. Please try again later."
-msgstr "Šo valūtu nevar izvēlēties, jo nav pieejams derīgs valūtas kurss. Lūdzu, vēlāk mēģiniet vēlreiz."
+msgstr ""
+"Šo valūtu nevar izvēlēties, jo nav pieejams derīgs valūtas kurss. Lūdzu, "
+"vēlāk mēģiniet vēlreiz."
 
 #: app/Http/Controllers/Pub/ContextController.php:177
 msgid ""
 "Currency preference could not be saved because both cookie and account "
 "persistence are disabled."
-msgstr "Valūtas izvēli neizdevās saglabāt, jo ir atspējota gan sīkdatnes, gan konta datu saglabāšana."
+msgstr ""
+"Valūtas izvēli neizdevās saglabāt, jo ir atspējota gan sīkdatnes, gan konta "
+"datu saglabāšana."
 
 #: app/Http/Controllers/Pub/ContextController.php:181
 msgid ""
 "Currency preference could not be saved. Cookie persistence is disabled, so "
 "logged-out visitors cannot keep a currency choice."
-msgstr "Valūtas izvēli neizdevās saglabāt. Sīkdatnes datu saglabāšana ir atspējota, tāpēc apmeklētāji, kuri nav pieteikušies, nevar saglabāt valūtas izvēli."
+msgstr ""
+"Valūtas izvēli neizdevās saglabāt. Sīkdatnes datu saglabāšana ir atspējota, "
+"tāpēc apmeklētāji, kuri nav pieteikušies, nevar saglabāt valūtas izvēli."
 
 #: app/Http/Controllers/Pub/ContextController.php:204
 msgid "Currency preference saved."
@@ -414,7 +432,8 @@ msgstr "Valūtas izvēle ir saglabāta."
 msgid ""
 "Display-layer multi-currency with exchange rate management and checkout "
 "disclosure."
-msgstr "Vairāku valūtu attēlojums ar valūtas kursu pārvaldību un norēķinu paziņojumu."
+msgstr ""
+"Vairāku valūtu attēlojums ar valūtas kursu pārvaldību un norēķinu paziņojumu."
 
 #: app/Integration/FluentCrmSmartCodes.php:189
 msgid "Multi-Currency Order"
@@ -492,7 +511,8 @@ msgstr "Norēķinu paziņojums"
 #: admin/components/checkout-settings.js:26
 msgid ""
 "Show a notice at checkout that payment is processed in the base currency."
-msgstr "Norēķinu laikā rādīt paziņojumu, ka maksājums tiek apstrādāts pamatvalūtā."
+msgstr ""
+"Norēķinu laikā rādīt paziņojumu, ka maksājums tiek apstrādāts pamatvalūtā."
 
 #: app/Integration/MultiCurrencySettings.php:63
 #: admin/components/crm-settings.js:23
@@ -501,7 +521,8 @@ msgstr "FluentCRM sinhronizācija"
 
 #: app/Integration/MultiCurrencySettings.php:64
 msgid "Tag contacts in FluentCRM based on their currency preference."
-msgstr "Pievienot FluentCRM kontaktpersonām birkas atbilstoši izvēlētajai valūtai."
+msgstr ""
+"Pievienot FluentCRM kontaktpersonām birkas atbilstoši izvēlētajai valūtai."
 
 #: app/Integration/MultiCurrencySettings.php:72
 msgid "Full Settings"
@@ -509,15 +530,17 @@ msgstr "Visi iestatījumi"
 
 #: app/Integration/MultiCurrencySettings.php:73
 msgid "Configure currencies, exchange rates, checkout disclosure, and more."
-msgstr "Konfigurējiet valūtas, valūtas kursus, norēķinu paziņojumu un citus iestatījumus."
+msgstr ""
+"Konfigurējiet valūtas, valūtas kursus, norēķinu paziņojumu un citus "
+"iestatījumus."
 
 #: app/Integration/MultiCurrencySettings.php:98
 msgid "Multi-Currency settings saved."
 msgstr "Vairāku valūtu iestatījumi ir saglabāti."
 
-#: app/Support/AdminMenu.php:19 admin/multi-currency-admin.js:107
-#: admin/multi-currency-admin.js:259 admin/multi-currency-admin.js:327
-#: admin/multi-currency-admin.js:385
+#: app/Support/AdminMenu.php:19 admin/multi-currency-page.js:107
+#: admin/multi-currency-page.js:259 admin/multi-currency-page.js:327
+#: admin/multi-currency-page.js:385
 msgid "Multi-Currency"
 msgstr "Vairākas valūtas"
 
@@ -529,7 +552,8 @@ msgstr "Ik pēc %d h"
 
 #: fchub-multi-currency.php:175
 msgid "FCHub Multi-Currency requires FluentCart to be installed and activated."
-msgstr "Lai izmantotu FCHub Multi-Currency, jāinstalē un jāaktivizē FluentCart."
+msgstr ""
+"Lai izmantotu FCHub Multi-Currency, jāinstalē un jāaktivizē FluentCart."
 
 #: admin/components/checkout-settings.js:35
 #: admin/components/checkout-settings.js:78 admin/components/crm-settings.js:35
@@ -567,11 +591,16 @@ msgstr "Kursa aktualitātes indikators"
 msgid ""
 "Global gate for the rates-updated badge. When disabled, no surface shows it "
 "— including the switcher dropdown footer."
-msgstr "Globāls slēdzis kursu atjaunināšanas indikatoram. Ja tas ir atspējots, indikators netiek rādīts nekur — arī valūtas pārslēdzēja nolaižamās izvēlnes kājenē."
+msgstr ""
+"Globāls slēdzis kursu atjaunināšanas indikatoram. Ja tas ir atspējots, "
+"indikators netiek rādīts nekur — arī valūtas pārslēdzēja nolaižamās izvēlnes "
+"kājenē."
 
 #: admin/components/crm-settings.js:26
 msgid "Tag contacts and update custom fields based on currency preference."
-msgstr "Pievienot kontaktpersonām birkas un atjaunināt pielāgotos laukus atbilstoši izvēlētajai valūtai."
+msgstr ""
+"Pievienot kontaktpersonām birkas un atjaunināt pielāgotos laukus atbilstoši "
+"izvēlētajai valūtai."
 
 #: admin/components/crm-settings.js:48
 msgid "Auto-create Tags"
@@ -692,7 +721,9 @@ msgstr "Pa labi ar atstarpi (100 $)"
 #: admin/components/currency-settings.js:225
 msgid ""
 "No display currencies added yet. Use the picker above to add currencies."
-msgstr "Neviena attēlojuma valūta vēl nav pievienota. Pievienojiet valūtas, izmantojot augstāk esošo izvēlni."
+msgstr ""
+"Neviena attēlojuma valūta vēl nav pievienota. Pievienojiet valūtas, "
+"izmantojot augstāk esošo izvēlni."
 
 #: admin/components/diagnostics-view.js:24
 msgid "Available"
@@ -810,7 +841,9 @@ msgstr "Vairāku valūtu režīms iespējots"
 msgid ""
 "Managed in FluentCart Store Setup. Checkout and payment gateways use this "
 "currency."
-msgstr "Pārvalda FluentCart veikala iestatījumos. Šo valūtu izmanto norēķini un maksājumu vārtejas."
+msgstr ""
+"Pārvalda FluentCart veikala iestatījumos. Šo valūtu izmanto norēķini un "
+"maksājumu vārtejas."
 
 #: admin/components/general-settings.js:106
 msgid "Default Display Currency"
@@ -841,13 +874,19 @@ msgid ""
 "Remember a guest currency in a cookie and matching browser-storage fallback. "
 "Disable this and logged-out visitors cannot keep a currency choice at all — "
 "the switch is reported as failed rather than silently ignored."
-msgstr "Saglabāt viesa izvēlēto valūtu sīkdatnē un atbilstošā pārlūkprogrammas krātuves rezerves risinājumā. Ja šo iespēju atspējo, apmeklētāji, kuri nav pieteikušies, vispār nevar saglabāt valūtas izvēli — pārslēgšana tiek norādīta kā neveiksmīga, nevis klusām ignorēta."
+msgstr ""
+"Saglabāt viesa izvēlēto valūtu sīkdatnē un atbilstošā pārlūkprogrammas "
+"krātuves rezerves risinājumā. Ja šo iespēju atspējo, apmeklētāji, kuri nav "
+"pieteikušies, vispār nevar saglabāt valūtas izvēli — pārslēgšana tiek "
+"norādīta kā neveiksmīga, nevis klusām ignorēta."
 
 #: admin/components/general-settings.js:177
 msgid ""
 "Currency switching is now a logged-in-only feature. Guests will be told "
 "their preference could not be saved."
-msgstr "Valūtas pārslēgšana tagad ir pieejama tikai lietotājiem, kuri ir pieteikušies. Viesi saņems paziņojumu, ka viņu izvēli neizdevās saglabāt."
+msgstr ""
+"Valūtas pārslēgšana tagad ir pieejama tikai lietotājiem, kuri ir "
+"pieteikušies. Viesi saņems paziņojumu, ka viņu izvēli neizdevās saglabāt."
 
 #: admin/components/general-settings.js:189
 msgid "Cookie Lifetime (days)"
@@ -862,7 +901,10 @@ msgid ""
 "Remember currency preference in the logged-in user account. Disable this if "
 "you want logged-in sessions to respect the default display currency on every "
 "fresh visit."
-msgstr "Saglabāt valūtas izvēli pieteiktā lietotāja kontā. Atspējojiet šo iespēju, ja vēlaties, lai katrā jaunā apmeklējumā pieteiktajiem lietotājiem tiktu izmantota noklusējuma attēlojuma valūta."
+msgstr ""
+"Saglabāt valūtas izvēli pieteiktā lietotāja kontā. Atspējojiet šo iespēju, "
+"ja vēlaties, lai katrā jaunā apmeklējumā pieteiktajiem lietotājiem tiktu "
+"izmantota noklusējuma attēlojuma valūta."
 
 #: admin/components/general-settings.js:227
 msgid "Coming Soon"
@@ -872,7 +914,9 @@ msgstr "Drīzumā"
 msgid ""
 "Automatically detect visitor currency based on their country. Requires a "
 "geolocation provider."
-msgstr "Automātiski noteikt apmeklētāja valūtu pēc viņa valsts. Nepieciešams ģeogrāfiskās atrašanās vietas pakalpojuma sniedzējs."
+msgstr ""
+"Automātiski noteikt apmeklētāja valūtu pēc viņa valsts. Nepieciešams "
+"ģeogrāfiskās atrašanās vietas pakalpojuma sniedzējs."
 
 #: admin/components/general-settings.js:251
 msgid "Remove Data on Uninstall"
@@ -882,7 +926,9 @@ msgstr "Dzēst datus atinstalējot"
 msgid ""
 "If enabled, all tables and settings will be removed when the plugin is "
 "uninstalled."
-msgstr "Ja šī iespēja ir iespējota, spraudņa atinstalēšanas laikā tiks dzēstas visas tabulas un iestatījumi."
+msgstr ""
+"Ja šī iespēja ir iespējota, spraudņa atinstalēšanas laikā tiks dzēstas visas "
+"tabulas un iestatījumi."
 
 #: admin/components/general-settings.js:263
 msgid "Keep data"
@@ -906,7 +952,9 @@ msgstr "Neviens manuālais kurss vēl nav saglabāts."
 
 #: admin/components/rate-settings.js:31
 msgid "No exchange rates yet. Add display currencies and trigger a refresh."
-msgstr "Valūtas kursu vēl nav. Pievienojiet attēlojuma valūtas un palaidiet atjaunināšanu."
+msgstr ""
+"Valūtas kursu vēl nav. Pievienojiet attēlojuma valūtas un palaidiet "
+"atjaunināšanu."
 
 #: admin/components/rate-settings.js:43
 msgid "Rate Provider"
@@ -938,7 +986,9 @@ msgstr "Novecošanas slieksnis (stundās)"
 
 #: admin/components/rate-settings.js:102
 msgid "Rates older than this will trigger an admin warning."
-msgstr "Par kursiem, kas ir vecāki par šo slieksni, administratoram tiks rādīts brīdinājums."
+msgstr ""
+"Par kursiem, kas ir vecāki par šo slieksni, administratoram tiks rādīts "
+"brīdinājums."
 
 #: admin/components/rate-settings.js:113
 msgid "Stale Rate Fallback"
@@ -1018,7 +1068,9 @@ msgstr "Noklusējuma noformējums"
 
 #: admin/components/switcher-settings.js:51
 msgid "Visual style used by switcher blocks that inherit global defaults."
-msgstr "Vizuālais stils valūtas pārslēdzēja blokiem, kuri pārmanto globālos noklusējumus."
+msgstr ""
+"Vizuālais stils valūtas pārslēdzēja blokiem, kuri pārmanto globālos "
+"noklusējumus."
 
 #: admin/components/switcher-settings.js:60
 #: blocks/currency-switcher/editor.js:406
@@ -1156,7 +1208,9 @@ msgstr "Iecienītās valūtas"
 #: admin/components/switcher-settings.js:194
 msgid ""
 "Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
-msgstr "Ar komatiem atdalīti ISO kodi, kas tiek piesprausti virs pārējiem, piemēram: EUR, USD, GBP"
+msgstr ""
+"Ar komatiem atdalīti ISO kodi, kas tiek piesprausti virs pārējiem, piemēram: "
+"EUR, USD, GBP"
 
 #: admin/components/switcher-settings.js:204
 #: blocks/currency-switcher/editor.js:521
@@ -1254,7 +1308,10 @@ msgid ""
 "Optional trust-building context shown at the bottom of the dropdown. The "
 "freshness badge also requires the global Rate Freshness Badge gate on the "
 "Checkout tab."
-msgstr "Neobligāta uzticamību veicinoša informācija, kas tiek rādīta nolaižamās izvēlnes apakšā. Aktualitātes indikatoram jābūt iespējotam arī ar globālo slēdzi “Kursa aktualitātes indikators” cilnē “Norēķini”."
+msgstr ""
+"Neobligāta uzticamību veicinoša informācija, kas tiek rādīta nolaižamās "
+"izvēlnes apakšā. Aktualitātes indikatoram jābūt iespējotam arī ar globālo "
+"slēdzi “Kursa aktualitātes indikators” cilnē “Norēķini”."
 
 #: admin/components/switcher-settings.js:298
 msgid "Freshness badge"
@@ -1268,87 +1325,87 @@ msgstr "Kursa vērtība"
 msgid "Checkout context"
 msgstr "Norēķinu informācija"
 
-#: admin/multi-currency-admin.js:47
+#: admin/multi-currency-page.js:47
 msgid "Network error. Please check your connection."
 msgstr "Tīkla kļūda. Lūdzu, pārbaudiet savienojumu."
 
-#: admin/multi-currency-admin.js:78
+#: admin/multi-currency-page.js:78
 msgid "Save"
 msgstr "Saglabāt"
 
-#: admin/multi-currency-admin.js:79
+#: admin/multi-currency-page.js:79
 msgid "Saving..."
 msgstr "Saglabā…"
 
-#: admin/multi-currency-admin.js:82
+#: admin/multi-currency-page.js:82
 msgid "General"
 msgstr "Vispārīgi"
 
-#: admin/multi-currency-admin.js:83
+#: admin/multi-currency-page.js:83
 msgid "Currencies"
 msgstr "Valūtas"
 
-#: admin/multi-currency-admin.js:84
+#: admin/multi-currency-page.js:84
 msgid "Exchange Rates"
 msgstr "Valūtas kursi"
 
-#: admin/multi-currency-admin.js:85
+#: admin/multi-currency-page.js:85
 msgid "Switcher"
 msgstr "Valūtas pārslēdzējs"
 
-#: admin/multi-currency-admin.js:86
+#: admin/multi-currency-page.js:86
 msgid "Checkout"
 msgstr "Norēķini"
 
-#: admin/multi-currency-admin.js:87
+#: admin/multi-currency-page.js:87
 msgid "CRM"
 msgstr "CRM"
 
-#: admin/multi-currency-admin.js:88
+#: admin/multi-currency-page.js:88
 msgid "Diagnostics"
 msgstr "Diagnostika"
 
-#: admin/multi-currency-admin.js:130
+#: admin/multi-currency-page.js:130
 msgid "Failed to load settings."
 msgstr "Neizdevās ielādēt iestatījumus."
 
-#: admin/multi-currency-admin.js:156
+#: admin/multi-currency-page.js:156
 msgid "Failed to load exchange rates."
 msgstr "Neizdevās ielādēt valūtas kursus."
 
-#: admin/multi-currency-admin.js:171
+#: admin/multi-currency-page.js:171
 msgid "Failed to load diagnostics."
 msgstr "Neizdevās ielādēt diagnostikas datus."
 
-#: admin/multi-currency-admin.js:185
+#: admin/multi-currency-page.js:185
 msgid "FluentCRM fields created."
 msgstr "FluentCRM lauki ir izveidoti."
 
-#: admin/multi-currency-admin.js:189
+#: admin/multi-currency-page.js:189
 msgid "Could not create the FluentCRM fields."
 msgstr "Neizdevās izveidot FluentCRM laukus."
 
-#: admin/multi-currency-admin.js:200
+#: admin/multi-currency-page.js:200
 msgid "Rates refreshed."
 msgstr "Kursi ir atjaunināti."
 
-#: admin/multi-currency-admin.js:204
+#: admin/multi-currency-page.js:204
 msgid "Rate refresh failed."
 msgstr "Kursu atjaunināšana neizdevās."
 
-#: admin/multi-currency-admin.js:218
+#: admin/multi-currency-page.js:218
 msgid "Manual rates saved."
 msgstr "Manuālie kursi ir saglabāti."
 
-#: admin/multi-currency-admin.js:234
+#: admin/multi-currency-page.js:234
 msgid "Settings saved."
 msgstr "Iestatījumi ir saglabāti."
 
-#: admin/multi-currency-admin.js:239
+#: admin/multi-currency-page.js:239
 msgid "Failed to save settings."
 msgstr "Neizdevās saglabāt iestatījumus."
 
-#: admin/multi-currency-admin.js:271
+#: admin/multi-currency-page.js:271
 msgid "Multi-Currency settings"
 msgstr "Vairāku valūtu iestatījumi"
 
@@ -1376,15 +1433,20 @@ msgstr[2] "%s minūtēm"
 msgid ""
 "Showing %1$s of %2$s currencies. The full list appears on the frontend — "
 "this is just a taste."
-msgstr "Rādītas %1$s no %2$s valūtām. Pilns saraksts būs redzams vietnē — šis ir tikai priekšskatījums."
+msgstr ""
+"Rādītas %1$s no %2$s valūtām. Pilns saraksts būs redzams vietnē — šis ir "
+"tikai priekšskatījums."
 
 #: admin/switcher-preview.js:179
 msgid "Display prices only. Checkout charged in %s."
-msgstr "Valūta paredzēta tikai cenu attēlošanai. Maksājums tiek iekasēts valūtā %s."
+msgstr ""
+"Valūta paredzēta tikai cenu attēlošanai. Maksājums tiek iekasēts valūtā %s."
 
 #: admin/switcher-preview.js:182
 msgid "Display prices only. Checkout is charged in the store currency."
-msgstr "Valūta paredzēta tikai cenu attēlošanai. Maksājums tiek iekasēts veikala valūtā."
+msgstr ""
+"Valūta paredzēta tikai cenu attēlošanai. Maksājums tiek iekasēts veikala "
+"valūtā."
 
 #: admin/switcher-preview.js:206
 msgid "Preview"
@@ -1406,7 +1468,9 @@ msgstr "Etiķete"
 msgid ""
 "This block inherits its switcher behavior from the global defaults in Multi-"
 "Currency settings. Only the label stays instance-specific."
-msgstr "Šis bloks pārslēdzēja darbību pārmanto no globālajiem noklusējumiem vairāku valūtu iestatījumos. Tikai etiķete ir pielāgojama katram blokam atsevišķi."
+msgstr ""
+"Šis bloks pārslēdzēja darbību pārmanto no globālajiem noklusējumiem vairāku "
+"valūtu iestatījumos. Tikai etiķete ir pielāgojama katram blokam atsevišķi."
 
 #: blocks/currency-switcher/editor.js:401
 #: blocks/currency-switcher/editor.js:403
@@ -1512,7 +1576,9 @@ msgstr "Pa labi"
 msgid ""
 "Editor preview uses your actual configured currencies and current global "
 "switcher defaults."
-msgstr "Redaktora priekšskatījumā tiek izmantotas jūsu konfigurētās valūtas un pašreizējie globālie pārslēdzēja noklusējumi."
+msgstr ""
+"Redaktora priekšskatījumā tiek izmantotas jūsu konfigurētās valūtas un "
+"pašreizējie globālie pārslēdzēja noklusējumi."
 
 #: blocks/currency-switcher/editor.js:676
 msgid "Rates updated 2 hours ago"
@@ -1524,7 +1590,8 @@ msgstr "1 EUR = 1,1000 USD"
 
 #: blocks/currency-switcher/editor.js:683
 msgid "Display prices only. Checkout is charged in EUR."
-msgstr "Valūta paredzēta tikai cenu attēlošanai. Maksājums tiek iekasēts valūtā EUR."
+msgstr ""
+"Valūta paredzēta tikai cenu attēlošanai. Maksājums tiek iekasēts valūtā EUR."
 
 #: blocks/currency-switcher/editor.js:702
 msgid "Header Compact"
@@ -1548,7 +1615,9 @@ msgstr "Pilns platums mobilajās ierīcēs"
 
 #: blocks/currency-switcher/editor.js:731
 msgid "Full-width mobile-friendly switcher with room for more context."
-msgstr "Mobilajām ierīcēm piemērots pilna platuma pārslēdzējs ar vietu plašākai informācijai."
+msgstr ""
+"Mobilajām ierīcēm piemērots pilna platuma pārslēdzējs ar vietu plašākai "
+"informācijai."
 
 #: blocks/currency-switcher/editor.js:809
 #: blocks/currency-switcher/editor.js:852
@@ -1612,7 +1681,9 @@ msgstr "Valūtas konteksta paziņojums"
 msgctxt "block description"
 msgid ""
 "Show a currency context note such as display currency vs checkout currency."
-msgstr "Rādīt valūtas konteksta paziņojumu, piemēram, attēlojuma valūtu un norēķinu valūtu."
+msgstr ""
+"Rādīt valūtas konteksta paziņojumu, piemēram, attēlojuma valūtu un norēķinu "
+"valūtu."
 
 #: blocks/currency-context-notice/block.json blocks/currency-current/block.json
 #: blocks/currency-selector-buttons/block.json
@@ -1671,7 +1742,9 @@ msgctxt "block description"
 msgid ""
 "A button-group alternative to the dropdown switcher for stores with a few "
 "main currencies."
-msgstr "Nolaižamā pārslēdzēja alternatīva pogu grupas veidā veikaliem ar dažām galvenajām valūtām."
+msgstr ""
+"Nolaižamā pārslēdzēja alternatīva pogu grupas veidā veikaliem ar dažām "
+"galvenajām valūtām."
 
 #: blocks/currency-selector-buttons/block.json
 msgctxt "block keyword"
@@ -1698,7 +1771,9 @@ msgctxt "block description"
 msgid ""
 "Display the FCHub Multi-Currency switcher in posts, pages, templates, and "
 "template parts."
-msgstr "Rādīt FCHub Multi-Currency valūtas pārslēdzēju ierakstos, lapās, veidnēs un veidņu daļās."
+msgstr ""
+"Rādīt FCHub Multi-Currency valūtas pārslēdzēju ierakstos, lapās, veidnēs un "
+"veidņu daļās."
 
 #: blocks/currency-switcher/block.json
 msgctxt "block keyword"
@@ -1755,7 +1830,9 @@ msgctxt "block description"
 msgid ""
 "Display the current exchange rate between the store base currency and the "
 "visitor display currency."
-msgstr "Rādīt pašreizējo valūtas kursu starp veikala pamatvalūtu un apmeklētāja attēlojuma valūtu."
+msgstr ""
+"Rādīt pašreizējo valūtas kursu starp veikala pamatvalūtu un apmeklētāja "
+"attēlojuma valūtu."
 
 #: blocks/exchange-rate/block.json
 msgctxt "block keyword"

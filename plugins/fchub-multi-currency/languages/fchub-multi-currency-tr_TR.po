@@ -3,17 +3,18 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-currency\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
+"currency\n"
+"POT-Creation-Date: 2026-08-19T05:50:59+00:00\n"
+"PO-Revision-Date: 2026-08-19 01:04+0300\n"
 "Last-Translator: \n"
 "Language-Team: Turkish\n"
+"Language: tr_TR\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-18T19:36:27+00:00\n"
-"PO-Revision-Date: 2026-08-19 01:04+0300\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: fchub-multi-currency\n"
-"Language: tr_TR\n"
 "Plural-Forms: nplurals=2; plural=n > 1;\n"
 
 #. Plugin Name of the plugin
@@ -30,8 +31,12 @@ msgstr "https://fchub.co/docs/fchub-multi-currency"
 
 #. Description of the plugin
 #: fchub-multi-currency.php
-msgid "Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure"
-msgstr "FluentCart için fiyat gösterimine yönelik çoklu para birimi, kur yönetimi ve ödeme para birimi bildirimi"
+msgid ""
+"Display-layer multi-currency for FluentCart with exchange rate management "
+"and checkout disclosure"
+msgstr ""
+"FluentCart için fiyat gösterimine yönelik çoklu para birimi, kur yönetimi ve "
+"ödeme para birimi bildirimi"
 
 #. Author of the plugin
 #: fchub-multi-currency.php
@@ -52,8 +57,12 @@ msgid "A ready-made showcase of the full currency block family."
 msgstr "Tüm para birimi blok ailesini sergileyen kullanıma hazır bir düzen."
 
 #: app/Bootstrap/Modules/DiagnosticsModule.php:71
-msgid "FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics page or trigger a manual refresh."
-msgstr "FCHub Multi-Currency: Bazı kurlar güncel değil. Tanılama sayfasını kontrol edin veya manuel yenileme başlatın."
+msgid ""
+"FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics "
+"page or trigger a manual refresh."
+msgstr ""
+"FCHub Multi-Currency: Bazı kurlar güncel değil. Tanılama sayfasını kontrol "
+"edin veya manuel yenileme başlatın."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:37
 msgid "Switch the rate provider to Manual rates before saving."
@@ -61,7 +70,8 @@ msgstr "Kaydetmeden önce kur sağlayıcısını Manuel kurlar olarak değiştir
 
 #: app/Domain/Actions/SaveManualRatesAction.php:43
 msgid "Add at least one display currency before saving manual rates."
-msgstr "Manuel kurları kaydetmeden önce en az bir görüntüleme para birimi ekleyin."
+msgstr ""
+"Manuel kurları kaydetmeden önce en az bir görüntüleme para birimi ekleyin."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:48
 msgid "Provide one rate for every configured display currency."
@@ -70,18 +80,24 @@ msgstr "Yapılandırılmış her görüntüleme para birimi için bir kur girin.
 #: app/Domain/Actions/SaveManualRatesAction.php:51
 #: app/Domain/Actions/SaveManualRatesAction.php:98
 msgid "Rates may only be saved for configured display currencies."
-msgstr "Kurlar yalnızca yapılandırılmış görüntüleme para birimleri için kaydedilebilir."
+msgstr ""
+"Kurlar yalnızca yapılandırılmış görüntüleme para birimleri için "
+"kaydedilebilir."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:67
 #: app/Http/Controllers/Admin/RatesAdminController.php:104
-#: admin/multi-currency-admin.js:222
+#: admin/multi-currency-page.js:222
 msgid "Manual rates could not be saved."
 msgstr "Manuel kurlar kaydedilemedi."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:110
 #: app/Domain/Actions/SaveManualRatesAction.php:117
-msgid "Each manual rate must be a positive decimal string with up to 8 decimal places."
-msgstr "Her manuel kur, en fazla 8 ondalık basamak içeren pozitif bir ondalık sayı olmalıdır."
+msgid ""
+"Each manual rate must be a positive decimal string with up to 8 decimal "
+"places."
+msgstr ""
+"Her manuel kur, en fazla 8 ondalık basamak içeren pozitif bir ondalık sayı "
+"olmalıdır."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:121
 msgid "Each manual rate must be greater than zero."
@@ -183,7 +199,8 @@ msgstr "Güncel kur: 1 %1$s = %2$s %3$s"
 #: app/Frontend/CurrencyContextPresentation.php:233
 #, php-format
 msgid "Viewing prices in %1$s. Checkout in %2$s."
-msgstr "Fiyatları %1$s cinsinden görüntülüyorsunuz. Ödeme %2$s cinsinden alınır."
+msgstr ""
+"Fiyatları %1$s cinsinden görüntülüyorsunuz. Ödeme %2$s cinsinden alınır."
 
 #. translators: %1$s is the display currency code, %2$s the base currency code.
 #. translators: 1: display currency code, 2: base currency code
@@ -191,7 +208,9 @@ msgstr "Fiyatları %1$s cinsinden görüntülüyorsunuz. Ödeme %2$s cinsinden a
 #: app/Frontend/CurrencyContextPresentation.php:227
 #, php-format
 msgid "Prices shown in %1$s are approximate. Checkout is charged in %2$s."
-msgstr "%1$s cinsinden gösterilen fiyatlar yaklaşık değerlerdir. Ödeme %2$s cinsinden alınır."
+msgstr ""
+"%1$s cinsinden gösterilen fiyatlar yaklaşık değerlerdir. Ödeme %2$s "
+"cinsinden alınır."
 
 #: app/Frontend/CurrencyContextPresentation.php:56
 #: app/Frontend/CurrencyContextPresentation.php:326
@@ -204,7 +223,9 @@ msgstr "Şu anda mağazanın baz para birimi kullanılıyor."
 #: app/Frontend/CurrencyContextPresentation.php:351
 #, php-format
 msgid "Display prices only. Checkout is charged in %s."
-msgstr "Gösterilen fiyatlar yalnızca bilgilendirme amaçlıdır. Ödeme %s cinsinden alınır."
+msgstr ""
+"Gösterilen fiyatlar yalnızca bilgilendirme amaçlıdır. Ödeme %s cinsinden "
+"alınır."
 
 #: app/Frontend/CurrencyContextPresentation.php:59
 #: app/Frontend/CurrencyContextPresentation.php:345
@@ -375,24 +396,40 @@ msgid "Currency code is required."
 msgstr "Para birimi kodu gereklidir."
 
 #: app/Http/Controllers/Pub/ContextController.php:144
-msgid "This currency cannot be selected because no usable exchange rate is available. Please try again later."
-msgstr "Kullanılabilir bir kur bulunmadığı için bu para birimi seçilemiyor. Lütfen daha sonra tekrar deneyin."
+msgid ""
+"This currency cannot be selected because no usable exchange rate is "
+"available. Please try again later."
+msgstr ""
+"Kullanılabilir bir kur bulunmadığı için bu para birimi seçilemiyor. Lütfen "
+"daha sonra tekrar deneyin."
 
 #: app/Http/Controllers/Pub/ContextController.php:177
-msgid "Currency preference could not be saved because both cookie and account persistence are disabled."
-msgstr "Çerez ve hesapta saklama seçeneklerinin ikisi de devre dışı olduğundan para birimi tercihi kaydedilemedi."
+msgid ""
+"Currency preference could not be saved because both cookie and account "
+"persistence are disabled."
+msgstr ""
+"Çerez ve hesapta saklama seçeneklerinin ikisi de devre dışı olduğundan para "
+"birimi tercihi kaydedilemedi."
 
 #: app/Http/Controllers/Pub/ContextController.php:181
-msgid "Currency preference could not be saved. Cookie persistence is disabled, so logged-out visitors cannot keep a currency choice."
-msgstr "Para birimi tercihi kaydedilemedi. Çerezde saklama devre dışı olduğundan oturum açmamış ziyaretçilerin seçimi korunamaz."
+msgid ""
+"Currency preference could not be saved. Cookie persistence is disabled, so "
+"logged-out visitors cannot keep a currency choice."
+msgstr ""
+"Para birimi tercihi kaydedilemedi. Çerezde saklama devre dışı olduğundan "
+"oturum açmamış ziyaretçilerin seçimi korunamaz."
 
 #: app/Http/Controllers/Pub/ContextController.php:204
 msgid "Currency preference saved."
 msgstr "Para birimi tercihi kaydedildi."
 
 #: app/Integration/AddonsRegistration.php:24
-msgid "Display-layer multi-currency with exchange rate management and checkout disclosure."
-msgstr "Kur yönetimi ve ödeme para birimi bildirimiyle birlikte, fiyat gösterimine yönelik çoklu para birimi desteği."
+msgid ""
+"Display-layer multi-currency with exchange rate management and checkout "
+"disclosure."
+msgstr ""
+"Kur yönetimi ve ödeme para birimi bildirimiyle birlikte, fiyat gösterimine "
+"yönelik çoklu para birimi desteği."
 
 #: app/Integration/FluentCrmSmartCodes.php:189
 msgid "Multi-Currency Order"
@@ -445,7 +482,9 @@ msgstr "Multi-Currency’yi etkinleştir"
 #: app/Integration/MultiCurrencySettings.php:46
 #: admin/components/general-settings.js:68
 msgid "Master switch for display-layer multi-currency across the store."
-msgstr "Mağaza genelinde görüntüleme amaçlı çoklu para birimini açıp kapatan ana ayar."
+msgstr ""
+"Mağaza genelinde görüntüleme amaçlı çoklu para birimini açıp kapatan ana "
+"ayar."
 
 #: app/Integration/MultiCurrencySettings.php:48
 #: app/Integration/MultiCurrencySettings.php:57
@@ -468,8 +507,11 @@ msgstr "Ödeme para birimi bildirimi"
 
 #: app/Integration/MultiCurrencySettings.php:55
 #: admin/components/checkout-settings.js:26
-msgid "Show a notice at checkout that payment is processed in the base currency."
-msgstr "Ödeme sırasında, tahsilatın baz para biriminde yapılacağını belirten bir bildirim gösterin."
+msgid ""
+"Show a notice at checkout that payment is processed in the base currency."
+msgstr ""
+"Ödeme sırasında, tahsilatın baz para biriminde yapılacağını belirten bir "
+"bildirim gösterin."
 
 #: app/Integration/MultiCurrencySettings.php:63
 #: admin/components/crm-settings.js:23
@@ -486,15 +528,16 @@ msgstr "Tüm ayarlar"
 
 #: app/Integration/MultiCurrencySettings.php:73
 msgid "Configure currencies, exchange rates, checkout disclosure, and more."
-msgstr "Para birimlerini, kurları, ödeme bildirimini ve diğer ayarları yapılandırın."
+msgstr ""
+"Para birimlerini, kurları, ödeme bildirimini ve diğer ayarları yapılandırın."
 
 #: app/Integration/MultiCurrencySettings.php:98
 msgid "Multi-Currency settings saved."
 msgstr "Multi-Currency ayarları kaydedildi."
 
-#: app/Support/AdminMenu.php:19 admin/multi-currency-admin.js:107
-#: admin/multi-currency-admin.js:259 admin/multi-currency-admin.js:327
-#: admin/multi-currency-admin.js:385
+#: app/Support/AdminMenu.php:19 admin/multi-currency-page.js:107
+#: admin/multi-currency-page.js:259 admin/multi-currency-page.js:327
+#: admin/multi-currency-page.js:385
 msgid "Multi-Currency"
 msgstr "Multi-Currency"
 
@@ -506,7 +549,9 @@ msgstr "%d saatte bir"
 
 #: fchub-multi-currency.php:175
 msgid "FCHub Multi-Currency requires FluentCart to be installed and activated."
-msgstr "FCHub Multi-Currency için FluentCart’ın kurulmuş ve etkinleştirilmiş olması gerekir."
+msgstr ""
+"FCHub Multi-Currency için FluentCart’ın kurulmuş ve etkinleştirilmiş olması "
+"gerekir."
 
 #: admin/components/checkout-settings.js:35
 #: admin/components/checkout-settings.js:78 admin/components/crm-settings.js:35
@@ -541,12 +586,17 @@ msgid "Rate Freshness Badge"
 msgstr "Kur güncelliği rozeti"
 
 #: admin/components/checkout-settings.js:69
-msgid "Global gate for the rates-updated badge. When disabled, no surface shows it — including the switcher dropdown footer."
-msgstr "Kur güncelliği rozetinin genel anahtarıdır. Devre dışı bırakıldığında, para birimi seçicinin açılır menü alt bilgisi dâhil hiçbir yerde gösterilmez."
+msgid ""
+"Global gate for the rates-updated badge. When disabled, no surface shows it "
+"— including the switcher dropdown footer."
+msgstr ""
+"Kur güncelliği rozetinin genel anahtarıdır. Devre dışı bırakıldığında, para "
+"birimi seçicinin açılır menü alt bilgisi dâhil hiçbir yerde gösterilmez."
 
 #: admin/components/crm-settings.js:26
 msgid "Tag contacts and update custom fields based on currency preference."
-msgstr "Kişileri etiketleyin ve özel alanları para birimi tercihine göre güncelleyin."
+msgstr ""
+"Kişileri etiketleyin ve özel alanları para birimi tercihine göre güncelleyin."
 
 #: admin/components/crm-settings.js:48
 msgid "Auto-create Tags"
@@ -586,7 +636,8 @@ msgstr "FluentCommunity eşitlemesi"
 
 #: admin/components/crm-settings.js:123
 msgid "Sync currency preference to FluentCommunity user meta."
-msgstr "Para birimi tercihini FluentCommunity kullanıcı meta verisiyle eşitleyin."
+msgstr ""
+"Para birimi tercihini FluentCommunity kullanıcı meta verisiyle eşitleyin."
 
 #: admin/components/currency-settings.js:113
 msgid "Search and add a currency…"
@@ -665,8 +716,11 @@ msgid "Right space (100 $)"
 msgstr "Sağda, boşluklu (100 $)"
 
 #: admin/components/currency-settings.js:225
-msgid "No display currencies added yet. Use the picker above to add currencies."
-msgstr "Henüz görüntüleme para birimi eklenmedi. Para birimi eklemek için yukarıdaki seçiciyi kullanın."
+msgid ""
+"No display currencies added yet. Use the picker above to add currencies."
+msgstr ""
+"Henüz görüntüleme para birimi eklenmedi. Para birimi eklemek için yukarıdaki "
+"seçiciyi kullanın."
 
 #: admin/components/diagnostics-view.js:24
 msgid "Available"
@@ -781,8 +835,12 @@ msgid "Multi-Currency Enabled"
 msgstr "Multi-Currency etkin"
 
 #: admin/components/general-settings.js:92
-msgid "Managed in FluentCart Store Setup. Checkout and payment gateways use this currency."
-msgstr "FluentCart Mağaza Kurulumu bölümünden yönetilir. Ödeme ve ödeme ağ geçitleri bu para birimini kullanır."
+msgid ""
+"Managed in FluentCart Store Setup. Checkout and payment gateways use this "
+"currency."
+msgstr ""
+"FluentCart Mağaza Kurulumu bölümünden yönetilir. Ödeme ve ödeme ağ geçitleri "
+"bu para birimini kullanır."
 
 #: admin/components/general-settings.js:106
 msgid "Default Display Currency"
@@ -790,7 +848,8 @@ msgstr "Varsayılan görüntüleme para birimi"
 
 #: admin/components/general-settings.js:109
 msgid "Currency shown to visitors before any preference is detected."
-msgstr "Herhangi bir tercih algılanmadan önce ziyaretçilere gösterilen para birimi."
+msgstr ""
+"Herhangi bir tercih algılanmadan önce ziyaretçilere gösterilen para birimi."
 
 #: admin/components/general-settings.js:124
 msgid "URL Parameter"
@@ -798,7 +857,8 @@ msgstr "URL parametresi"
 
 #: admin/components/general-settings.js:127
 msgid "Allow currency switching via URL (e.g. ?currency=EUR)."
-msgstr "URL üzerinden para birimi değiştirmeye izin verin (örneğin ?currency=EUR)."
+msgstr ""
+"URL üzerinden para birimi değiştirmeye izin verin (örneğin ?currency=EUR)."
 
 #: admin/components/general-settings.js:146
 msgid "URL Parameter Key"
@@ -809,12 +869,23 @@ msgid "Cookie Persistence"
 msgstr "Çerezde saklama"
 
 #: admin/components/general-settings.js:161
-msgid "Remember a guest currency in a cookie and matching browser-storage fallback. Disable this and logged-out visitors cannot keep a currency choice at all — the switch is reported as failed rather than silently ignored."
-msgstr "Misafirlerin para birimi seçimini bir çerezde ve buna karşılık gelen tarayıcı depolama yedeğinde saklayın. Bu ayarı devre dışı bırakırsanız oturum açmamış ziyaretçilerin seçimi hiçbir şekilde korunamaz; değişiklik sessizce yok sayılmak yerine başarısız olarak bildirilir."
+msgid ""
+"Remember a guest currency in a cookie and matching browser-storage fallback. "
+"Disable this and logged-out visitors cannot keep a currency choice at all — "
+"the switch is reported as failed rather than silently ignored."
+msgstr ""
+"Misafirlerin para birimi seçimini bir çerezde ve buna karşılık gelen "
+"tarayıcı depolama yedeğinde saklayın. Bu ayarı devre dışı bırakırsanız "
+"oturum açmamış ziyaretçilerin seçimi hiçbir şekilde korunamaz; değişiklik "
+"sessizce yok sayılmak yerine başarısız olarak bildirilir."
 
 #: admin/components/general-settings.js:177
-msgid "Currency switching is now a logged-in-only feature. Guests will be told their preference could not be saved."
-msgstr "Para birimi değiştirme artık yalnızca oturum açmış kullanıcılar tarafından kullanılabilir. Misafirlere tercihlerinin kaydedilemediği bildirilir."
+msgid ""
+"Currency switching is now a logged-in-only feature. Guests will be told "
+"their preference could not be saved."
+msgstr ""
+"Para birimi değiştirme artık yalnızca oturum açmış kullanıcılar tarafından "
+"kullanılabilir. Misafirlere tercihlerinin kaydedilemediği bildirilir."
 
 #: admin/components/general-settings.js:189
 msgid "Cookie Lifetime (days)"
@@ -825,24 +896,37 @@ msgid "Account Persistence"
 msgstr "Hesapta saklama"
 
 #: admin/components/general-settings.js:204
-msgid "Remember currency preference in the logged-in user account. Disable this if you want logged-in sessions to respect the default display currency on every fresh visit."
-msgstr "Para birimi tercihini oturum açmış kullanıcı hesabında saklayın. Her yeni ziyarette varsayılan görüntüleme para biriminin kullanılmasını istiyorsanız bu ayarı devre dışı bırakın."
+msgid ""
+"Remember currency preference in the logged-in user account. Disable this if "
+"you want logged-in sessions to respect the default display currency on every "
+"fresh visit."
+msgstr ""
+"Para birimi tercihini oturum açmış kullanıcı hesabında saklayın. Her yeni "
+"ziyarette varsayılan görüntüleme para biriminin kullanılmasını istiyorsanız "
+"bu ayarı devre dışı bırakın."
 
 #: admin/components/general-settings.js:227
 msgid "Coming Soon"
 msgstr "Yakında"
 
 #: admin/components/general-settings.js:230
-msgid "Automatically detect visitor currency based on their country. Requires a geolocation provider."
-msgstr "Ziyaretçinin para birimini ülkesine göre otomatik olarak belirleyin. Bir coğrafi konum sağlayıcısı gerektirir."
+msgid ""
+"Automatically detect visitor currency based on their country. Requires a "
+"geolocation provider."
+msgstr ""
+"Ziyaretçinin para birimini ülkesine göre otomatik olarak belirleyin. Bir "
+"coğrafi konum sağlayıcısı gerektirir."
 
 #: admin/components/general-settings.js:251
 msgid "Remove Data on Uninstall"
 msgstr "Kaldırırken verileri sil"
 
 #: admin/components/general-settings.js:254
-msgid "If enabled, all tables and settings will be removed when the plugin is uninstalled."
-msgstr "Etkinleştirildiğinde, eklenti kaldırılırken tüm tablolar ve ayarlar silinir."
+msgid ""
+"If enabled, all tables and settings will be removed when the plugin is "
+"uninstalled."
+msgstr ""
+"Etkinleştirildiğinde, eklenti kaldırılırken tüm tablolar ve ayarlar silinir."
 
 #: admin/components/general-settings.js:263
 msgid "Keep data"
@@ -978,7 +1062,9 @@ msgstr "Varsayılan ön ayar"
 
 #: admin/components/switcher-settings.js:51
 msgid "Visual style used by switcher blocks that inherit global defaults."
-msgstr "Genel varsayılanları devralan para birimi seçici bloklarının kullandığı görsel stil."
+msgstr ""
+"Genel varsayılanları devralan para birimi seçici bloklarının kullandığı "
+"görsel stil."
 
 #: admin/components/switcher-settings.js:60
 #: blocks/currency-switcher/editor.js:406
@@ -1114,8 +1200,11 @@ msgid "Favorite Currencies"
 msgstr "Favori para birimleri"
 
 #: admin/components/switcher-settings.js:194
-msgid "Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
-msgstr "Diğerlerinin üstüne sabitlenecek, virgülle ayrılmış ISO kodları; örneğin: EUR, USD, GBP"
+msgid ""
+"Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
+msgstr ""
+"Diğerlerinin üstüne sabitlenecek, virgülle ayrılmış ISO kodları; örneğin: "
+"EUR, USD, GBP"
 
 #: admin/components/switcher-settings.js:204
 #: blocks/currency-switcher/editor.js:521
@@ -1129,7 +1218,8 @@ msgstr "Varsayılan yerleşim"
 
 #: admin/components/switcher-settings.js:216
 msgid "Baseline geometry for inheriting switcher blocks."
-msgstr "Genel ayarları devralan para birimi seçici bloklarının temel boyutları."
+msgstr ""
+"Genel ayarları devralan para birimi seçici bloklarının temel boyutları."
 
 #: admin/components/switcher-settings.js:222
 #: blocks/currency-switcher/editor.js:593
@@ -1209,8 +1299,14 @@ msgid "Footer Context"
 msgstr "Alt bilgi bağlamı"
 
 #: admin/components/switcher-settings.js:290
-msgid "Optional trust-building context shown at the bottom of the dropdown. The freshness badge also requires the global Rate Freshness Badge gate on the Checkout tab."
-msgstr "Açılır menünün altında gösterilen, güven vermeye yardımcı isteğe bağlı bilgiler. Güncellik rozeti için ayrıca Ödeme sekmesindeki genel Kur güncelliği rozeti ayarının etkin olması gerekir."
+msgid ""
+"Optional trust-building context shown at the bottom of the dropdown. The "
+"freshness badge also requires the global Rate Freshness Badge gate on the "
+"Checkout tab."
+msgstr ""
+"Açılır menünün altında gösterilen, güven vermeye yardımcı isteğe bağlı "
+"bilgiler. Güncellik rozeti için ayrıca Ödeme sekmesindeki genel Kur "
+"güncelliği rozeti ayarının etkin olması gerekir."
 
 #: admin/components/switcher-settings.js:298
 msgid "Freshness badge"
@@ -1224,87 +1320,87 @@ msgstr "Kur değeri"
 msgid "Checkout context"
 msgstr "Ödeme bağlamı"
 
-#: admin/multi-currency-admin.js:47
+#: admin/multi-currency-page.js:47
 msgid "Network error. Please check your connection."
 msgstr "Ağ hatası. Lütfen bağlantınızı kontrol edin."
 
-#: admin/multi-currency-admin.js:78
+#: admin/multi-currency-page.js:78
 msgid "Save"
 msgstr "Kaydet"
 
-#: admin/multi-currency-admin.js:79
+#: admin/multi-currency-page.js:79
 msgid "Saving..."
 msgstr "Kaydediliyor…"
 
-#: admin/multi-currency-admin.js:82
+#: admin/multi-currency-page.js:82
 msgid "General"
 msgstr "Genel"
 
-#: admin/multi-currency-admin.js:83
+#: admin/multi-currency-page.js:83
 msgid "Currencies"
 msgstr "Para birimleri"
 
-#: admin/multi-currency-admin.js:84
+#: admin/multi-currency-page.js:84
 msgid "Exchange Rates"
 msgstr "Kurlar"
 
-#: admin/multi-currency-admin.js:85
+#: admin/multi-currency-page.js:85
 msgid "Switcher"
 msgstr "Para birimi seçici"
 
-#: admin/multi-currency-admin.js:86
+#: admin/multi-currency-page.js:86
 msgid "Checkout"
 msgstr "Ödeme"
 
-#: admin/multi-currency-admin.js:87
+#: admin/multi-currency-page.js:87
 msgid "CRM"
 msgstr "CRM"
 
-#: admin/multi-currency-admin.js:88
+#: admin/multi-currency-page.js:88
 msgid "Diagnostics"
 msgstr "Tanılama"
 
-#: admin/multi-currency-admin.js:130
+#: admin/multi-currency-page.js:130
 msgid "Failed to load settings."
 msgstr "Ayarlar yüklenemedi."
 
-#: admin/multi-currency-admin.js:156
+#: admin/multi-currency-page.js:156
 msgid "Failed to load exchange rates."
 msgstr "Kurlar yüklenemedi."
 
-#: admin/multi-currency-admin.js:171
+#: admin/multi-currency-page.js:171
 msgid "Failed to load diagnostics."
 msgstr "Tanılama verileri yüklenemedi."
 
-#: admin/multi-currency-admin.js:185
+#: admin/multi-currency-page.js:185
 msgid "FluentCRM fields created."
 msgstr "FluentCRM alanları oluşturuldu."
 
-#: admin/multi-currency-admin.js:189
+#: admin/multi-currency-page.js:189
 msgid "Could not create the FluentCRM fields."
 msgstr "FluentCRM alanları oluşturulamadı."
 
-#: admin/multi-currency-admin.js:200
+#: admin/multi-currency-page.js:200
 msgid "Rates refreshed."
 msgstr "Kurlar yenilendi."
 
-#: admin/multi-currency-admin.js:204
+#: admin/multi-currency-page.js:204
 msgid "Rate refresh failed."
 msgstr "Kurlar yenilenemedi."
 
-#: admin/multi-currency-admin.js:218
+#: admin/multi-currency-page.js:218
 msgid "Manual rates saved."
 msgstr "Manuel kurlar kaydedildi."
 
-#: admin/multi-currency-admin.js:234
+#: admin/multi-currency-page.js:234
 msgid "Settings saved."
 msgstr "Ayarlar kaydedildi."
 
-#: admin/multi-currency-admin.js:239
+#: admin/multi-currency-page.js:239
 msgid "Failed to save settings."
 msgstr "Ayarlar kaydedilemedi."
 
-#: admin/multi-currency-admin.js:271
+#: admin/multi-currency-page.js:271
 msgid "Multi-Currency settings"
 msgstr "Multi-Currency ayarları"
 
@@ -1328,16 +1424,24 @@ msgstr[1] "%s dakika"
 
 #. translators: %1$s is the number of currencies shown, %2$s the total configured.
 #: admin/switcher-preview.js:118
-msgid "Showing %1$s of %2$s currencies. The full list appears on the frontend — this is just a taste."
-msgstr "Yapılandırılmış %2$s para biriminden %1$s tanesi gösteriliyor. Tam liste mağazada görünür — bu yalnızca kısa bir ön izleme."
+msgid ""
+"Showing %1$s of %2$s currencies. The full list appears on the frontend — "
+"this is just a taste."
+msgstr ""
+"Yapılandırılmış %2$s para biriminden %1$s tanesi gösteriliyor. Tam liste "
+"mağazada görünür — bu yalnızca kısa bir ön izleme."
 
 #: admin/switcher-preview.js:179
 msgid "Display prices only. Checkout charged in %s."
-msgstr "Gösterilen fiyatlar yalnızca bilgilendirme amaçlıdır. Ödeme %s cinsinden alınır."
+msgstr ""
+"Gösterilen fiyatlar yalnızca bilgilendirme amaçlıdır. Ödeme %s cinsinden "
+"alınır."
 
 #: admin/switcher-preview.js:182
 msgid "Display prices only. Checkout is charged in the store currency."
-msgstr "Gösterilen fiyatlar yalnızca bilgilendirme amaçlıdır. Ödeme mağaza para biriminde alınır."
+msgstr ""
+"Gösterilen fiyatlar yalnızca bilgilendirme amaçlıdır. Ödeme mağaza para "
+"biriminde alınır."
 
 #: admin/switcher-preview.js:206
 msgid "Preview"
@@ -1356,8 +1460,12 @@ msgid "Label"
 msgstr "Etiket"
 
 #: blocks/currency-switcher/editor.js:391
-msgid "This block inherits its switcher behavior from the global defaults in Multi-Currency settings. Only the label stays instance-specific."
-msgstr "Bu blok, para birimi seçici davranışını Multi-Currency ayarlarındaki genel varsayılanlardan devralır. Yalnızca etiketi bu bloğa özeldir."
+msgid ""
+"This block inherits its switcher behavior from the global defaults in Multi-"
+"Currency settings. Only the label stays instance-specific."
+msgstr ""
+"Bu blok, para birimi seçici davranışını Multi-Currency ayarlarındaki genel "
+"varsayılanlardan devralır. Yalnızca etiketi bu bloğa özeldir."
 
 #: blocks/currency-switcher/editor.js:401
 #: blocks/currency-switcher/editor.js:403
@@ -1460,8 +1568,12 @@ msgid "Right"
 msgstr "Sağ"
 
 #: blocks/currency-switcher/editor.js:625
-msgid "Editor preview uses your actual configured currencies and current global switcher defaults."
-msgstr "Düzenleyici ön izlemesi, yapılandırdığınız gerçek para birimlerini ve geçerli genel para birimi seçici varsayılanlarını kullanır."
+msgid ""
+"Editor preview uses your actual configured currencies and current global "
+"switcher defaults."
+msgstr ""
+"Düzenleyici ön izlemesi, yapılandırdığınız gerçek para birimlerini ve "
+"geçerli genel para birimi seçici varsayılanlarını kullanır."
 
 #: blocks/currency-switcher/editor.js:676
 msgid "Rates updated 2 hours ago"
@@ -1473,7 +1585,9 @@ msgstr "1 EUR = 1,1000 USD"
 
 #: blocks/currency-switcher/editor.js:683
 msgid "Display prices only. Checkout is charged in EUR."
-msgstr "Gösterilen fiyatlar yalnızca bilgilendirme amaçlıdır. Ödeme EUR cinsinden alınır."
+msgstr ""
+"Gösterilen fiyatlar yalnızca bilgilendirme amaçlıdır. Ödeme EUR cinsinden "
+"alınır."
 
 #: blocks/currency-switcher/editor.js:702
 msgid "Header Compact"
@@ -1489,7 +1603,8 @@ msgstr "Açıklamalı alt bilgi"
 
 #: blocks/currency-switcher/editor.js:718
 msgid "A more descriptive switcher for footer or utility content."
-msgstr "Alt bilgi veya yardımcı içerik için daha açıklayıcı bir para birimi seçici."
+msgstr ""
+"Alt bilgi veya yardımcı içerik için daha açıklayıcı bir para birimi seçici."
 
 #: blocks/currency-switcher/editor.js:731
 msgid "Mobile Full Width"
@@ -1497,7 +1612,8 @@ msgstr "Mobil tam genişlik"
 
 #: blocks/currency-switcher/editor.js:731
 msgid "Full-width mobile-friendly switcher with room for more context."
-msgstr "Ek bilgiler için alan sunan, mobil uyumlu tam genişlikte para birimi seçici."
+msgstr ""
+"Ek bilgiler için alan sunan, mobil uyumlu tam genişlikte para birimi seçici."
 
 #: blocks/currency-switcher/editor.js:809
 #: blocks/currency-switcher/editor.js:852
@@ -1559,8 +1675,11 @@ msgstr "Para birimi bağlam bildirimi"
 
 #: blocks/currency-context-notice/block.json
 msgctxt "block description"
-msgid "Show a currency context note such as display currency vs checkout currency."
-msgstr "Görüntüleme ve ödeme para birimlerini karşılaştıran bir para birimi bağlam bildirimi gösterin."
+msgid ""
+"Show a currency context note such as display currency vs checkout currency."
+msgstr ""
+"Görüntüleme ve ödeme para birimlerini karşılaştıran bir para birimi bağlam "
+"bildirimi gösterin."
 
 #: blocks/currency-context-notice/block.json blocks/currency-current/block.json
 #: blocks/currency-selector-buttons/block.json
@@ -1592,7 +1711,8 @@ msgstr "Geçerli para birimi"
 #: blocks/currency-current/block.json
 msgctxt "block description"
 msgid "Display the visitor's current display currency in compact form."
-msgstr "Ziyaretçinin geçerli görüntüleme para birimini kompakt biçimde gösterin."
+msgstr ""
+"Ziyaretçinin geçerli görüntüleme para birimini kompakt biçimde gösterin."
 
 #: blocks/currency-current/block.json
 msgctxt "block keyword"
@@ -1616,8 +1736,12 @@ msgstr "Para birimi seçim düğmeleri"
 
 #: blocks/currency-selector-buttons/block.json
 msgctxt "block description"
-msgid "A button-group alternative to the dropdown switcher for stores with a few main currencies."
-msgstr "Birkaç ana para birimi sunan mağazalar için açılır seçiciye alternatif bir düğme grubu."
+msgid ""
+"A button-group alternative to the dropdown switcher for stores with a few "
+"main currencies."
+msgstr ""
+"Birkaç ana para birimi sunan mağazalar için açılır seçiciye alternatif bir "
+"düğme grubu."
 
 #: blocks/currency-selector-buttons/block.json
 msgctxt "block keyword"
@@ -1641,8 +1765,12 @@ msgstr "Para birimi seçici"
 
 #: blocks/currency-switcher/block.json
 msgctxt "block description"
-msgid "Display the FCHub Multi-Currency switcher in posts, pages, templates, and template parts."
-msgstr "FCHub Multi-Currency para birimi seçicisini yazılarda, sayfalarda, şablonlarda ve şablon parçalarında gösterin."
+msgid ""
+"Display the FCHub Multi-Currency switcher in posts, pages, templates, and "
+"template parts."
+msgstr ""
+"FCHub Multi-Currency para birimi seçicisini yazılarda, sayfalarda, "
+"şablonlarda ve şablon parçalarında gösterin."
 
 #: blocks/currency-switcher/block.json
 msgctxt "block keyword"
@@ -1696,8 +1824,12 @@ msgstr "Döviz kuru"
 
 #: blocks/exchange-rate/block.json
 msgctxt "block description"
-msgid "Display the current exchange rate between the store base currency and the visitor display currency."
-msgstr "Mağazanın baz para birimi ile ziyaretçinin görüntüleme para birimi arasındaki güncel kuru gösterin."
+msgid ""
+"Display the current exchange rate between the store base currency and the "
+"visitor display currency."
+msgstr ""
+"Mağazanın baz para birimi ile ziyaretçinin görüntüleme para birimi "
+"arasındaki güncel kuru gösterin."
 
 #: blocks/exchange-rate/block.json
 msgctxt "block keyword"

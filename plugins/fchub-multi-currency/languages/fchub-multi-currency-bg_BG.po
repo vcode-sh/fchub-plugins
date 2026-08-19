@@ -3,17 +3,18 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-currency\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
+"currency\n"
+"POT-Creation-Date: 2026-08-19T05:50:59+00:00\n"
+"PO-Revision-Date: 2026-08-19 01:48+0300\n"
 "Last-Translator: \n"
 "Language-Team: Bulgarian\n"
+"Language: bg_BG\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-18T19:36:27+00:00\n"
-"PO-Revision-Date: 2026-08-19 01:48+0300\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: fchub-multi-currency\n"
-"Language: bg_BG\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #. Plugin Name of the plugin
@@ -30,8 +31,12 @@ msgstr "https://fchub.co/docs/fchub-multi-currency"
 
 #. Description of the plugin
 #: fchub-multi-currency.php
-msgid "Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure"
-msgstr "Показване на цени в няколко валути във FluentCart с управление на обменните курсове и уведомление при плащане"
+msgid ""
+"Display-layer multi-currency for FluentCart with exchange rate management "
+"and checkout disclosure"
+msgstr ""
+"Показване на цени в няколко валути във FluentCart с управление на обменните "
+"курсове и уведомление при плащане"
 
 #. Author of the plugin
 #: fchub-multi-currency.php
@@ -52,8 +57,12 @@ msgid "A ready-made showcase of the full currency block family."
 msgstr "Готово представяне на цялото семейство валутни блокове."
 
 #: app/Bootstrap/Modules/DiagnosticsModule.php:71
-msgid "FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics page or trigger a manual refresh."
-msgstr "FCHub Multi-Currency: Някои обменни курсове са остарели. Проверете страницата за диагностика или стартирайте ръчно обновяване."
+msgid ""
+"FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics "
+"page or trigger a manual refresh."
+msgstr ""
+"FCHub Multi-Currency: Някои обменни курсове са остарели. Проверете "
+"страницата за диагностика или стартирайте ръчно обновяване."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:37
 msgid "Switch the rate provider to Manual rates before saving."
@@ -61,7 +70,8 @@ msgstr "Преди да запазите, сменете доставчика н
 
 #: app/Domain/Actions/SaveManualRatesAction.php:43
 msgid "Add at least one display currency before saving manual rates."
-msgstr "Добавете поне една валута за показване, преди да запазите ръчните курсове."
+msgstr ""
+"Добавете поне една валута за показване, преди да запазите ръчните курсове."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:48
 msgid "Provide one rate for every configured display currency."
@@ -74,14 +84,18 @@ msgstr "Курсове могат да се запазват само за на�
 
 #: app/Domain/Actions/SaveManualRatesAction.php:67
 #: app/Http/Controllers/Admin/RatesAdminController.php:104
-#: admin/multi-currency-admin.js:222
+#: admin/multi-currency-page.js:222
 msgid "Manual rates could not be saved."
 msgstr "Ръчните курсове не можаха да бъдат запазени."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:110
 #: app/Domain/Actions/SaveManualRatesAction.php:117
-msgid "Each manual rate must be a positive decimal string with up to 8 decimal places."
-msgstr "Всеки ръчен курс трябва да бъде положително десетично число с до 8 знака след десетичния разделител."
+msgid ""
+"Each manual rate must be a positive decimal string with up to 8 decimal "
+"places."
+msgstr ""
+"Всеки ръчен курс трябва да бъде положително десетично число с до 8 знака "
+"след десетичния разделител."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:121
 msgid "Each manual rate must be greater than zero."
@@ -326,7 +340,9 @@ msgstr "Ръчните курсове се записват отделно и н
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:69
 msgid "Failed to refresh exchange rates. Check the logs for details."
-msgstr "Обменните курсове не можаха да бъдат обновени. Проверете журналите за подробности."
+msgstr ""
+"Обменните курсове не можаха да бъдат обновени. Проверете журналите за "
+"подробности."
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:77
 msgid "Exchange rates refreshed successfully."
@@ -375,24 +391,41 @@ msgid "Currency code is required."
 msgstr "Кодът на валутата е задължителен."
 
 #: app/Http/Controllers/Pub/ContextController.php:144
-msgid "This currency cannot be selected because no usable exchange rate is available. Please try again later."
-msgstr "Тази валута не може да бъде избрана, защото няма използваем обменен курс. Моля, опитайте отново по-късно."
+msgid ""
+"This currency cannot be selected because no usable exchange rate is "
+"available. Please try again later."
+msgstr ""
+"Тази валута не може да бъде избрана, защото няма използваем обменен курс. "
+"Моля, опитайте отново по-късно."
 
 #: app/Http/Controllers/Pub/ContextController.php:177
-msgid "Currency preference could not be saved because both cookie and account persistence are disabled."
-msgstr "Предпочитаната валута не можа да бъде запазена, защото съхраняването в бисквитка и в профила е изключено."
+msgid ""
+"Currency preference could not be saved because both cookie and account "
+"persistence are disabled."
+msgstr ""
+"Предпочитаната валута не можа да бъде запазена, защото съхраняването в "
+"бисквитка и в профила е изключено."
 
 #: app/Http/Controllers/Pub/ContextController.php:181
-msgid "Currency preference could not be saved. Cookie persistence is disabled, so logged-out visitors cannot keep a currency choice."
-msgstr "Предпочитаната валута не можа да бъде запазена. Съхраняването в бисквитка е изключено, затова посетителите без вход не могат да запазят избора си на валута."
+msgid ""
+"Currency preference could not be saved. Cookie persistence is disabled, so "
+"logged-out visitors cannot keep a currency choice."
+msgstr ""
+"Предпочитаната валута не можа да бъде запазена. Съхраняването в бисквитка е "
+"изключено, затова посетителите без вход не могат да запазят избора си на "
+"валута."
 
 #: app/Http/Controllers/Pub/ContextController.php:204
 msgid "Currency preference saved."
 msgstr "Предпочитаната валута е запазена."
 
 #: app/Integration/AddonsRegistration.php:24
-msgid "Display-layer multi-currency with exchange rate management and checkout disclosure."
-msgstr "Показване на цени в няколко валути с управление на обменните курсове и уведомление при плащане."
+msgid ""
+"Display-layer multi-currency with exchange rate management and checkout "
+"disclosure."
+msgstr ""
+"Показване на цени в няколко валути с управление на обменните курсове и "
+"уведомление при плащане."
 
 #: app/Integration/FluentCrmSmartCodes.php:189
 msgid "Multi-Currency Order"
@@ -445,7 +478,8 @@ msgstr "Активиране на множество валути"
 #: app/Integration/MultiCurrencySettings.php:46
 #: admin/components/general-settings.js:68
 msgid "Master switch for display-layer multi-currency across the store."
-msgstr "Главен превключвател за показването на цени в няколко валути в целия магазин."
+msgstr ""
+"Главен превключвател за показването на цени в няколко валути в целия магазин."
 
 #: app/Integration/MultiCurrencySettings.php:48
 #: app/Integration/MultiCurrencySettings.php:57
@@ -468,8 +502,11 @@ msgstr "Уведомление при плащане"
 
 #: app/Integration/MultiCurrencySettings.php:55
 #: admin/components/checkout-settings.js:26
-msgid "Show a notice at checkout that payment is processed in the base currency."
-msgstr "Показва при плащане уведомление, че плащането се обработва в основната валута."
+msgid ""
+"Show a notice at checkout that payment is processed in the base currency."
+msgstr ""
+"Показва при плащане уведомление, че плащането се обработва в основната "
+"валута."
 
 #: app/Integration/MultiCurrencySettings.php:63
 #: admin/components/crm-settings.js:23
@@ -478,7 +515,9 @@ msgstr "Синхронизиране с FluentCRM"
 
 #: app/Integration/MultiCurrencySettings.php:64
 msgid "Tag contacts in FluentCRM based on their currency preference."
-msgstr "Добавя етикети на контактите във FluentCRM според предпочитаната от тях валута."
+msgstr ""
+"Добавя етикети на контактите във FluentCRM според предпочитаната от тях "
+"валута."
 
 #: app/Integration/MultiCurrencySettings.php:72
 msgid "Full Settings"
@@ -486,15 +525,16 @@ msgstr "Всички настройки"
 
 #: app/Integration/MultiCurrencySettings.php:73
 msgid "Configure currencies, exchange rates, checkout disclosure, and more."
-msgstr "Настройте валутите, обменните курсове, уведомлението при плащане и още."
+msgstr ""
+"Настройте валутите, обменните курсове, уведомлението при плащане и още."
 
 #: app/Integration/MultiCurrencySettings.php:98
 msgid "Multi-Currency settings saved."
 msgstr "Настройките за множество валути са запазени."
 
-#: app/Support/AdminMenu.php:19 admin/multi-currency-admin.js:107
-#: admin/multi-currency-admin.js:259 admin/multi-currency-admin.js:327
-#: admin/multi-currency-admin.js:385
+#: app/Support/AdminMenu.php:19 admin/multi-currency-page.js:107
+#: admin/multi-currency-page.js:259 admin/multi-currency-page.js:327
+#: admin/multi-currency-page.js:385
 msgid "Multi-Currency"
 msgstr "Множество валути"
 
@@ -506,7 +546,8 @@ msgstr "На интервал от %d ч."
 
 #: fchub-multi-currency.php:175
 msgid "FCHub Multi-Currency requires FluentCart to be installed and activated."
-msgstr "FCHub Multi-Currency изисква FluentCart да бъде инсталиран и активиран."
+msgstr ""
+"FCHub Multi-Currency изисква FluentCart да бъде инсталиран и активиран."
 
 #: admin/components/checkout-settings.js:35
 #: admin/components/checkout-settings.js:78 admin/components/crm-settings.js:35
@@ -541,12 +582,19 @@ msgid "Rate Freshness Badge"
 msgstr "Значка за актуалност на курсовете"
 
 #: admin/components/checkout-settings.js:69
-msgid "Global gate for the rates-updated badge. When disabled, no surface shows it — including the switcher dropdown footer."
-msgstr "Общ превключвател за значката с времето на обновяване на курсовете. Когато е изключен, значката не се показва никъде — включително в долната част на падащото меню за валута."
+msgid ""
+"Global gate for the rates-updated badge. When disabled, no surface shows it "
+"— including the switcher dropdown footer."
+msgstr ""
+"Общ превключвател за значката с времето на обновяване на курсовете. Когато е "
+"изключен, значката не се показва никъде — включително в долната част на "
+"падащото меню за валута."
 
 #: admin/components/crm-settings.js:26
 msgid "Tag contacts and update custom fields based on currency preference."
-msgstr "Добавя етикети към контактите и обновява персонализираните полета според предпочитаната валута."
+msgstr ""
+"Добавя етикети към контактите и обновява персонализираните полета според "
+"предпочитаната валута."
 
 #: admin/components/crm-settings.js:48
 msgid "Auto-create Tags"
@@ -586,7 +634,9 @@ msgstr "Синхронизиране с FluentCommunity"
 
 #: admin/components/crm-settings.js:123
 msgid "Sync currency preference to FluentCommunity user meta."
-msgstr "Синхронизира предпочитаната валута с потребителските метаданни във FluentCommunity."
+msgstr ""
+"Синхронизира предпочитаната валута с потребителските метаданни във "
+"FluentCommunity."
 
 #: admin/components/currency-settings.js:113
 msgid "Search and add a currency…"
@@ -665,8 +715,11 @@ msgid "Right space (100 $)"
 msgstr "Отдясно с интервал (100 $)"
 
 #: admin/components/currency-settings.js:225
-msgid "No display currencies added yet. Use the picker above to add currencies."
-msgstr "Все още няма добавени валути за показване. Използвайте полето по-горе, за да добавите валути."
+msgid ""
+"No display currencies added yet. Use the picker above to add currencies."
+msgstr ""
+"Все още няма добавени валути за показване. Използвайте полето по-горе, за да "
+"добавите валути."
 
 #: admin/components/diagnostics-view.js:24
 msgid "Available"
@@ -781,8 +834,12 @@ msgid "Multi-Currency Enabled"
 msgstr "Активиране на множество валути"
 
 #: admin/components/general-settings.js:92
-msgid "Managed in FluentCart Store Setup. Checkout and payment gateways use this currency."
-msgstr "Управлява се в настройките на магазина във FluentCart. Плащането и платежните шлюзове използват тази валута."
+msgid ""
+"Managed in FluentCart Store Setup. Checkout and payment gateways use this "
+"currency."
+msgstr ""
+"Управлява се в настройките на магазина във FluentCart. Плащането и "
+"платежните шлюзове използват тази валута."
 
 #: admin/components/general-settings.js:106
 msgid "Default Display Currency"
@@ -790,7 +847,9 @@ msgstr "Валута за показване по подразбиране"
 
 #: admin/components/general-settings.js:109
 msgid "Currency shown to visitors before any preference is detected."
-msgstr "Валутата, която се показва на посетителите, преди да бъде открито тяхно предпочитание."
+msgstr ""
+"Валутата, която се показва на посетителите, преди да бъде открито тяхно "
+"предпочитание."
 
 #: admin/components/general-settings.js:124
 msgid "URL Parameter"
@@ -809,12 +868,23 @@ msgid "Cookie Persistence"
 msgstr "Запазване в бисквитка"
 
 #: admin/components/general-settings.js:161
-msgid "Remember a guest currency in a cookie and matching browser-storage fallback. Disable this and logged-out visitors cannot keep a currency choice at all — the switch is reported as failed rather than silently ignored."
-msgstr "Запазва валутата на госта в бисквитка и в съответно резервно хранилище на браузъра. Ако изключите тази настройка, посетителите без вход изобщо няма да могат да запазят избора си на валута — смяната ще бъде отчетена като неуспешна, вместо да бъде пренебрегната без предупреждение."
+msgid ""
+"Remember a guest currency in a cookie and matching browser-storage fallback. "
+"Disable this and logged-out visitors cannot keep a currency choice at all — "
+"the switch is reported as failed rather than silently ignored."
+msgstr ""
+"Запазва валутата на госта в бисквитка и в съответно резервно хранилище на "
+"браузъра. Ако изключите тази настройка, посетителите без вход изобщо няма да "
+"могат да запазят избора си на валута — смяната ще бъде отчетена като "
+"неуспешна, вместо да бъде пренебрегната без предупреждение."
 
 #: admin/components/general-settings.js:177
-msgid "Currency switching is now a logged-in-only feature. Guests will be told their preference could not be saved."
-msgstr "Смяната на валутата вече е достъпна само за влезли потребители. Гостите ще бъдат уведомени, че предпочитанието им не може да бъде запазено."
+msgid ""
+"Currency switching is now a logged-in-only feature. Guests will be told "
+"their preference could not be saved."
+msgstr ""
+"Смяната на валутата вече е достъпна само за влезли потребители. Гостите ще "
+"бъдат уведомени, че предпочитанието им не може да бъде запазено."
 
 #: admin/components/general-settings.js:189
 msgid "Cookie Lifetime (days)"
@@ -825,24 +895,38 @@ msgid "Account Persistence"
 msgstr "Запазване в профила"
 
 #: admin/components/general-settings.js:204
-msgid "Remember currency preference in the logged-in user account. Disable this if you want logged-in sessions to respect the default display currency on every fresh visit."
-msgstr "Запазва предпочитаната валута в профила на влезлия потребител. Изключете тази настройка, ако искате при всяко ново посещение сесията да използва валутата за показване по подразбиране."
+msgid ""
+"Remember currency preference in the logged-in user account. Disable this if "
+"you want logged-in sessions to respect the default display currency on every "
+"fresh visit."
+msgstr ""
+"Запазва предпочитаната валута в профила на влезлия потребител. Изключете "
+"тази настройка, ако искате при всяко ново посещение сесията да използва "
+"валутата за показване по подразбиране."
 
 #: admin/components/general-settings.js:227
 msgid "Coming Soon"
 msgstr "Очаквайте скоро"
 
 #: admin/components/general-settings.js:230
-msgid "Automatically detect visitor currency based on their country. Requires a geolocation provider."
-msgstr "Автоматично разпознава валутата на посетителя според държавата му. Изисква доставчик на геолокация."
+msgid ""
+"Automatically detect visitor currency based on their country. Requires a "
+"geolocation provider."
+msgstr ""
+"Автоматично разпознава валутата на посетителя според държавата му. Изисква "
+"доставчик на геолокация."
 
 #: admin/components/general-settings.js:251
 msgid "Remove Data on Uninstall"
 msgstr "Премахване на данните при деинсталиране"
 
 #: admin/components/general-settings.js:254
-msgid "If enabled, all tables and settings will be removed when the plugin is uninstalled."
-msgstr "Ако е включено, всички таблици и настройки ще бъдат премахнати при деинсталиране на разширението."
+msgid ""
+"If enabled, all tables and settings will be removed when the plugin is "
+"uninstalled."
+msgstr ""
+"Ако е включено, всички таблици и настройки ще бъдат премахнати при "
+"деинсталиране на разширението."
 
 #: admin/components/general-settings.js:263
 msgid "Keep data"
@@ -866,7 +950,9 @@ msgstr "Все още няма запазени ръчни курсове."
 
 #: admin/components/rate-settings.js:31
 msgid "No exchange rates yet. Add display currencies and trigger a refresh."
-msgstr "Все още няма обменни курсове. Добавете валути за показване и стартирайте обновяване."
+msgstr ""
+"Все още няма обменни курсове. Добавете валути за показване и стартирайте "
+"обновяване."
 
 #: admin/components/rate-settings.js:43
 msgid "Rate Provider"
@@ -898,7 +984,9 @@ msgstr "Праг за остаряване (часове)"
 
 #: admin/components/rate-settings.js:102
 msgid "Rates older than this will trigger an admin warning."
-msgstr "Курсове, по-стари от този праг, ще задействат предупреждение за администратора."
+msgstr ""
+"Курсове, по-стари от този праг, ще задействат предупреждение за "
+"администратора."
 
 #: admin/components/rate-settings.js:113
 msgid "Stale Rate Fallback"
@@ -978,7 +1066,9 @@ msgstr "Предварително зададен стил"
 
 #: admin/components/switcher-settings.js:51
 msgid "Visual style used by switcher blocks that inherit global defaults."
-msgstr "Визуалният стил за блоковете на превключвателя, които наследяват общите настройки."
+msgstr ""
+"Визуалният стил за блоковете на превключвателя, които наследяват общите "
+"настройки."
 
 #: admin/components/switcher-settings.js:60
 #: blocks/currency-switcher/editor.js:406
@@ -1114,8 +1204,11 @@ msgid "Favorite Currencies"
 msgstr "Предпочитани валути"
 
 #: admin/components/switcher-settings.js:194
-msgid "Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
-msgstr "ISO кодове, разделени със запетаи и закрепени над останалите, например: EUR, USD, GBP"
+msgid ""
+"Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
+msgstr ""
+"ISO кодове, разделени със запетаи и закрепени над останалите, например: EUR, "
+"USD, GBP"
 
 #: admin/components/switcher-settings.js:204
 #: blocks/currency-switcher/editor.js:521
@@ -1129,7 +1222,9 @@ msgstr "Настройки на оформлението по подразбир
 
 #: admin/components/switcher-settings.js:216
 msgid "Baseline geometry for inheriting switcher blocks."
-msgstr "Основни размери за блоковете на превключвателя, които наследяват общите настройки."
+msgstr ""
+"Основни размери за блоковете на превключвателя, които наследяват общите "
+"настройки."
 
 #: admin/components/switcher-settings.js:222
 #: blocks/currency-switcher/editor.js:593
@@ -1209,8 +1304,14 @@ msgid "Footer Context"
 msgstr "Информация в долната част"
 
 #: admin/components/switcher-settings.js:290
-msgid "Optional trust-building context shown at the bottom of the dropdown. The freshness badge also requires the global Rate Freshness Badge gate on the Checkout tab."
-msgstr "Допълнителна информация в долната част на падащото меню, която вдъхва доверие. Значката за актуалност изисква и общата настройка „Значка за актуалност на курсовете“ в раздела „Плащане“."
+msgid ""
+"Optional trust-building context shown at the bottom of the dropdown. The "
+"freshness badge also requires the global Rate Freshness Badge gate on the "
+"Checkout tab."
+msgstr ""
+"Допълнителна информация в долната част на падащото меню, която вдъхва "
+"доверие. Значката за актуалност изисква и общата настройка „Значка за "
+"актуалност на курсовете“ в раздела „Плащане“."
 
 #: admin/components/switcher-settings.js:298
 msgid "Freshness badge"
@@ -1224,87 +1325,87 @@ msgstr "Стойност на курса"
 msgid "Checkout context"
 msgstr "Информация за плащането"
 
-#: admin/multi-currency-admin.js:47
+#: admin/multi-currency-page.js:47
 msgid "Network error. Please check your connection."
 msgstr "Мрежова грешка. Моля, проверете връзката си."
 
-#: admin/multi-currency-admin.js:78
+#: admin/multi-currency-page.js:78
 msgid "Save"
 msgstr "Запазване"
 
-#: admin/multi-currency-admin.js:79
+#: admin/multi-currency-page.js:79
 msgid "Saving..."
 msgstr "Запазване…"
 
-#: admin/multi-currency-admin.js:82
+#: admin/multi-currency-page.js:82
 msgid "General"
 msgstr "Общи"
 
-#: admin/multi-currency-admin.js:83
+#: admin/multi-currency-page.js:83
 msgid "Currencies"
 msgstr "Валути"
 
-#: admin/multi-currency-admin.js:84
+#: admin/multi-currency-page.js:84
 msgid "Exchange Rates"
 msgstr "Обменни курсове"
 
-#: admin/multi-currency-admin.js:85
+#: admin/multi-currency-page.js:85
 msgid "Switcher"
 msgstr "Превключвател"
 
-#: admin/multi-currency-admin.js:86
+#: admin/multi-currency-page.js:86
 msgid "Checkout"
 msgstr "Плащане"
 
-#: admin/multi-currency-admin.js:87
+#: admin/multi-currency-page.js:87
 msgid "CRM"
 msgstr "CRM"
 
-#: admin/multi-currency-admin.js:88
+#: admin/multi-currency-page.js:88
 msgid "Diagnostics"
 msgstr "Диагностика"
 
-#: admin/multi-currency-admin.js:130
+#: admin/multi-currency-page.js:130
 msgid "Failed to load settings."
 msgstr "Настройките не можаха да бъдат заредени."
 
-#: admin/multi-currency-admin.js:156
+#: admin/multi-currency-page.js:156
 msgid "Failed to load exchange rates."
 msgstr "Обменните курсове не можаха да бъдат заредени."
 
-#: admin/multi-currency-admin.js:171
+#: admin/multi-currency-page.js:171
 msgid "Failed to load diagnostics."
 msgstr "Диагностиката не можа да бъде заредена."
 
-#: admin/multi-currency-admin.js:185
+#: admin/multi-currency-page.js:185
 msgid "FluentCRM fields created."
 msgstr "Полетата във FluentCRM са създадени."
 
-#: admin/multi-currency-admin.js:189
+#: admin/multi-currency-page.js:189
 msgid "Could not create the FluentCRM fields."
 msgstr "Полетата във FluentCRM не можаха да бъдат създадени."
 
-#: admin/multi-currency-admin.js:200
+#: admin/multi-currency-page.js:200
 msgid "Rates refreshed."
 msgstr "Курсовете са обновени."
 
-#: admin/multi-currency-admin.js:204
+#: admin/multi-currency-page.js:204
 msgid "Rate refresh failed."
 msgstr "Обновяването на курсовете беше неуспешно."
 
-#: admin/multi-currency-admin.js:218
+#: admin/multi-currency-page.js:218
 msgid "Manual rates saved."
 msgstr "Ръчните курсове са запазени."
 
-#: admin/multi-currency-admin.js:234
+#: admin/multi-currency-page.js:234
 msgid "Settings saved."
 msgstr "Настройките са запазени."
 
-#: admin/multi-currency-admin.js:239
+#: admin/multi-currency-page.js:239
 msgid "Failed to save settings."
 msgstr "Настройките не можаха да бъдат запазени."
 
-#: admin/multi-currency-admin.js:271
+#: admin/multi-currency-page.js:271
 msgid "Multi-Currency settings"
 msgstr "Настройки за множество валути"
 
@@ -1328,8 +1429,12 @@ msgstr[1] "%s минути"
 
 #. translators: %1$s is the number of currencies shown, %2$s the total configured.
 #: admin/switcher-preview.js:118
-msgid "Showing %1$s of %2$s currencies. The full list appears on the frontend — this is just a taste."
-msgstr "Показани са %1$s от %2$s валути. Пълният списък се вижда на сайта — тук е само кратък преглед."
+msgid ""
+"Showing %1$s of %2$s currencies. The full list appears on the frontend — "
+"this is just a taste."
+msgstr ""
+"Показани са %1$s от %2$s валути. Пълният списък се вижда на сайта — тук е "
+"само кратък преглед."
 
 #: admin/switcher-preview.js:179
 msgid "Display prices only. Checkout charged in %s."
@@ -1337,7 +1442,8 @@ msgstr "Валутата е само за показване. Плащането
 
 #: admin/switcher-preview.js:182
 msgid "Display prices only. Checkout is charged in the store currency."
-msgstr "Валутата е само за показване. Плащането се извършва във валутата на магазина."
+msgstr ""
+"Валутата е само за показване. Плащането се извършва във валутата на магазина."
 
 #: admin/switcher-preview.js:206
 msgid "Preview"
@@ -1356,8 +1462,12 @@ msgid "Label"
 msgstr "Етикет"
 
 #: blocks/currency-switcher/editor.js:391
-msgid "This block inherits its switcher behavior from the global defaults in Multi-Currency settings. Only the label stays instance-specific."
-msgstr "Този блок наследява поведението на превключвателя от общите настройки за множество валути. Само етикетът остава отделен за този блок."
+msgid ""
+"This block inherits its switcher behavior from the global defaults in Multi-"
+"Currency settings. Only the label stays instance-specific."
+msgstr ""
+"Този блок наследява поведението на превключвателя от общите настройки за "
+"множество валути. Само етикетът остава отделен за този блок."
 
 #: blocks/currency-switcher/editor.js:401
 #: blocks/currency-switcher/editor.js:403
@@ -1460,8 +1570,12 @@ msgid "Right"
 msgstr "Отдясно"
 
 #: blocks/currency-switcher/editor.js:625
-msgid "Editor preview uses your actual configured currencies and current global switcher defaults."
-msgstr "Прегледът в редактора използва действително настроените валути и текущите общи настройки на превключвателя."
+msgid ""
+"Editor preview uses your actual configured currencies and current global "
+"switcher defaults."
+msgstr ""
+"Прегледът в редактора използва действително настроените валути и текущите "
+"общи настройки на превключвателя."
 
 #: blocks/currency-switcher/editor.js:676
 msgid "Rates updated 2 hours ago"
@@ -1497,7 +1611,9 @@ msgstr "Мобилен на пълна ширина"
 
 #: blocks/currency-switcher/editor.js:731
 msgid "Full-width mobile-friendly switcher with room for more context."
-msgstr "Удобен за мобилни устройства превключвател на пълна ширина с място за повече информация."
+msgstr ""
+"Удобен за мобилни устройства превключвател на пълна ширина с място за повече "
+"информация."
 
 #: blocks/currency-switcher/editor.js:809
 #: blocks/currency-switcher/editor.js:852
@@ -1559,8 +1675,11 @@ msgstr "Уведомление за валутите"
 
 #: blocks/currency-context-notice/block.json
 msgctxt "block description"
-msgid "Show a currency context note such as display currency vs checkout currency."
-msgstr "Показва информация за валутите, например валутата за показване спрямо валутата за плащане."
+msgid ""
+"Show a currency context note such as display currency vs checkout currency."
+msgstr ""
+"Показва информация за валутите, например валутата за показване спрямо "
+"валутата за плащане."
 
 #: blocks/currency-context-notice/block.json blocks/currency-current/block.json
 #: blocks/currency-selector-buttons/block.json
@@ -1616,8 +1735,12 @@ msgstr "Бутони за избор на валута"
 
 #: blocks/currency-selector-buttons/block.json
 msgctxt "block description"
-msgid "A button-group alternative to the dropdown switcher for stores with a few main currencies."
-msgstr "Алтернатива на падащия превключвател с група бутони за магазини с няколко основни валути."
+msgid ""
+"A button-group alternative to the dropdown switcher for stores with a few "
+"main currencies."
+msgstr ""
+"Алтернатива на падащия превключвател с група бутони за магазини с няколко "
+"основни валути."
 
 #: blocks/currency-selector-buttons/block.json
 msgctxt "block keyword"
@@ -1641,8 +1764,12 @@ msgstr "Превключвател на валута"
 
 #: blocks/currency-switcher/block.json
 msgctxt "block description"
-msgid "Display the FCHub Multi-Currency switcher in posts, pages, templates, and template parts."
-msgstr "Показва превключвателя на FCHub Multi-Currency в публикации, страници, шаблони и части от шаблони."
+msgid ""
+"Display the FCHub Multi-Currency switcher in posts, pages, templates, and "
+"template parts."
+msgstr ""
+"Показва превключвателя на FCHub Multi-Currency в публикации, страници, "
+"шаблони и части от шаблони."
 
 #: blocks/currency-switcher/block.json
 msgctxt "block keyword"
@@ -1696,8 +1823,12 @@ msgstr "Обменен курс"
 
 #: blocks/exchange-rate/block.json
 msgctxt "block description"
-msgid "Display the current exchange rate between the store base currency and the visitor display currency."
-msgstr "Показва текущия обменен курс между основната валута на магазина и валутата за показване на посетителя."
+msgid ""
+"Display the current exchange rate between the store base currency and the "
+"visitor display currency."
+msgstr ""
+"Показва текущия обменен курс между основната валута на магазина и валутата "
+"за показване на посетителя."
 
 #: blocks/exchange-rate/block.json
 msgctxt "block keyword"

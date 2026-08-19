@@ -3,17 +3,18 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-currency\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
+"currency\n"
+"POT-Creation-Date: 2026-08-19T05:50:59+00:00\n"
+"PO-Revision-Date: 2026-08-19 01:20+0300\n"
 "Last-Translator: \n"
 "Language-Team: Norwegian Bokmål\n"
+"Language: nb_NO\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-18T19:36:27+00:00\n"
-"PO-Revision-Date: 2026-08-19 01:20+0300\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: fchub-multi-currency\n"
-"Language: nb_NO\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #. Plugin Name of the plugin
@@ -30,8 +31,12 @@ msgstr "https://fchub.co/docs/fchub-multi-currency"
 
 #. Description of the plugin
 #: fchub-multi-currency.php
-msgid "Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure"
-msgstr "Flervalutavisning for FluentCart med administrasjon av valutakurser og informasjon i kassen"
+msgid ""
+"Display-layer multi-currency for FluentCart with exchange rate management "
+"and checkout disclosure"
+msgstr ""
+"Flervalutavisning for FluentCart med administrasjon av valutakurser og "
+"informasjon i kassen"
 
 #. Author of the plugin
 #: fchub-multi-currency.php
@@ -52,8 +57,12 @@ msgid "A ready-made showcase of the full currency block family."
 msgstr "En ferdig oversikt over hele serien med valutablokker."
 
 #: app/Bootstrap/Modules/DiagnosticsModule.php:71
-msgid "FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics page or trigger a manual refresh."
-msgstr "FCHub Multi-Currency: Noen valutakurser er utdaterte. Sjekk diagnostikksiden eller start en manuell oppdatering."
+msgid ""
+"FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics "
+"page or trigger a manual refresh."
+msgstr ""
+"FCHub Multi-Currency: Noen valutakurser er utdaterte. Sjekk diagnostikksiden "
+"eller start en manuell oppdatering."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:37
 msgid "Switch the rate provider to Manual rates before saving."
@@ -74,14 +83,17 @@ msgstr "Kurser kan bare lagres for konfigurerte visningsvalutaer."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:67
 #: app/Http/Controllers/Admin/RatesAdminController.php:104
-#: admin/multi-currency-admin.js:222
+#: admin/multi-currency-page.js:222
 msgid "Manual rates could not be saved."
 msgstr "De manuelle kursene kunne ikke lagres."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:110
 #: app/Domain/Actions/SaveManualRatesAction.php:117
-msgid "Each manual rate must be a positive decimal string with up to 8 decimal places."
-msgstr "Hver manuell kurs må være en positiv desimalverdi med opptil 8 desimaler."
+msgid ""
+"Each manual rate must be a positive decimal string with up to 8 decimal "
+"places."
+msgstr ""
+"Hver manuell kurs må være en positiv desimalverdi med opptil 8 desimaler."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:121
 msgid "Each manual rate must be greater than zero."
@@ -375,24 +387,39 @@ msgid "Currency code is required."
 msgstr "Valutakode er påkrevd."
 
 #: app/Http/Controllers/Pub/ContextController.php:144
-msgid "This currency cannot be selected because no usable exchange rate is available. Please try again later."
-msgstr "Denne valutaen kan ikke velges fordi ingen brukbar valutakurs er tilgjengelig. Prøv igjen senere."
+msgid ""
+"This currency cannot be selected because no usable exchange rate is "
+"available. Please try again later."
+msgstr ""
+"Denne valutaen kan ikke velges fordi ingen brukbar valutakurs er "
+"tilgjengelig. Prøv igjen senere."
 
 #: app/Http/Controllers/Pub/ContextController.php:177
-msgid "Currency preference could not be saved because both cookie and account persistence are disabled."
-msgstr "Valutavalget kunne ikke lagres fordi lagring i både informasjonskapsel og brukerkonto er deaktivert."
+msgid ""
+"Currency preference could not be saved because both cookie and account "
+"persistence are disabled."
+msgstr ""
+"Valutavalget kunne ikke lagres fordi lagring i både informasjonskapsel og "
+"brukerkonto er deaktivert."
 
 #: app/Http/Controllers/Pub/ContextController.php:181
-msgid "Currency preference could not be saved. Cookie persistence is disabled, so logged-out visitors cannot keep a currency choice."
-msgstr "Valutavalget kunne ikke lagres. Lagring i informasjonskapsel er deaktivert, så utloggede besøkende kan ikke beholde et valutavalg."
+msgid ""
+"Currency preference could not be saved. Cookie persistence is disabled, so "
+"logged-out visitors cannot keep a currency choice."
+msgstr ""
+"Valutavalget kunne ikke lagres. Lagring i informasjonskapsel er deaktivert, "
+"så utloggede besøkende kan ikke beholde et valutavalg."
 
 #: app/Http/Controllers/Pub/ContextController.php:204
 msgid "Currency preference saved."
 msgstr "Valutavalget er lagret."
 
 #: app/Integration/AddonsRegistration.php:24
-msgid "Display-layer multi-currency with exchange rate management and checkout disclosure."
-msgstr "Flervalutavisning med administrasjon av valutakurser og informasjon i kassen."
+msgid ""
+"Display-layer multi-currency with exchange rate management and checkout "
+"disclosure."
+msgstr ""
+"Flervalutavisning med administrasjon av valutakurser og informasjon i kassen."
 
 #: app/Integration/FluentCrmSmartCodes.php:189
 msgid "Multi-Currency Order"
@@ -468,7 +495,8 @@ msgstr "Valutainformasjon i kassen"
 
 #: app/Integration/MultiCurrencySettings.php:55
 #: admin/components/checkout-settings.js:26
-msgid "Show a notice at checkout that payment is processed in the base currency."
+msgid ""
+"Show a notice at checkout that payment is processed in the base currency."
 msgstr "Vis en melding i kassen om at betalingen behandles i basisvalutaen."
 
 #: app/Integration/MultiCurrencySettings.php:63
@@ -492,9 +520,9 @@ msgstr "Konfigurer valutaer, valutakurser, informasjon i kassen og mer."
 msgid "Multi-Currency settings saved."
 msgstr "Multi-Currency-innstillingene er lagret."
 
-#: app/Support/AdminMenu.php:19 admin/multi-currency-admin.js:107
-#: admin/multi-currency-admin.js:259 admin/multi-currency-admin.js:327
-#: admin/multi-currency-admin.js:385
+#: app/Support/AdminMenu.php:19 admin/multi-currency-page.js:107
+#: admin/multi-currency-page.js:259 admin/multi-currency-page.js:327
+#: admin/multi-currency-page.js:385
 msgid "Multi-Currency"
 msgstr "Multi-Currency"
 
@@ -541,12 +569,19 @@ msgid "Rate Freshness Badge"
 msgstr "Merke for kursoppdatering"
 
 #: admin/components/checkout-settings.js:69
-msgid "Global gate for the rates-updated badge. When disabled, no surface shows it — including the switcher dropdown footer."
-msgstr "Hovedbryter for merket som viser når kursene sist ble oppdatert. Når det er deaktivert, vises ikke merket noe sted — heller ikke nederst i nedtrekksmenyen for valutavelgeren."
+msgid ""
+"Global gate for the rates-updated badge. When disabled, no surface shows it "
+"— including the switcher dropdown footer."
+msgstr ""
+"Hovedbryter for merket som viser når kursene sist ble oppdatert. Når det er "
+"deaktivert, vises ikke merket noe sted — heller ikke nederst i "
+"nedtrekksmenyen for valutavelgeren."
 
 #: admin/components/crm-settings.js:26
 msgid "Tag contacts and update custom fields based on currency preference."
-msgstr "Merk kontakter med tagger og oppdater egendefinerte felt basert på valutavalget."
+msgstr ""
+"Merk kontakter med tagger og oppdater egendefinerte felt basert på "
+"valutavalget."
 
 #: admin/components/crm-settings.js:48
 msgid "Auto-create Tags"
@@ -665,8 +700,11 @@ msgid "Right space (100 $)"
 msgstr "Høyre med mellomrom (100 $)"
 
 #: admin/components/currency-settings.js:225
-msgid "No display currencies added yet. Use the picker above to add currencies."
-msgstr "Ingen visningsvalutaer er lagt til ennå. Bruk velgeren ovenfor for å legge til valutaer."
+msgid ""
+"No display currencies added yet. Use the picker above to add currencies."
+msgstr ""
+"Ingen visningsvalutaer er lagt til ennå. Bruk velgeren ovenfor for å legge "
+"til valutaer."
 
 #: admin/components/diagnostics-view.js:24
 msgid "Available"
@@ -781,8 +819,12 @@ msgid "Multi-Currency Enabled"
 msgstr "Multi-Currency aktivert"
 
 #: admin/components/general-settings.js:92
-msgid "Managed in FluentCart Store Setup. Checkout and payment gateways use this currency."
-msgstr "Administreres under Butikkoppsett i FluentCart. Kassen og betalingsløsningene bruker denne valutaen."
+msgid ""
+"Managed in FluentCart Store Setup. Checkout and payment gateways use this "
+"currency."
+msgstr ""
+"Administreres under Butikkoppsett i FluentCart. Kassen og "
+"betalingsløsningene bruker denne valutaen."
 
 #: admin/components/general-settings.js:106
 msgid "Default Display Currency"
@@ -809,12 +851,23 @@ msgid "Cookie Persistence"
 msgstr "Lagring i informasjonskapsel"
 
 #: admin/components/general-settings.js:161
-msgid "Remember a guest currency in a cookie and matching browser-storage fallback. Disable this and logged-out visitors cannot keep a currency choice at all — the switch is reported as failed rather than silently ignored."
-msgstr "Husk gjestens valuta i en informasjonskapsel med reservelagring i nettleseren. Hvis dette deaktiveres, kan ikke utloggede besøkende beholde et valutavalg — valutabyttet rapporteres som mislykket i stedet for å bli ignorert uten varsel."
+msgid ""
+"Remember a guest currency in a cookie and matching browser-storage fallback. "
+"Disable this and logged-out visitors cannot keep a currency choice at all — "
+"the switch is reported as failed rather than silently ignored."
+msgstr ""
+"Husk gjestens valuta i en informasjonskapsel med reservelagring i "
+"nettleseren. Hvis dette deaktiveres, kan ikke utloggede besøkende beholde et "
+"valutavalg — valutabyttet rapporteres som mislykket i stedet for å bli "
+"ignorert uten varsel."
 
 #: admin/components/general-settings.js:177
-msgid "Currency switching is now a logged-in-only feature. Guests will be told their preference could not be saved."
-msgstr "Valutabytte er nå bare tilgjengelig for innloggede brukere. Gjester får beskjed om at valutavalget ikke kunne lagres."
+msgid ""
+"Currency switching is now a logged-in-only feature. Guests will be told "
+"their preference could not be saved."
+msgstr ""
+"Valutabytte er nå bare tilgjengelig for innloggede brukere. Gjester får "
+"beskjed om at valutavalget ikke kunne lagres."
 
 #: admin/components/general-settings.js:189
 msgid "Cookie Lifetime (days)"
@@ -825,24 +878,37 @@ msgid "Account Persistence"
 msgstr "Lagring i brukerkonto"
 
 #: admin/components/general-settings.js:204
-msgid "Remember currency preference in the logged-in user account. Disable this if you want logged-in sessions to respect the default display currency on every fresh visit."
-msgstr "Husk valutavalget i kontoen til den innloggede brukeren. Deaktiver dette hvis innloggede økter skal bruke standard visningsvaluta ved hvert nye besøk."
+msgid ""
+"Remember currency preference in the logged-in user account. Disable this if "
+"you want logged-in sessions to respect the default display currency on every "
+"fresh visit."
+msgstr ""
+"Husk valutavalget i kontoen til den innloggede brukeren. Deaktiver dette "
+"hvis innloggede økter skal bruke standard visningsvaluta ved hvert nye besøk."
 
 #: admin/components/general-settings.js:227
 msgid "Coming Soon"
 msgstr "Kommer snart"
 
 #: admin/components/general-settings.js:230
-msgid "Automatically detect visitor currency based on their country. Requires a geolocation provider."
-msgstr "Finn den besøkendes valuta automatisk basert på land. Krever en geolokaliseringsleverandør."
+msgid ""
+"Automatically detect visitor currency based on their country. Requires a "
+"geolocation provider."
+msgstr ""
+"Finn den besøkendes valuta automatisk basert på land. Krever en "
+"geolokaliseringsleverandør."
 
 #: admin/components/general-settings.js:251
 msgid "Remove Data on Uninstall"
 msgstr "Fjern data ved avinstallering"
 
 #: admin/components/general-settings.js:254
-msgid "If enabled, all tables and settings will be removed when the plugin is uninstalled."
-msgstr "Når dette er aktivert, fjernes alle tabeller og innstillinger når utvidelsen avinstalleres."
+msgid ""
+"If enabled, all tables and settings will be removed when the plugin is "
+"uninstalled."
+msgstr ""
+"Når dette er aktivert, fjernes alle tabeller og innstillinger når utvidelsen "
+"avinstalleres."
 
 #: admin/components/general-settings.js:263
 msgid "Keep data"
@@ -866,7 +932,8 @@ msgstr "Ingen manuelle kurser er lagret ennå."
 
 #: admin/components/rate-settings.js:31
 msgid "No exchange rates yet. Add display currencies and trigger a refresh."
-msgstr "Ingen valutakurser ennå. Legg til visningsvalutaer og start en oppdatering."
+msgstr ""
+"Ingen valutakurser ennå. Legg til visningsvalutaer og start en oppdatering."
 
 #: admin/components/rate-settings.js:43
 msgid "Rate Provider"
@@ -898,7 +965,8 @@ msgstr "Aldersgrense for kurser (timer)"
 
 #: admin/components/rate-settings.js:102
 msgid "Rates older than this will trigger an admin warning."
-msgstr "Kurser som er eldre enn dette, utløser en advarsel for administratoren."
+msgstr ""
+"Kurser som er eldre enn dette, utløser en advarsel for administratoren."
 
 #: admin/components/rate-settings.js:113
 msgid "Stale Rate Fallback"
@@ -978,7 +1046,9 @@ msgstr "Standard forhåndsinnstilling"
 
 #: admin/components/switcher-settings.js:51
 msgid "Visual style used by switcher blocks that inherit global defaults."
-msgstr "Visuell stil for valutavelgerblokker som arver de globale standardinnstillingene."
+msgstr ""
+"Visuell stil for valutavelgerblokker som arver de globale "
+"standardinnstillingene."
 
 #: admin/components/switcher-settings.js:60
 #: blocks/currency-switcher/editor.js:406
@@ -1016,7 +1086,8 @@ msgstr "Plassering av etikett"
 
 #: admin/components/switcher-settings.js:87
 msgid "Where the optional label should sit relative to the switcher."
-msgstr "Hvor den valgfrie etiketten skal plasseres i forhold til valutavelgeren."
+msgstr ""
+"Hvor den valgfrie etiketten skal plasseres i forhold til valutavelgeren."
 
 #: admin/components/switcher-settings.js:93
 #: blocks/currency-switcher/editor.js:425
@@ -1114,8 +1185,10 @@ msgid "Favorite Currencies"
 msgstr "Favorittvalutaer"
 
 #: admin/components/switcher-settings.js:194
-msgid "Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
-msgstr "Kommaseparerte ISO-koder som festes over resten, for eksempel: EUR, USD, GBP"
+msgid ""
+"Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
+msgstr ""
+"Kommaseparerte ISO-koder som festes over resten, for eksempel: EUR, USD, GBP"
 
 #: admin/components/switcher-settings.js:204
 #: blocks/currency-switcher/editor.js:521
@@ -1209,8 +1282,14 @@ msgid "Footer Context"
 msgstr "Informasjon nederst"
 
 #: admin/components/switcher-settings.js:290
-msgid "Optional trust-building context shown at the bottom of the dropdown. The freshness badge also requires the global Rate Freshness Badge gate on the Checkout tab."
-msgstr "Valgfri tillitsskapende informasjon som vises nederst i nedtrekksmenyen. Merket for kursoppdatering krever også at den globale innstillingen Merke for kursoppdatering er aktivert under fanen Kasse."
+msgid ""
+"Optional trust-building context shown at the bottom of the dropdown. The "
+"freshness badge also requires the global Rate Freshness Badge gate on the "
+"Checkout tab."
+msgstr ""
+"Valgfri tillitsskapende informasjon som vises nederst i nedtrekksmenyen. "
+"Merket for kursoppdatering krever også at den globale innstillingen Merke "
+"for kursoppdatering er aktivert under fanen Kasse."
 
 #: admin/components/switcher-settings.js:298
 msgid "Freshness badge"
@@ -1224,87 +1303,87 @@ msgstr "Kursverdi"
 msgid "Checkout context"
 msgstr "Kasseinformasjon"
 
-#: admin/multi-currency-admin.js:47
+#: admin/multi-currency-page.js:47
 msgid "Network error. Please check your connection."
 msgstr "Nettverksfeil. Kontroller tilkoblingen."
 
-#: admin/multi-currency-admin.js:78
+#: admin/multi-currency-page.js:78
 msgid "Save"
 msgstr "Lagre"
 
-#: admin/multi-currency-admin.js:79
+#: admin/multi-currency-page.js:79
 msgid "Saving..."
 msgstr "Lagrer …"
 
-#: admin/multi-currency-admin.js:82
+#: admin/multi-currency-page.js:82
 msgid "General"
 msgstr "Generelt"
 
-#: admin/multi-currency-admin.js:83
+#: admin/multi-currency-page.js:83
 msgid "Currencies"
 msgstr "Valutaer"
 
-#: admin/multi-currency-admin.js:84
+#: admin/multi-currency-page.js:84
 msgid "Exchange Rates"
 msgstr "Valutakurser"
 
-#: admin/multi-currency-admin.js:85
+#: admin/multi-currency-page.js:85
 msgid "Switcher"
 msgstr "Valutavelger"
 
-#: admin/multi-currency-admin.js:86
+#: admin/multi-currency-page.js:86
 msgid "Checkout"
 msgstr "Kasse"
 
-#: admin/multi-currency-admin.js:87
+#: admin/multi-currency-page.js:87
 msgid "CRM"
 msgstr "CRM"
 
-#: admin/multi-currency-admin.js:88
+#: admin/multi-currency-page.js:88
 msgid "Diagnostics"
 msgstr "Diagnostikk"
 
-#: admin/multi-currency-admin.js:130
+#: admin/multi-currency-page.js:130
 msgid "Failed to load settings."
 msgstr "Innstillingene kunne ikke lastes inn."
 
-#: admin/multi-currency-admin.js:156
+#: admin/multi-currency-page.js:156
 msgid "Failed to load exchange rates."
 msgstr "Valutakursene kunne ikke lastes inn."
 
-#: admin/multi-currency-admin.js:171
+#: admin/multi-currency-page.js:171
 msgid "Failed to load diagnostics."
 msgstr "Diagnostikkdataene kunne ikke lastes inn."
 
-#: admin/multi-currency-admin.js:185
+#: admin/multi-currency-page.js:185
 msgid "FluentCRM fields created."
 msgstr "FluentCRM-feltene er opprettet."
 
-#: admin/multi-currency-admin.js:189
+#: admin/multi-currency-page.js:189
 msgid "Could not create the FluentCRM fields."
 msgstr "FluentCRM-feltene kunne ikke opprettes."
 
-#: admin/multi-currency-admin.js:200
+#: admin/multi-currency-page.js:200
 msgid "Rates refreshed."
 msgstr "Kursene er oppdatert."
 
-#: admin/multi-currency-admin.js:204
+#: admin/multi-currency-page.js:204
 msgid "Rate refresh failed."
 msgstr "Kursoppdateringen mislyktes."
 
-#: admin/multi-currency-admin.js:218
+#: admin/multi-currency-page.js:218
 msgid "Manual rates saved."
 msgstr "De manuelle kursene er lagret."
 
-#: admin/multi-currency-admin.js:234
+#: admin/multi-currency-page.js:234
 msgid "Settings saved."
 msgstr "Innstillingene er lagret."
 
-#: admin/multi-currency-admin.js:239
+#: admin/multi-currency-page.js:239
 msgid "Failed to save settings."
 msgstr "Innstillingene kunne ikke lagres."
 
-#: admin/multi-currency-admin.js:271
+#: admin/multi-currency-page.js:271
 msgid "Multi-Currency settings"
 msgstr "Multi-Currency-innstillinger"
 
@@ -1328,8 +1407,12 @@ msgstr[1] "%s minutter"
 
 #. translators: %1$s is the number of currencies shown, %2$s the total configured.
 #: admin/switcher-preview.js:118
-msgid "Showing %1$s of %2$s currencies. The full list appears on the frontend — this is just a taste."
-msgstr "Viser %1$s av %2$s valutaer. Hele listen vises i nettbutikken — dette er bare en smakebit."
+msgid ""
+"Showing %1$s of %2$s currencies. The full list appears on the frontend — "
+"this is just a taste."
+msgstr ""
+"Viser %1$s av %2$s valutaer. Hele listen vises i nettbutikken — dette er "
+"bare en smakebit."
 
 #: admin/switcher-preview.js:179
 msgid "Display prices only. Checkout charged in %s."
@@ -1356,8 +1439,13 @@ msgid "Label"
 msgstr "Etikett"
 
 #: blocks/currency-switcher/editor.js:391
-msgid "This block inherits its switcher behavior from the global defaults in Multi-Currency settings. Only the label stays instance-specific."
-msgstr "Denne blokken arver virkemåten for valutavelgeren fra de globale standardinnstillingene i Multi-Currency. Bare etiketten er unik for denne blokken."
+msgid ""
+"This block inherits its switcher behavior from the global defaults in Multi-"
+"Currency settings. Only the label stays instance-specific."
+msgstr ""
+"Denne blokken arver virkemåten for valutavelgeren fra de globale "
+"standardinnstillingene i Multi-Currency. Bare etiketten er unik for denne "
+"blokken."
 
 #: blocks/currency-switcher/editor.js:401
 #: blocks/currency-switcher/editor.js:403
@@ -1460,8 +1548,12 @@ msgid "Right"
 msgstr "Høyre"
 
 #: blocks/currency-switcher/editor.js:625
-msgid "Editor preview uses your actual configured currencies and current global switcher defaults."
-msgstr "Forhåndsvisningen i redigeringsverktøyet bruker de konfigurerte valutaene dine og de gjeldende globale standardinnstillingene for valutavelgeren."
+msgid ""
+"Editor preview uses your actual configured currencies and current global "
+"switcher defaults."
+msgstr ""
+"Forhåndsvisningen i redigeringsverktøyet bruker de konfigurerte valutaene "
+"dine og de gjeldende globale standardinnstillingene for valutavelgeren."
 
 #: blocks/currency-switcher/editor.js:676
 msgid "Rates updated 2 hours ago"
@@ -1489,7 +1581,8 @@ msgstr "Beskrivende bunntekst"
 
 #: blocks/currency-switcher/editor.js:718
 msgid "A more descriptive switcher for footer or utility content."
-msgstr "En mer beskrivende valutavelger for bunntekst eller annet sekundærinnhold."
+msgstr ""
+"En mer beskrivende valutavelger for bunntekst eller annet sekundærinnhold."
 
 #: blocks/currency-switcher/editor.js:731
 msgid "Mobile Full Width"
@@ -1559,8 +1652,11 @@ msgstr "Melding om valutakontekst"
 
 #: blocks/currency-context-notice/block.json
 msgctxt "block description"
-msgid "Show a currency context note such as display currency vs checkout currency."
-msgstr "Vis en melding om valutakonteksten, for eksempel visningsvaluta sammenlignet med valutaen i kassen."
+msgid ""
+"Show a currency context note such as display currency vs checkout currency."
+msgstr ""
+"Vis en melding om valutakonteksten, for eksempel visningsvaluta sammenlignet "
+"med valutaen i kassen."
 
 #: blocks/currency-context-notice/block.json blocks/currency-current/block.json
 #: blocks/currency-selector-buttons/block.json
@@ -1616,8 +1712,12 @@ msgstr "Knapper for valutavalg"
 
 #: blocks/currency-selector-buttons/block.json
 msgctxt "block description"
-msgid "A button-group alternative to the dropdown switcher for stores with a few main currencies."
-msgstr "Et alternativ med en knappegruppe i stedet for nedtrekksmenyen, for butikker med noen få hovedvalutaer."
+msgid ""
+"A button-group alternative to the dropdown switcher for stores with a few "
+"main currencies."
+msgstr ""
+"Et alternativ med en knappegruppe i stedet for nedtrekksmenyen, for butikker "
+"med noen få hovedvalutaer."
 
 #: blocks/currency-selector-buttons/block.json
 msgctxt "block keyword"
@@ -1641,8 +1741,12 @@ msgstr "Valutavelger"
 
 #: blocks/currency-switcher/block.json
 msgctxt "block description"
-msgid "Display the FCHub Multi-Currency switcher in posts, pages, templates, and template parts."
-msgstr "Vis valutavelgeren fra FCHub Multi-Currency i innlegg, sider, maler og maldeler."
+msgid ""
+"Display the FCHub Multi-Currency switcher in posts, pages, templates, and "
+"template parts."
+msgstr ""
+"Vis valutavelgeren fra FCHub Multi-Currency i innlegg, sider, maler og "
+"maldeler."
 
 #: blocks/currency-switcher/block.json
 msgctxt "block keyword"
@@ -1696,8 +1800,12 @@ msgstr "Valutakurs"
 
 #: blocks/exchange-rate/block.json
 msgctxt "block description"
-msgid "Display the current exchange rate between the store base currency and the visitor display currency."
-msgstr "Vis gjeldende valutakurs mellom butikkens basisvaluta og den besøkendes visningsvaluta."
+msgid ""
+"Display the current exchange rate between the store base currency and the "
+"visitor display currency."
+msgstr ""
+"Vis gjeldende valutakurs mellom butikkens basisvaluta og den besøkendes "
+"visningsvaluta."
 
 #: blocks/exchange-rate/block.json
 msgctxt "block keyword"

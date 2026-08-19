@@ -5,16 +5,16 @@ msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
 "currency\n"
+"POT-Creation-Date: 2026-08-19T05:50:59+00:00\n"
+"PO-Revision-Date: 2026-08-19 02:00+0300\n"
 "Last-Translator: \n"
 "Language-Team: Croatian\n"
+"Language: hr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-18T19:36:27+00:00\n"
-"PO-Revision-Date: 2026-08-19 02:00+0300\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: fchub-multi-currency\n"
-"Language: hr\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
@@ -84,7 +84,7 @@ msgstr "Tečajevi se mogu spremiti samo za konfigurirane prikazne valute."
 
 #: app/Domain/Actions/SaveManualRatesAction.php:67
 #: app/Http/Controllers/Admin/RatesAdminController.php:104
-#: admin/multi-currency-admin.js:222
+#: admin/multi-currency-page.js:222
 msgid "Manual rates could not be saved."
 msgstr "Ručne tečajeve nije moguće spremiti."
 
@@ -346,7 +346,8 @@ msgstr "Ručni tečajevi spremaju se izričito i ne mogu se osvježavati."
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:69
 msgid "Failed to refresh exchange rates. Check the logs for details."
-msgstr "Osvježavanje tečajeva nije uspjelo. Pojedinosti provjerite u zapisnicima."
+msgstr ""
+"Osvježavanje tečajeva nije uspjelo. Pojedinosti provjerite u zapisnicima."
 
 #: app/Http/Controllers/Admin/RatesAdminController.php:77
 msgid "Exchange rates refreshed successfully."
@@ -529,9 +530,9 @@ msgstr "Konfigurirajte valute, tečajeve, obavijest pri plaćanju i ostalo."
 msgid "Multi-Currency settings saved."
 msgstr "Postavke više valuta su spremljene."
 
-#: app/Support/AdminMenu.php:19 admin/multi-currency-admin.js:107
-#: admin/multi-currency-admin.js:259 admin/multi-currency-admin.js:327
-#: admin/multi-currency-admin.js:385
+#: app/Support/AdminMenu.php:19 admin/multi-currency-page.js:107
+#: admin/multi-currency-page.js:259 admin/multi-currency-page.js:327
+#: admin/multi-currency-page.js:385
 msgid "Multi-Currency"
 msgstr "Više valuta"
 
@@ -571,7 +572,8 @@ msgstr "Tekst obavijesti"
 
 #: admin/components/checkout-settings.js:51
 msgid "Supports placeholders: {base_currency}, {display_currency}, {rate}"
-msgstr "Podržava rezervirana mjesta: {base_currency}, {display_currency}, {rate}"
+msgstr ""
+"Podržava rezervirana mjesta: {base_currency}, {display_currency}, {rate}"
 
 #: admin/components/checkout-settings.js:66
 msgid "Rate Freshness Badge"
@@ -587,7 +589,8 @@ msgstr ""
 
 #: admin/components/crm-settings.js:26
 msgid "Tag contacts and update custom fields based on currency preference."
-msgstr "Označite kontakte i ažurirajte prilagođena polja prema preferiranoj valuti."
+msgstr ""
+"Označite kontakte i ažurirajte prilagođena polja prema preferiranoj valuti."
 
 #: admin/components/crm-settings.js:48
 msgid "Auto-create Tags"
@@ -627,7 +630,9 @@ msgstr "Sinkronizacija s FluentCommunityjem"
 
 #: admin/components/crm-settings.js:123
 msgid "Sync currency preference to FluentCommunity user meta."
-msgstr "Sinkronizirajte preferiranu valutu s korisničkim metapodacima FluentCommunityja."
+msgstr ""
+"Sinkronizirajte preferiranu valutu s korisničkim metapodacima "
+"FluentCommunityja."
 
 #: admin/components/currency-settings.js:113
 msgid "Search and add a currency…"
@@ -708,8 +713,7 @@ msgstr "Desno s razmakom (100 $)"
 #: admin/components/currency-settings.js:225
 msgid ""
 "No display currencies added yet. Use the picker above to add currencies."
-msgstr ""
-"Još nema dodanih prikaznih valuta. Dodajte ih pomoću izbornika iznad."
+msgstr "Još nema dodanih prikaznih valuta. Dodajte ih pomoću izbornika iznad."
 
 #: admin/components/diagnostics-view.js:24
 msgid "Available"
@@ -901,8 +905,8 @@ msgid ""
 "Automatically detect visitor currency based on their country. Requires a "
 "geolocation provider."
 msgstr ""
-"Automatski otkrijte valutu posjetitelja prema zemlji iz koje dolazi. Potreban "
-"je pružatelj geolokacije."
+"Automatski otkrijte valutu posjetitelja prema zemlji iz koje dolazi. "
+"Potreban je pružatelj geolokacije."
 
 #: admin/components/general-settings.js:251
 msgid "Remove Data on Uninstall"
@@ -1050,7 +1054,8 @@ msgstr "Zadana postavka izgleda"
 
 #: admin/components/switcher-settings.js:51
 msgid "Visual style used by switcher blocks that inherit global defaults."
-msgstr "Vizualni stil blokova za promjenu valute koji nasljeđuju globalne postavke."
+msgstr ""
+"Vizualni stil blokova za promjenu valute koji nasljeđuju globalne postavke."
 
 #: admin/components/switcher-settings.js:60
 #: blocks/currency-switcher/editor.js:406
@@ -1204,7 +1209,8 @@ msgstr "Zadane postavke rasporeda"
 
 #: admin/components/switcher-settings.js:216
 msgid "Baseline geometry for inheriting switcher blocks."
-msgstr "Osnovna geometrija za blokove za promjenu valute koji nasljeđuju postavke."
+msgstr ""
+"Osnovna geometrija za blokove za promjenu valute koji nasljeđuju postavke."
 
 #: admin/components/switcher-settings.js:222
 #: blocks/currency-switcher/editor.js:593
@@ -1305,87 +1311,87 @@ msgstr "Vrijednost tečaja"
 msgid "Checkout context"
 msgstr "Kontekst plaćanja"
 
-#: admin/multi-currency-admin.js:47
+#: admin/multi-currency-page.js:47
 msgid "Network error. Please check your connection."
 msgstr "Mrežna pogreška. Provjerite vezu."
 
-#: admin/multi-currency-admin.js:78
+#: admin/multi-currency-page.js:78
 msgid "Save"
 msgstr "Spremi"
 
-#: admin/multi-currency-admin.js:79
+#: admin/multi-currency-page.js:79
 msgid "Saving..."
 msgstr "Spremanje…"
 
-#: admin/multi-currency-admin.js:82
+#: admin/multi-currency-page.js:82
 msgid "General"
 msgstr "Općenito"
 
-#: admin/multi-currency-admin.js:83
+#: admin/multi-currency-page.js:83
 msgid "Currencies"
 msgstr "Valute"
 
-#: admin/multi-currency-admin.js:84
+#: admin/multi-currency-page.js:84
 msgid "Exchange Rates"
 msgstr "Tečajevi"
 
-#: admin/multi-currency-admin.js:85
+#: admin/multi-currency-page.js:85
 msgid "Switcher"
 msgstr "Izbornik valute"
 
-#: admin/multi-currency-admin.js:86
+#: admin/multi-currency-page.js:86
 msgid "Checkout"
 msgstr "Plaćanje"
 
-#: admin/multi-currency-admin.js:87
+#: admin/multi-currency-page.js:87
 msgid "CRM"
 msgstr "CRM"
 
-#: admin/multi-currency-admin.js:88
+#: admin/multi-currency-page.js:88
 msgid "Diagnostics"
 msgstr "Dijagnostika"
 
-#: admin/multi-currency-admin.js:130
+#: admin/multi-currency-page.js:130
 msgid "Failed to load settings."
 msgstr "Učitavanje postavki nije uspjelo."
 
-#: admin/multi-currency-admin.js:156
+#: admin/multi-currency-page.js:156
 msgid "Failed to load exchange rates."
 msgstr "Učitavanje tečajeva nije uspjelo."
 
-#: admin/multi-currency-admin.js:171
+#: admin/multi-currency-page.js:171
 msgid "Failed to load diagnostics."
 msgstr "Učitavanje dijagnostike nije uspjelo."
 
-#: admin/multi-currency-admin.js:185
+#: admin/multi-currency-page.js:185
 msgid "FluentCRM fields created."
 msgstr "Polja FluentCRM-a su izrađena."
 
-#: admin/multi-currency-admin.js:189
+#: admin/multi-currency-page.js:189
 msgid "Could not create the FluentCRM fields."
 msgstr "Polja FluentCRM-a nije moguće izraditi."
 
-#: admin/multi-currency-admin.js:200
+#: admin/multi-currency-page.js:200
 msgid "Rates refreshed."
 msgstr "Tečajevi su osvježeni."
 
-#: admin/multi-currency-admin.js:204
+#: admin/multi-currency-page.js:204
 msgid "Rate refresh failed."
 msgstr "Osvježavanje tečajeva nije uspjelo."
 
-#: admin/multi-currency-admin.js:218
+#: admin/multi-currency-page.js:218
 msgid "Manual rates saved."
 msgstr "Ručni tečajevi su spremljeni."
 
-#: admin/multi-currency-admin.js:234
+#: admin/multi-currency-page.js:234
 msgid "Settings saved."
 msgstr "Postavke su spremljene."
 
-#: admin/multi-currency-admin.js:239
+#: admin/multi-currency-page.js:239
 msgid "Failed to save settings."
 msgstr "Spremanje postavki nije uspjelo."
 
-#: admin/multi-currency-admin.js:271
+#: admin/multi-currency-page.js:271
 msgid "Multi-Currency settings"
 msgstr "Postavke više valuta"
 
