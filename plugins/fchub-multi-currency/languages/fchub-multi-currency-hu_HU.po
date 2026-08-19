@@ -5,7 +5,7 @@ msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
 "currency\n"
-"POT-Creation-Date: 2026-08-19T05:50:59+00:00\n"
+"POT-Creation-Date: 2026-08-19T09:45:38+00:00\n"
 "PO-Revision-Date: 2026-08-19 02:24+0300\n"
 "Last-Translator: \n"
 "Language-Team: Hungarian\n"
@@ -132,7 +132,6 @@ msgid "Cookie (guest)"
 msgstr "Süti (vendég)"
 
 #: app/Domain/Enums/ResolverSource.php:23
-#: admin/components/general-settings.js:225
 msgid "Geolocation"
 msgstr "Helymeghatározás"
 
@@ -562,7 +561,7 @@ msgstr ""
 #: admin/components/general-settings.js:133
 #: admin/components/general-settings.js:170
 #: admin/components/general-settings.js:213
-#: admin/components/general-settings.js:239
+#: admin/components/general-settings.js:237
 msgid "Enabled"
 msgstr "Bekapcsolva"
 
@@ -572,7 +571,7 @@ msgstr "Bekapcsolva"
 #: admin/components/general-settings.js:136
 #: admin/components/general-settings.js:173
 #: admin/components/general-settings.js:216
-#: admin/components/general-settings.js:242
+#: admin/components/general-settings.js:240
 msgid "Disabled"
 msgstr "Kikapcsolva"
 
@@ -908,34 +907,33 @@ msgstr ""
 "Kapcsolja ki, ha azt szeretné, hogy a bejelentkezett felhasználók minden új "
 "látogatáskor az alapértelmezett megjelenítési pénznemet használják."
 
-#: admin/components/general-settings.js:227
-msgid "Coming Soon"
-msgstr "Hamarosan"
+#: admin/components/general-settings.js:225
+msgid "Detect from visitor locale"
+msgstr "Felismerés a látogató területi beállítása alapján"
 
-#: admin/components/general-settings.js:230
+#: admin/components/general-settings.js:228
 msgid ""
-"Automatically detect visitor currency based on their country. Requires a "
-"geolocation provider."
-msgstr ""
-"A látogató pénznemének automatikus felismerése az országa alapján. "
-"Helymeghatározási szolgáltató szükséges hozzá."
+"On a first visit with no saved preference, show the offered currency implied "
+"by the visitor's timezone. Runs entirely in the browser — no lookup service, "
+"nothing stored until they choose."
+msgstr "Első látogatáskor mentett beállítás nélkül a látogató időzónája alapján kínált pénznemet mutatja. Teljes egészében a böngészőben fut — nincs külső szolgáltatás, semmi sem tárolódik, amíg a látogató nem választ."
 
-#: admin/components/general-settings.js:251
+#: admin/components/general-settings.js:249
 msgid "Remove Data on Uninstall"
 msgstr "Adatok törlése eltávolításkor"
 
-#: admin/components/general-settings.js:254
+#: admin/components/general-settings.js:252
 msgid ""
 "If enabled, all tables and settings will be removed when the plugin is "
 "uninstalled."
 msgstr ""
 "Bekapcsolva a bővítmény eltávolításakor minden tábla és beállítás törlődik."
 
-#: admin/components/general-settings.js:263
+#: admin/components/general-settings.js:261
 msgid "Keep data"
 msgstr "Adatok megtartása"
 
-#: admin/components/general-settings.js:266
+#: admin/components/general-settings.js:264
 msgid "Delete all"
 msgstr "Minden törlése"
 
@@ -1843,3 +1841,13 @@ msgstr "árfolyam"
 msgctxt "block keyword"
 msgid "fx"
 msgstr "deviza"
+
+#~ msgid "Coming Soon"
+#~ msgstr "Hamarosan"
+
+#~ msgid ""
+#~ "Automatically detect visitor currency based on their country. Requires a "
+#~ "geolocation provider."
+#~ msgstr ""
+#~ "A látogató pénznemének automatikus felismerése az országa alapján. "
+#~ "Helymeghatározási szolgáltató szükséges hozzá."

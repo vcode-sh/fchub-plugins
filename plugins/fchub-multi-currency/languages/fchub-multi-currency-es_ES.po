@@ -5,7 +5,7 @@ msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
 "currency\n"
-"POT-Creation-Date: 2026-08-19T05:50:59+00:00\n"
+"POT-Creation-Date: 2026-08-19T09:45:38+00:00\n"
 "PO-Revision-Date: 2026-08-18 21:01+0000\n"
 "Last-Translator: \n"
 "Language-Team: Spanish (Spain)\n"
@@ -135,7 +135,6 @@ msgid "Cookie (guest)"
 msgstr "Cookie (visitante)"
 
 #: app/Domain/Enums/ResolverSource.php:23
-#: admin/components/general-settings.js:225
 msgid "Geolocation"
 msgstr "Geolocalización"
 
@@ -565,7 +564,7 @@ msgstr ""
 #: admin/components/general-settings.js:133
 #: admin/components/general-settings.js:170
 #: admin/components/general-settings.js:213
-#: admin/components/general-settings.js:239
+#: admin/components/general-settings.js:237
 msgid "Enabled"
 msgstr "Activado"
 
@@ -575,7 +574,7 @@ msgstr "Activado"
 #: admin/components/general-settings.js:136
 #: admin/components/general-settings.js:173
 #: admin/components/general-settings.js:216
-#: admin/components/general-settings.js:242
+#: admin/components/general-settings.js:240
 msgid "Disabled"
 msgstr "Desactivado"
 
@@ -916,23 +915,22 @@ msgstr ""
 "sesión. Desactívalo si quieres que cada nueva visita de un usuario conectado "
 "utilice la divisa de visualización predeterminada."
 
-#: admin/components/general-settings.js:227
-msgid "Coming Soon"
-msgstr "Próximamente"
+#: admin/components/general-settings.js:225
+msgid "Detect from visitor locale"
+msgstr "Detectar según la configuración regional del visitante"
 
-#: admin/components/general-settings.js:230
+#: admin/components/general-settings.js:228
 msgid ""
-"Automatically detect visitor currency based on their country. Requires a "
-"geolocation provider."
-msgstr ""
-"Detecta automáticamente la divisa del visitante según su país. Requiere un "
-"proveedor de geolocalización."
+"On a first visit with no saved preference, show the offered currency implied "
+"by the visitor's timezone. Runs entirely in the browser — no lookup service, "
+"nothing stored until they choose."
+msgstr "En una primera visita sin preferencia guardada, muestra la moneda ofrecida que sugiere la zona horaria del visitante. Funciona íntegramente en el navegador — sin servicio de consulta, no se guarda nada hasta que elija."
 
-#: admin/components/general-settings.js:251
+#: admin/components/general-settings.js:249
 msgid "Remove Data on Uninstall"
 msgstr "Eliminar los datos al desinstalar"
 
-#: admin/components/general-settings.js:254
+#: admin/components/general-settings.js:252
 msgid ""
 "If enabled, all tables and settings will be removed when the plugin is "
 "uninstalled."
@@ -940,11 +938,11 @@ msgstr ""
 "Si se activa, se eliminarán todas las tablas y los ajustes al desinstalar el "
 "plugin."
 
-#: admin/components/general-settings.js:263
+#: admin/components/general-settings.js:261
 msgid "Keep data"
 msgstr "Conservar los datos"
 
-#: admin/components/general-settings.js:266
+#: admin/components/general-settings.js:264
 msgid "Delete all"
 msgstr "Eliminar todo"
 
@@ -1858,3 +1856,13 @@ msgstr "tipo de cambio"
 msgctxt "block keyword"
 msgid "fx"
 msgstr "fx"
+
+#~ msgid "Coming Soon"
+#~ msgstr "Próximamente"
+
+#~ msgid ""
+#~ "Automatically detect visitor currency based on their country. Requires a "
+#~ "geolocation provider."
+#~ msgstr ""
+#~ "Detecta automáticamente la divisa del visitante según su país. Requiere "
+#~ "un proveedor de geolocalización."

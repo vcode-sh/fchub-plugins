@@ -5,7 +5,7 @@ msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
 "currency\n"
-"POT-Creation-Date: 2026-08-19T05:50:59+00:00\n"
+"POT-Creation-Date: 2026-08-19T09:45:38+00:00\n"
 "PO-Revision-Date: 2026-08-19 01:04+0300\n"
 "Last-Translator: \n"
 "Language-Team: Turkish\n"
@@ -132,7 +132,6 @@ msgid "Cookie (guest)"
 msgstr "Çerez (misafir)"
 
 #: app/Domain/Enums/ResolverSource.php:23
-#: admin/components/general-settings.js:225
 msgid "Geolocation"
 msgstr "Coğrafi konum"
 
@@ -559,7 +558,7 @@ msgstr ""
 #: admin/components/general-settings.js:133
 #: admin/components/general-settings.js:170
 #: admin/components/general-settings.js:213
-#: admin/components/general-settings.js:239
+#: admin/components/general-settings.js:237
 msgid "Enabled"
 msgstr "Etkin"
 
@@ -569,7 +568,7 @@ msgstr "Etkin"
 #: admin/components/general-settings.js:136
 #: admin/components/general-settings.js:173
 #: admin/components/general-settings.js:216
-#: admin/components/general-settings.js:242
+#: admin/components/general-settings.js:240
 msgid "Disabled"
 msgstr "Devre dışı"
 
@@ -905,34 +904,33 @@ msgstr ""
 "ziyarette varsayılan görüntüleme para biriminin kullanılmasını istiyorsanız "
 "bu ayarı devre dışı bırakın."
 
-#: admin/components/general-settings.js:227
-msgid "Coming Soon"
-msgstr "Yakında"
+#: admin/components/general-settings.js:225
+msgid "Detect from visitor locale"
+msgstr "Ziyaretçinin yerel ayarından algıla"
 
-#: admin/components/general-settings.js:230
+#: admin/components/general-settings.js:228
 msgid ""
-"Automatically detect visitor currency based on their country. Requires a "
-"geolocation provider."
-msgstr ""
-"Ziyaretçinin para birimini ülkesine göre otomatik olarak belirleyin. Bir "
-"coğrafi konum sağlayıcısı gerektirir."
+"On a first visit with no saved preference, show the offered currency implied "
+"by the visitor's timezone. Runs entirely in the browser — no lookup service, "
+"nothing stored until they choose."
+msgstr "Kayıtlı tercihi olmayan ilk ziyarette, ziyaretçinin saat diliminin işaret ettiği sunulan para birimini gösterir. Tamamen tarayıcıda çalışır — sorgu servisi yok, ziyaretçi seçene kadar hiçbir şey kaydedilmez."
 
-#: admin/components/general-settings.js:251
+#: admin/components/general-settings.js:249
 msgid "Remove Data on Uninstall"
 msgstr "Kaldırırken verileri sil"
 
-#: admin/components/general-settings.js:254
+#: admin/components/general-settings.js:252
 msgid ""
 "If enabled, all tables and settings will be removed when the plugin is "
 "uninstalled."
 msgstr ""
 "Etkinleştirildiğinde, eklenti kaldırılırken tüm tablolar ve ayarlar silinir."
 
-#: admin/components/general-settings.js:263
+#: admin/components/general-settings.js:261
 msgid "Keep data"
 msgstr "Verileri koru"
 
-#: admin/components/general-settings.js:266
+#: admin/components/general-settings.js:264
 msgid "Delete all"
 msgstr "Tümünü sil"
 
@@ -1840,3 +1838,13 @@ msgstr "kur"
 msgctxt "block keyword"
 msgid "fx"
 msgstr "döviz"
+
+#~ msgid "Coming Soon"
+#~ msgstr "Yakında"
+
+#~ msgid ""
+#~ "Automatically detect visitor currency based on their country. Requires a "
+#~ "geolocation provider."
+#~ msgstr ""
+#~ "Ziyaretçinin para birimini ülkesine göre otomatik olarak belirleyin. Bir "
+#~ "coğrafi konum sağlayıcısı gerektirir."

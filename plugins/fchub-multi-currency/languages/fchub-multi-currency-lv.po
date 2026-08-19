@@ -5,7 +5,7 @@ msgstr ""
 "Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
 "currency\n"
-"POT-Creation-Date: 2026-08-19T05:50:59+00:00\n"
+"POT-Creation-Date: 2026-08-19T09:45:38+00:00\n"
 "PO-Revision-Date: 2026-08-19 02:50+0300\n"
 "Last-Translator: \n"
 "Language-Team: Latvian\n"
@@ -131,7 +131,6 @@ msgid "Cookie (guest)"
 msgstr "Sīkdatne (viesim)"
 
 #: app/Domain/Enums/ResolverSource.php:23
-#: admin/components/general-settings.js:225
 msgid "Geolocation"
 msgstr "Ģeogrāfiskā atrašanās vieta"
 
@@ -561,7 +560,7 @@ msgstr ""
 #: admin/components/general-settings.js:133
 #: admin/components/general-settings.js:170
 #: admin/components/general-settings.js:213
-#: admin/components/general-settings.js:239
+#: admin/components/general-settings.js:237
 msgid "Enabled"
 msgstr "Iespējots"
 
@@ -571,7 +570,7 @@ msgstr "Iespējots"
 #: admin/components/general-settings.js:136
 #: admin/components/general-settings.js:173
 #: admin/components/general-settings.js:216
-#: admin/components/general-settings.js:242
+#: admin/components/general-settings.js:240
 msgid "Disabled"
 msgstr "Atspējots"
 
@@ -906,23 +905,22 @@ msgstr ""
 "ja vēlaties, lai katrā jaunā apmeklējumā pieteiktajiem lietotājiem tiktu "
 "izmantota noklusējuma attēlojuma valūta."
 
-#: admin/components/general-settings.js:227
-msgid "Coming Soon"
-msgstr "Drīzumā"
+#: admin/components/general-settings.js:225
+msgid "Detect from visitor locale"
+msgstr "Noteikt pēc apmeklētāja lokalizācijas"
 
-#: admin/components/general-settings.js:230
+#: admin/components/general-settings.js:228
 msgid ""
-"Automatically detect visitor currency based on their country. Requires a "
-"geolocation provider."
-msgstr ""
-"Automātiski noteikt apmeklētāja valūtu pēc viņa valsts. Nepieciešams "
-"ģeogrāfiskās atrašanās vietas pakalpojuma sniedzējs."
+"On a first visit with no saved preference, show the offered currency implied "
+"by the visitor's timezone. Runs entirely in the browser — no lookup service, "
+"nothing stored until they choose."
+msgstr "Pirmajā apmeklējumā bez saglabātas izvēles tiek rādīta piedāvātā valūta, uz kuru norāda apmeklētāja laika josla. Darbojas pilnībā pārlūkprogrammā — bez uzmeklēšanas pakalpojuma, nekas netiek saglabāts, kamēr apmeklētājs neizvēlas."
 
-#: admin/components/general-settings.js:251
+#: admin/components/general-settings.js:249
 msgid "Remove Data on Uninstall"
 msgstr "Dzēst datus atinstalējot"
 
-#: admin/components/general-settings.js:254
+#: admin/components/general-settings.js:252
 msgid ""
 "If enabled, all tables and settings will be removed when the plugin is "
 "uninstalled."
@@ -930,11 +928,11 @@ msgstr ""
 "Ja šī iespēja ir iespējota, spraudņa atinstalēšanas laikā tiks dzēstas visas "
 "tabulas un iestatījumi."
 
-#: admin/components/general-settings.js:263
+#: admin/components/general-settings.js:261
 msgid "Keep data"
 msgstr "Saglabāt datus"
 
-#: admin/components/general-settings.js:266
+#: admin/components/general-settings.js:264
 msgid "Delete all"
 msgstr "Dzēst visu"
 
@@ -1843,3 +1841,13 @@ msgstr "kurss"
 msgctxt "block keyword"
 msgid "fx"
 msgstr "fx"
+
+#~ msgid "Coming Soon"
+#~ msgstr "Drīzumā"
+
+#~ msgid ""
+#~ "Automatically detect visitor currency based on their country. Requires a "
+#~ "geolocation provider."
+#~ msgstr ""
+#~ "Automātiski noteikt apmeklētāja valūtu pēc viņa valsts. Nepieciešams "
+#~ "ģeogrāfiskās atrašanās vietas pakalpojuma sniedzējs."
