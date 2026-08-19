@@ -1,0 +1,1717 @@
+# Copyright (C) 2026 Vibe Code
+# This file is distributed under the GPLv2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-currency\n"
+"Last-Translator: \n"
+"Language-Team: Czech\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-08-18T19:36:27+00:00\n"
+"PO-Revision-Date: 2026-08-19 00:00+0300\n"
+"X-Generator: GNU gettext 1.0\n"
+"X-Domain: fchub-multi-currency\n"
+"Language: cs_CZ\n"
+"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
+
+#. Plugin Name of the plugin
+#: fchub-multi-currency.php app/Bootstrap/Modules/BlocksModule.php:77
+#: app/GDPR/PersonalDataHandler.php:24 app/GDPR/PersonalDataHandler.php:34
+#: app/Integration/AddonsRegistration.php:23
+msgid "FCHub Multi-Currency"
+msgstr "FCHub Multi-Currency"
+
+#. Plugin URI of the plugin
+#: fchub-multi-currency.php
+msgid "https://fchub.co/docs/fchub-multi-currency"
+msgstr "https://fchub.co/docs/fchub-multi-currency"
+
+#. Description of the plugin
+#: fchub-multi-currency.php
+msgid "Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure"
+msgstr "Zobrazení cen ve více měnách pro FluentCart se správou směnných kurzů a upozorněním v pokladně"
+
+#. Author of the plugin
+#: fchub-multi-currency.php
+msgid "Vibe Code"
+msgstr "Vibe Code"
+
+#. Author URI of the plugin
+#: fchub-multi-currency.php
+msgid "https://x.com/vcode_sh"
+msgstr "https://x.com/vcode_sh"
+
+#: app/Bootstrap/Modules/BlocksModule.php:81
+msgid "Currency Showcase"
+msgstr "Ukázka měn"
+
+#: app/Bootstrap/Modules/BlocksModule.php:83
+msgid "A ready-made showcase of the full currency block family."
+msgstr "Připravená ukázka celé sady měnových bloků."
+
+#: app/Bootstrap/Modules/DiagnosticsModule.php:71
+msgid "FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics page or trigger a manual refresh."
+msgstr "FCHub Multi-Currency: Některé směnné kurzy jsou zastaralé. Zkontrolujte stránku diagnostiky nebo spusťte ruční aktualizaci."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:37
+msgid "Switch the rate provider to Manual rates before saving."
+msgstr "Před uložením změňte poskytovatele kurzů na „Ruční kurzy“."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:43
+msgid "Add at least one display currency before saving manual rates."
+msgstr "Před uložením ručních kurzů přidejte alespoň jednu zobrazovanou měnu."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:48
+msgid "Provide one rate for every configured display currency."
+msgstr "Zadejte kurz pro každou nastavenou zobrazovanou měnu."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:51
+#: app/Domain/Actions/SaveManualRatesAction.php:98
+msgid "Rates may only be saved for configured display currencies."
+msgstr "Kurzy lze uložit pouze pro nastavené zobrazované měny."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:67
+#: app/Http/Controllers/Admin/RatesAdminController.php:104
+#: admin/multi-currency-admin.js:222
+msgid "Manual rates could not be saved."
+msgstr "Ruční kurzy se nepodařilo uložit."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:110
+#: app/Domain/Actions/SaveManualRatesAction.php:117
+msgid "Each manual rate must be a positive decimal string with up to 8 decimal places."
+msgstr "Každý ruční kurz musí být kladné desetinné číslo zapsané jako řetězec s nejvýše 8 desetinnými místy."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:121
+msgid "Each manual rate must be greater than zero."
+msgstr "Každý ruční kurz musí být větší než nula."
+
+#: app/Domain/Enums/RateProvider.php:19 admin/components/rate-settings.js:52
+msgid "ExchangeRate-API (free tier)"
+msgstr "ExchangeRate-API (bezplatný tarif)"
+
+#: app/Domain/Enums/RateProvider.php:20 admin/components/rate-settings.js:55
+msgid "Open Exchange Rates"
+msgstr "Open Exchange Rates"
+
+#: app/Domain/Enums/RateProvider.php:21
+msgid "European Central Bank (EUR base, free)"
+msgstr "Evropská centrální banka (základ EUR, zdarma)"
+
+#: app/Domain/Enums/RateProvider.php:22 admin/components/rate-settings.js:61
+msgid "Manual rates"
+msgstr "Ruční kurzy"
+
+#: app/Domain/Enums/ResolverSource.php:20
+msgid "URL parameter"
+msgstr "Parametr URL"
+
+#: app/Domain/Enums/ResolverSource.php:21
+msgid "User preference"
+msgstr "Předvolba uživatele"
+
+#: app/Domain/Enums/ResolverSource.php:22
+msgid "Cookie (guest)"
+msgstr "Soubor cookie (host)"
+
+#: app/Domain/Enums/ResolverSource.php:23
+#: admin/components/general-settings.js:225
+msgid "Geolocation"
+msgstr "Geolokace"
+
+#: app/Domain/Enums/ResolverSource.php:24
+msgid "Store default"
+msgstr "Výchozí měna obchodu"
+
+#: app/Domain/Enums/RoundingMode.php:20 admin/components/rate-settings.js:143
+msgid "Truncate (no rounding)"
+msgstr "Zkrátit (bez zaokrouhlení)"
+
+#: app/Domain/Enums/RoundingMode.php:21 admin/components/rate-settings.js:146
+msgid "Round half up (standard)"
+msgstr "Poloviny zaokrouhlit nahoru (standardní)"
+
+#: app/Domain/Enums/RoundingMode.php:22 admin/components/rate-settings.js:149
+msgid "Round half down"
+msgstr "Poloviny zaokrouhlit dolů"
+
+#: app/Domain/Enums/RoundingMode.php:23 admin/components/rate-settings.js:152
+msgid "Always round up"
+msgstr "Vždy zaokrouhlit nahoru"
+
+#: app/Domain/Enums/RoundingMode.php:24 admin/components/rate-settings.js:155
+msgid "Always round down"
+msgstr "Vždy zaokrouhlit dolů"
+
+#. translators: {base_currency} is a literal placeholder token replaced with the currency code.
+#: app/Domain/Services/CheckoutDisclosureService.php:33
+msgid "Your payment will be processed in {base_currency}."
+msgstr "Vaše platba bude zpracována v měně {base_currency}."
+
+#. translators: %s is a human-readable time difference, e.g. "2 hours".
+#. translators: %s: human-readable time difference, e.g. "2 hours"
+#: app/Frontend/CurrencyContextPresentation.php:36
+#: app/Frontend/CurrencyContextPresentation.php:312
+#: admin/switcher-preview.js:163
+#, php-format
+msgid "Rates updated %s ago"
+msgstr "Kurzy byly aktualizovány před %s"
+
+#. translators: %1$s is the base currency code, %2$s the exchange rate, %3$s the display currency code.
+#. translators: 1: base currency code, 2: rate, 3: display currency code
+#. translators: 1: base currency code, 2: exchange rate, 3: display currency code
+#: app/Frontend/CurrencyContextPresentation.php:46
+#: app/Frontend/CurrencyContextPresentation.php:201
+#: app/Frontend/CurrencyContextPresentation.php:332
+#: admin/switcher-preview.js:169
+#, php-format
+msgid "1 %1$s = %2$s %3$s"
+msgstr "1 %1$s = %2$s %3$s"
+
+#. translators: %1$s is the base currency code, %2$s the exchange rate, %3$s the display currency code.
+#. translators: 1: base currency code, 2: rate, 3: display currency code
+#: app/Frontend/CurrencyContextPresentation.php:48
+#: app/Frontend/CurrencyContextPresentation.php:194
+#, php-format
+msgid "Current rate: 1 %1$s = %2$s %3$s"
+msgstr "Aktuální kurz: 1 %1$s = %2$s %3$s"
+
+#. translators: %1$s is the display currency code, %2$s the base currency code.
+#. translators: 1: display currency code, 2: base currency code
+#: app/Frontend/CurrencyContextPresentation.php:50
+#: app/Frontend/CurrencyContextPresentation.php:233
+#, php-format
+msgid "Viewing prices in %1$s. Checkout in %2$s."
+msgstr "Ceny jsou zobrazeny v měně %1$s. Platba proběhne v měně %2$s."
+
+#. translators: %1$s is the display currency code, %2$s the base currency code.
+#. translators: 1: display currency code, 2: base currency code
+#: app/Frontend/CurrencyContextPresentation.php:52
+#: app/Frontend/CurrencyContextPresentation.php:227
+#, php-format
+msgid "Prices shown in %1$s are approximate. Checkout is charged in %2$s."
+msgstr "Ceny zobrazené v měně %1$s jsou orientační. Platba bude účtována v měně %2$s."
+
+#: app/Frontend/CurrencyContextPresentation.php:56
+#: app/Frontend/CurrencyContextPresentation.php:326
+msgid "Base currency currently in use."
+msgstr "Právě se používá základní měna."
+
+#. translators: %s is the base currency code.
+#. translators: %s: base currency code
+#: app/Frontend/CurrencyContextPresentation.php:58
+#: app/Frontend/CurrencyContextPresentation.php:351
+#, php-format
+msgid "Display prices only. Checkout is charged in %s."
+msgstr "Měna slouží pouze k zobrazení cen. Platba bude účtována v měně %s."
+
+#: app/Frontend/CurrencyContextPresentation.php:59
+#: app/Frontend/CurrencyContextPresentation.php:345
+msgid "You are viewing the store base currency."
+msgstr "Prohlížíte ceny v základní měně obchodu."
+
+#: app/Frontend/CurrencyContextPresentation.php:60
+msgid "That currency is not available right now."
+msgstr "Tato měna nyní není k dispozici."
+
+#. translators: %s is the display currency name.
+#: app/Frontend/CurrencyContextPresentation.php:65
+#, php-format
+msgid "Prices are now shown in %s."
+msgstr "Ceny se nyní zobrazují v měně %s."
+
+#. translators: %s is a number of minutes.
+#: app/Frontend/CurrencyContextPresentation.php:123
+#, php-format
+msgid "%s min"
+msgid_plural "%s mins"
+msgstr[0] "%s minutou"
+msgstr[1] "%s minutami"
+msgstr[2] "%s minutami"
+
+#. translators: %s is a number of hours.
+#: app/Frontend/CurrencyContextPresentation.php:125
+#: admin/switcher-preview.js:63
+#, php-format
+msgid "%s hour"
+msgid_plural "%s hours"
+msgstr[0] "%s hodinou"
+msgstr[1] "%s hodinami"
+msgstr[2] "%s hodinami"
+
+#. translators: %s is a number of days.
+#: app/Frontend/CurrencyContextPresentation.php:127
+#: admin/switcher-preview.js:64
+#, php-format
+msgid "%s day"
+msgid_plural "%s days"
+msgstr[0] "%s dnem"
+msgstr[1] "%s dny"
+msgstr[2] "%s dny"
+
+#. translators: %s is a number of weeks.
+#: app/Frontend/CurrencyContextPresentation.php:129
+#: admin/switcher-preview.js:65
+#, php-format
+msgid "%s week"
+msgid_plural "%s weeks"
+msgstr[0] "%s týdnem"
+msgstr[1] "%s týdny"
+msgstr[2] "%s týdny"
+
+#. translators: %s is a number of months.
+#: app/Frontend/CurrencyContextPresentation.php:131
+#, php-format
+msgid "%s month"
+msgid_plural "%s months"
+msgstr[0] "%s měsícem"
+msgstr[1] "%s měsíci"
+msgstr[2] "%s měsíci"
+
+#. translators: %s is a number of years.
+#: app/Frontend/CurrencyContextPresentation.php:133
+#, php-format
+msgid "%s year"
+msgid_plural "%s years"
+msgstr[0] "%s rokem"
+msgstr[1] "%s lety"
+msgstr[2] "%s lety"
+
+#: app/Frontend/CurrencySwitcherRenderer.php:310 admin/switcher-preview.js:222
+#: blocks/currency-switcher/editor.js:655
+msgid "Search currency"
+msgstr "Vyhledat měnu"
+
+#: app/Frontend/CurrencySwitcherRenderer.php:315
+#: app/Frontend/CurrencySwitcherRenderer.php:617
+#: admin/components/general-settings.js:114
+msgid "Select currency"
+msgstr "Vyberte měnu"
+
+#: app/Frontend/CurrencySwitcherRenderer.php:637
+msgid "Apply"
+msgstr "Použít"
+
+#: app/GDPR/PersonalDataHandler.php:57
+msgid "Multi-Currency Preferences"
+msgstr "Nastavení více měn"
+
+#: app/GDPR/PersonalDataHandler.php:61
+#: app/Http/Controllers/Admin/DiagnosticsController.php:77
+msgid "Preferred Currency"
+msgstr "Preferovaná měna"
+
+#: app/GDPR/PersonalDataHandler.php:76
+msgid "Multi-Currency Activity"
+msgstr "Aktivita související s měnami"
+
+#: app/GDPR/PersonalDataHandler.php:80
+msgid "Event"
+msgstr "Událost"
+
+#: app/GDPR/PersonalDataHandler.php:84
+msgid "Date"
+msgstr "Datum"
+
+#: app/Http/Controllers/Admin/DiagnosticsController.php:70
+msgid "FluentCRM is not active, so there is nowhere to create the fields."
+msgstr "FluentCRM není aktivní, proto v něm nelze pole vytvořit."
+
+#: app/Http/Controllers/Admin/DiagnosticsController.php:78
+msgid "Last Order Display Currency"
+msgstr "Zobrazovaná měna poslední objednávky"
+
+#: app/Http/Controllers/Admin/DiagnosticsController.php:79
+msgid "Last Order FX Rate"
+msgstr "Směnný kurz poslední objednávky"
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:53
+msgid "Manual rates are saved explicitly and cannot be refreshed."
+msgstr "Ruční kurzy se ukládají přímo a nelze je automaticky aktualizovat."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:69
+msgid "Failed to refresh exchange rates. Check the logs for details."
+msgstr "Směnné kurzy se nepodařilo aktualizovat. Podrobnosti najdete v protokolech."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:77
+msgid "Exchange rates refreshed successfully."
+msgstr "Směnné kurzy byly úspěšně aktualizovány."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:89
+msgid "Provide manual rates as a currency-to-rate object."
+msgstr "Zadejte ruční kurzy jako objekt s měnami a jejich kurzy."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:112
+msgid "Manual rates saved successfully."
+msgstr "Ruční kurzy byly úspěšně uloženy."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:37
+#: app/Http/Controllers/Pub/ContextController.php:110
+msgid "Invalid JSON payload."
+msgstr "Neplatná data JSON."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:52
+msgid "Select a valid exchange-rate provider."
+msgstr "Vyberte platného poskytovatele směnných kurzů."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:105
+msgid "An API key is required for the selected exchange-rate provider."
+msgstr "Vybraný poskytovatel směnných kurzů vyžaduje klíč API."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:136
+msgid "Settings saved successfully."
+msgstr "Nastavení bylo úspěšně uloženo."
+
+#: app/Http/Controllers/Pub/ContextController.php:46
+#: app/Http/Controllers/Pub/ContextController.php:131
+msgid "Invalid currency code."
+msgstr "Neplatný kód měny."
+
+#: app/Http/Controllers/Pub/ContextController.php:75
+msgid "Multi-Currency is disabled."
+msgstr "Funkce více měn je vypnutá."
+
+#: app/Http/Controllers/Pub/ContextController.php:95
+msgid "Too many requests. Please try again later."
+msgstr "Příliš mnoho požadavků. Zkuste to prosím později."
+
+#: app/Http/Controllers/Pub/ContextController.php:120
+msgid "Currency code is required."
+msgstr "Kód měny je povinný."
+
+#: app/Http/Controllers/Pub/ContextController.php:144
+msgid "This currency cannot be selected because no usable exchange rate is available. Please try again later."
+msgstr "Tuto měnu nelze vybrat, protože pro ni není k dispozici použitelný směnný kurz. Zkuste to prosím později."
+
+#: app/Http/Controllers/Pub/ContextController.php:177
+msgid "Currency preference could not be saved because both cookie and account persistence are disabled."
+msgstr "Volbu měny se nepodařilo uložit, protože je vypnuté ukládání do souboru cookie i uživatelského účtu."
+
+#: app/Http/Controllers/Pub/ContextController.php:181
+msgid "Currency preference could not be saved. Cookie persistence is disabled, so logged-out visitors cannot keep a currency choice."
+msgstr "Volbu měny se nepodařilo uložit. Ukládání do souboru cookie je vypnuté, takže odhlášení návštěvníci si volbu měny nemohou zachovat."
+
+#: app/Http/Controllers/Pub/ContextController.php:204
+msgid "Currency preference saved."
+msgstr "Volba měny byla uložena."
+
+#: app/Integration/AddonsRegistration.php:24
+msgid "Display-layer multi-currency with exchange rate management and checkout disclosure."
+msgstr "Zobrazení cen ve více měnách se správou směnných kurzů a upozorněním v pokladně."
+
+#: app/Integration/FluentCrmSmartCodes.php:189
+msgid "Multi-Currency Order"
+msgstr "Měny objednávky"
+
+#: app/Integration/FluentCrmSmartCodes.php:190
+msgid "Currency and exchange rate values captured on the order."
+msgstr "Hodnoty měny a směnného kurzu uložené u objednávky."
+
+#: app/Integration/FluentCrmSmartCodes.php:201
+msgid "Display Currency Code"
+msgstr "Kód zobrazované měny"
+
+#: app/Integration/FluentCrmSmartCodes.php:202
+msgid "Base Currency Code"
+msgstr "Kód základní měny"
+
+#: app/Integration/FluentCrmSmartCodes.php:203
+msgid "Total in Display Currency"
+msgstr "Celkem v zobrazované měně"
+
+#: app/Integration/FluentCrmSmartCodes.php:204
+msgid "Subtotal in Display Currency"
+msgstr "Mezisoučet v zobrazované měně"
+
+#: app/Integration/FluentCrmSmartCodes.php:205
+msgid "Exchange Rate Used"
+msgstr "Použitý směnný kurz"
+
+#: app/Integration/FluentCrmSmartCodes.php:206
+msgid "Checkout Currency Notice"
+msgstr "Upozornění na měnu v pokladně"
+
+#: app/Integration/MultiCurrencySettings.php:39
+msgid "Save Settings"
+msgstr "Uložit nastavení"
+
+#: app/Integration/MultiCurrencySettings.php:40
+msgid "Multi-Currency integration is active"
+msgstr "Integrace více měn je aktivní"
+
+#: app/Integration/MultiCurrencySettings.php:41
+msgid "Multi-Currency integration is disabled"
+msgstr "Integrace více měn je vypnutá"
+
+#: app/Integration/MultiCurrencySettings.php:45
+msgid "Enable Multi-Currency"
+msgstr "Povolit více měn"
+
+#: app/Integration/MultiCurrencySettings.php:46
+#: admin/components/general-settings.js:68
+msgid "Master switch for display-layer multi-currency across the store."
+msgstr "Hlavní přepínač zobrazení cen v různých měnách v celém obchodě."
+
+#: app/Integration/MultiCurrencySettings.php:48
+#: app/Integration/MultiCurrencySettings.php:57
+#: app/Integration/MultiCurrencySettings.php:66
+#: admin/components/crm-settings.js:57
+msgid "Yes"
+msgstr "Ano"
+
+#: app/Integration/MultiCurrencySettings.php:49
+#: app/Integration/MultiCurrencySettings.php:58
+#: app/Integration/MultiCurrencySettings.php:67
+#: admin/components/crm-settings.js:60
+msgid "No"
+msgstr "Ne"
+
+#: app/Integration/MultiCurrencySettings.php:54
+#: admin/components/checkout-settings.js:23
+msgid "Checkout Disclosure"
+msgstr "Upozornění v pokladně"
+
+#: app/Integration/MultiCurrencySettings.php:55
+#: admin/components/checkout-settings.js:26
+msgid "Show a notice at checkout that payment is processed in the base currency."
+msgstr "V pokladně zobrazit upozornění, že platba bude zpracována v základní měně."
+
+#: app/Integration/MultiCurrencySettings.php:63
+#: admin/components/crm-settings.js:23
+msgid "FluentCRM Sync"
+msgstr "Synchronizace s FluentCRM"
+
+#: app/Integration/MultiCurrencySettings.php:64
+msgid "Tag contacts in FluentCRM based on their currency preference."
+msgstr "Označovat kontakty ve FluentCRM štítky podle jejich preferované měny."
+
+#: app/Integration/MultiCurrencySettings.php:72
+msgid "Full Settings"
+msgstr "Kompletní nastavení"
+
+#: app/Integration/MultiCurrencySettings.php:73
+msgid "Configure currencies, exchange rates, checkout disclosure, and more."
+msgstr "Nastavte měny, směnné kurzy, upozornění v pokladně a další možnosti."
+
+#: app/Integration/MultiCurrencySettings.php:98
+msgid "Multi-Currency settings saved."
+msgstr "Nastavení více měn bylo uloženo."
+
+#: app/Support/AdminMenu.php:19 admin/multi-currency-admin.js:107
+#: admin/multi-currency-admin.js:259 admin/multi-currency-admin.js:327
+#: admin/multi-currency-admin.js:385
+msgid "Multi-Currency"
+msgstr "Více měn"
+
+#. translators: %d is the number of hours between rate refreshes
+#: fchub-multi-currency.php:89
+#, php-format
+msgid "Every %d Hours"
+msgstr "Každých %d hodin"
+
+#: fchub-multi-currency.php:175
+msgid "FCHub Multi-Currency requires FluentCart to be installed and activated."
+msgstr "FCHub Multi-Currency vyžaduje nainstalovaný a aktivovaný FluentCart."
+
+#: admin/components/checkout-settings.js:35
+#: admin/components/checkout-settings.js:78 admin/components/crm-settings.js:35
+#: admin/components/crm-settings.js:129 admin/components/general-settings.js:77
+#: admin/components/general-settings.js:133
+#: admin/components/general-settings.js:170
+#: admin/components/general-settings.js:213
+#: admin/components/general-settings.js:239
+msgid "Enabled"
+msgstr "Zapnuto"
+
+#: admin/components/checkout-settings.js:38
+#: admin/components/checkout-settings.js:81 admin/components/crm-settings.js:38
+#: admin/components/crm-settings.js:132 admin/components/general-settings.js:80
+#: admin/components/general-settings.js:136
+#: admin/components/general-settings.js:173
+#: admin/components/general-settings.js:216
+#: admin/components/general-settings.js:242
+msgid "Disabled"
+msgstr "Vypnuto"
+
+#: admin/components/checkout-settings.js:48
+msgid "Disclosure Text"
+msgstr "Text upozornění"
+
+#: admin/components/checkout-settings.js:51
+msgid "Supports placeholders: {base_currency}, {display_currency}, {rate}"
+msgstr "Podporované zástupné řetězce: {base_currency}, {display_currency}, {rate}"
+
+#: admin/components/checkout-settings.js:66
+msgid "Rate Freshness Badge"
+msgstr "Indikátor aktuálnosti kurzů"
+
+#: admin/components/checkout-settings.js:69
+msgid "Global gate for the rates-updated badge. When disabled, no surface shows it — including the switcher dropdown footer."
+msgstr "Hlavní přepínač indikátoru aktualizace kurzů. Po vypnutí se indikátor nikde nezobrazí — ani v zápatí rozbalovací nabídky přepínače."
+
+#: admin/components/crm-settings.js:26
+msgid "Tag contacts and update custom fields based on currency preference."
+msgstr "Označovat kontakty štítky a aktualizovat vlastní pole podle preferované měny."
+
+#: admin/components/crm-settings.js:48
+msgid "Auto-create Tags"
+msgstr "Automatické vytváření štítků"
+
+#: admin/components/crm-settings.js:51
+msgid "Automatically create tags for each currency."
+msgstr "Automaticky vytvořit štítek pro každou měnu."
+
+#: admin/components/crm-settings.js:69
+msgid "Tag Prefix"
+msgstr "Předpona štítku"
+
+#: admin/components/crm-settings.js:72
+msgid "Tags created as {prefix}{CODE}, e.g. currency:EUR"
+msgstr "Štítky se vytvoří ve tvaru {prefix}{CODE}, např. currency:EUR"
+
+#: admin/components/crm-settings.js:83
+msgid "Preferred Currency Field"
+msgstr "Pole preferované měny"
+
+#: admin/components/crm-settings.js:94
+msgid "Last Order Currency Field"
+msgstr "Pole měny poslední objednávky"
+
+#: admin/components/crm-settings.js:105
+msgid "Last Order FX Rate Field"
+msgstr "Pole směnného kurzu poslední objednávky"
+
+#: admin/components/crm-settings.js:115
+msgid "FluentCommunity"
+msgstr "FluentCommunity"
+
+#: admin/components/crm-settings.js:120
+msgid "FluentCommunity Sync"
+msgstr "Synchronizace s FluentCommunity"
+
+#: admin/components/crm-settings.js:123
+msgid "Sync currency preference to FluentCommunity user meta."
+msgstr "Synchronizovat preferovanou měnu do uživatelských metadat FluentCommunity."
+
+#: admin/components/currency-settings.js:113
+msgid "Search and add a currency…"
+msgstr "Vyhledejte a přidejte měnu…"
+
+#: admin/components/currency-settings.js:130
+msgid "Currency"
+msgstr "Měna"
+
+#: admin/components/currency-settings.js:133
+#: admin/components/switcher-settings.js:128
+#: blocks/currency-switcher/editor.js:817
+msgid "Symbol"
+msgstr "Symbol"
+
+#: admin/components/currency-settings.js:136
+msgid "Decimals"
+msgstr "Desetinná místa"
+
+#: admin/components/currency-settings.js:139
+msgid "Decimal"
+msgstr "Desetinný oddělovač"
+
+#: admin/components/currency-settings.js:142
+msgid "Thousands"
+msgstr "Oddělovač tisíců"
+
+#: admin/components/currency-settings.js:145
+msgid "Position"
+msgstr "Umístění"
+
+#: admin/components/currency-settings.js:153
+msgid "Drag to reorder"
+msgstr "Přetažením změňte pořadí"
+
+#: admin/components/currency-settings.js:172
+#: admin/components/currency-settings.js:185
+#: blocks/currency-switcher/editor.js:531
+#: blocks/currency-switcher/editor.js:543
+#: blocks/currency-switcher/editor.js:608
+msgid "Auto"
+msgstr "Automaticky"
+
+#: admin/components/currency-settings.js:175
+#: admin/components/currency-settings.js:191
+msgid "Dot (.)"
+msgstr "Tečka (.)"
+
+#: admin/components/currency-settings.js:178
+#: admin/components/currency-settings.js:188
+msgid "Comma (,)"
+msgstr "Čárka (,)"
+
+#: admin/components/currency-settings.js:194
+msgid "Space"
+msgstr "Mezera"
+
+#: admin/components/currency-settings.js:197
+msgid "None"
+msgstr "Žádný"
+
+#: admin/components/currency-settings.js:204
+msgid "Left ($100)"
+msgstr "Vlevo ($100)"
+
+#: admin/components/currency-settings.js:207
+msgid "Right (100$)"
+msgstr "Vpravo (100$)"
+
+#: admin/components/currency-settings.js:210
+msgid "Left space ($ 100)"
+msgstr "Vlevo s mezerou ($ 100)"
+
+#: admin/components/currency-settings.js:213
+msgid "Right space (100 $)"
+msgstr "Vpravo s mezerou (100 $)"
+
+#: admin/components/currency-settings.js:225
+msgid "No display currencies added yet. Use the picker above to add currencies."
+msgstr "Zatím nebyly přidány žádné zobrazované měny. Přidejte je pomocí výběru výše."
+
+#: admin/components/diagnostics-view.js:24
+msgid "Available"
+msgstr "K dispozici"
+
+#: admin/components/diagnostics-view.js:25
+#: admin/components/diagnostics-view.js:85
+msgid "Missing"
+msgstr "Chybí"
+
+#: admin/components/diagnostics-view.js:26
+msgid "Active"
+msgstr "Aktivní"
+
+#: admin/components/diagnostics-view.js:27
+msgid "Not found"
+msgstr "Nenalezeno"
+
+#: admin/components/diagnostics-view.js:28
+msgid "On"
+msgstr "Zapnuto"
+
+#: admin/components/diagnostics-view.js:29
+#: admin/components/switcher-settings.js:179
+#: blocks/currency-switcher/editor.js:505
+msgid "Off"
+msgstr "Vypnuto"
+
+#: admin/components/diagnostics-view.js:53
+msgid "Plugin"
+msgstr "Plugin"
+
+#: admin/components/diagnostics-view.js:56
+msgid "Version"
+msgstr "Verze"
+
+#: admin/components/diagnostics-view.js:59
+msgid "DB Version"
+msgstr "Verze databáze"
+
+#: admin/components/diagnostics-view.js:62
+#: admin/components/general-settings.js:89
+msgid "Base Currency"
+msgstr "Základní měna"
+
+#: admin/components/diagnostics-view.js:71
+msgid "Dependencies"
+msgstr "Závislosti"
+
+#: admin/components/diagnostics-view.js:77
+msgid "FluentCRM Custom Fields"
+msgstr "Vlastní pole FluentCRM"
+
+#: admin/components/diagnostics-view.js:82
+msgid "Found"
+msgstr "Nalezeno"
+
+#: admin/components/diagnostics-view.js:88
+msgid "Unknown"
+msgstr "Neznámé"
+
+#: admin/components/diagnostics-view.js:93
+msgid "Create missing fields"
+msgstr "Vytvořit chybějící pole"
+
+#: admin/components/diagnostics-view.js:102
+msgid "Rates"
+msgstr "Kurzy"
+
+#: admin/components/diagnostics-view.js:105
+msgid "Total rates"
+msgstr "Celkem kurzů"
+
+#: admin/components/diagnostics-view.js:108
+msgid "Stale rates"
+msgstr "Zastaralé kurzy"
+
+#: admin/components/diagnostics-view.js:115
+msgid "Feature Flags"
+msgstr "Přepínače funkcí"
+
+#: admin/components/diagnostics-view.js:126
+msgid "Switcher Events"
+msgstr "Události přepínače"
+
+#: admin/components/diagnostics-view.js:134
+msgid "No event data yet."
+msgstr "Zatím nejsou k dispozici žádná data událostí."
+
+#: admin/components/diagnostics-view.js:142
+msgid "Top Switched Currencies"
+msgstr "Nejčastěji volené měny"
+
+#: admin/components/diagnostics-view.js:150
+msgid "No switch data yet."
+msgstr "Zatím nejsou k dispozici žádná data o změnách měny."
+
+#: admin/components/diagnostics-view.js:158
+msgid "No diagnostics data."
+msgstr "Nejsou k dispozici žádná diagnostická data."
+
+#: admin/components/general-settings.js:44
+msgid "Same as base currency (%s) — recommended"
+msgstr "Stejná jako základní měna (%s) — doporučeno"
+
+#: admin/components/general-settings.js:45
+msgid "store base"
+msgstr "základní měna obchodu"
+
+#: admin/components/general-settings.js:65
+msgid "Multi-Currency Enabled"
+msgstr "Více měn povoleno"
+
+#: admin/components/general-settings.js:92
+msgid "Managed in FluentCart Store Setup. Checkout and payment gateways use this currency."
+msgstr "Spravuje se v nastavení obchodu FluentCart. V této měně probíhá platba v pokladně a používají ji platební brány."
+
+#: admin/components/general-settings.js:106
+msgid "Default Display Currency"
+msgstr "Výchozí zobrazovaná měna"
+
+#: admin/components/general-settings.js:109
+msgid "Currency shown to visitors before any preference is detected."
+msgstr "Měna zobrazená návštěvníkům, dokud není zjištěna jejich volba."
+
+#: admin/components/general-settings.js:124
+msgid "URL Parameter"
+msgstr "Parametr URL"
+
+#: admin/components/general-settings.js:127
+msgid "Allow currency switching via URL (e.g. ?currency=EUR)."
+msgstr "Povolit změnu měny pomocí adresy URL (např. ?currency=EUR)."
+
+#: admin/components/general-settings.js:146
+msgid "URL Parameter Key"
+msgstr "Klíč parametru URL"
+
+#: admin/components/general-settings.js:158
+msgid "Cookie Persistence"
+msgstr "Ukládání do souboru cookie"
+
+#: admin/components/general-settings.js:161
+msgid "Remember a guest currency in a cookie and matching browser-storage fallback. Disable this and logged-out visitors cannot keep a currency choice at all — the switch is reported as failed rather than silently ignored."
+msgstr "Zapamatovat měnu návštěvníka v souboru cookie a odpovídajícím záložním úložišti prohlížeče. Po vypnutí si odhlášení návštěvníci nebudou moci volbu měny vůbec zachovat — změna bude nahlášena jako neúspěšná, nikoli bez upozornění ignorována."
+
+#: admin/components/general-settings.js:177
+msgid "Currency switching is now a logged-in-only feature. Guests will be told their preference could not be saved."
+msgstr "Měnu nyní mohou měnit pouze přihlášení uživatelé. Nepřihlášení návštěvníci dostanou upozornění, že jejich volbu nelze uložit."
+
+#: admin/components/general-settings.js:189
+msgid "Cookie Lifetime (days)"
+msgstr "Platnost souboru cookie (dny)"
+
+#: admin/components/general-settings.js:201
+msgid "Account Persistence"
+msgstr "Ukládání do účtu"
+
+#: admin/components/general-settings.js:204
+msgid "Remember currency preference in the logged-in user account. Disable this if you want logged-in sessions to respect the default display currency on every fresh visit."
+msgstr "Zapamatovat preferovanou měnu v účtu přihlášeného uživatele. Vypněte, pokud mají přihlášení uživatelé při každé nové návštěvě používat výchozí zobrazovanou měnu."
+
+#: admin/components/general-settings.js:227
+msgid "Coming Soon"
+msgstr "Již brzy"
+
+#: admin/components/general-settings.js:230
+msgid "Automatically detect visitor currency based on their country. Requires a geolocation provider."
+msgstr "Automaticky zjistit měnu návštěvníka podle jeho země. Vyžaduje poskytovatele geolokace."
+
+#: admin/components/general-settings.js:251
+msgid "Remove Data on Uninstall"
+msgstr "Odstranit data při odinstalaci"
+
+#: admin/components/general-settings.js:254
+msgid "If enabled, all tables and settings will be removed when the plugin is uninstalled."
+msgstr "Po zapnutí budou při odinstalaci pluginu odstraněny všechny tabulky a nastavení."
+
+#: admin/components/general-settings.js:263
+msgid "Keep data"
+msgstr "Ponechat data"
+
+#: admin/components/general-settings.js:266
+msgid "Delete all"
+msgstr "Smazat vše"
+
+#: admin/components/rate-settings.js:28
+msgid "Stale"
+msgstr "Zastaralý"
+
+#: admin/components/rate-settings.js:29
+msgid "OK"
+msgstr "V pořádku"
+
+#: admin/components/rate-settings.js:30
+msgid "No manual rates saved yet."
+msgstr "Zatím nejsou uloženy žádné ruční kurzy."
+
+#: admin/components/rate-settings.js:31
+msgid "No exchange rates yet. Add display currencies and trigger a refresh."
+msgstr "Zatím nejsou k dispozici žádné směnné kurzy. Přidejte zobrazované měny a spusťte aktualizaci."
+
+#: admin/components/rate-settings.js:43
+msgid "Rate Provider"
+msgstr "Poskytovatel kurzů"
+
+#: admin/components/rate-settings.js:46
+msgid "Service used to fetch exchange rates."
+msgstr "Služba používaná k načítání směnných kurzů."
+
+#: admin/components/rate-settings.js:58
+msgid "European Central Bank (free)"
+msgstr "Evropská centrální banka (zdarma)"
+
+#: admin/components/rate-settings.js:71
+msgid "API Key"
+msgstr "Klíč API"
+
+#: admin/components/rate-settings.js:84
+msgid "Refresh Interval (hours)"
+msgstr "Interval aktualizace (v hodinách)"
+
+#: admin/components/rate-settings.js:87
+msgid "How often to fetch new exchange rates."
+msgstr "Jak často načítat nové směnné kurzy."
+
+#: admin/components/rate-settings.js:99
+msgid "Stale Threshold (hours)"
+msgstr "Limit stáří kurzu (v hodinách)"
+
+#: admin/components/rate-settings.js:102
+msgid "Rates older than this will trigger an admin warning."
+msgstr "Kurzy starší než tento limit vyvolají upozornění pro správce."
+
+#: admin/components/rate-settings.js:113
+msgid "Stale Rate Fallback"
+msgstr "Postup při zastaralém kurzu"
+
+#: admin/components/rate-settings.js:116
+msgid "What to do when rates are outdated beyond the threshold."
+msgstr "Co udělat, když jsou kurzy starší než nastavený limit."
+
+#: admin/components/rate-settings.js:122
+msgid "Show base currency"
+msgstr "Zobrazit základní měnu"
+
+#: admin/components/rate-settings.js:125
+msgid "Use last known rate"
+msgstr "Použít poslední známý kurz"
+
+#: admin/components/rate-settings.js:134
+msgid "Rounding Mode"
+msgstr "Způsob zaokrouhlení"
+
+#: admin/components/rate-settings.js:137
+msgid "How converted prices are rounded."
+msgstr "Jak se zaokrouhlují přepočtené ceny."
+
+#: admin/components/rate-settings.js:162
+msgid "Manual Rates"
+msgstr "Ruční kurzy"
+
+#: admin/components/rate-settings.js:165
+msgid "Save the provider change before entering manual rates."
+msgstr "Před zadáním ručních kurzů uložte změnu poskytovatele."
+
+#: admin/components/rate-settings.js:168
+msgid "Add and save at least one display currency first."
+msgstr "Nejprve přidejte a uložte alespoň jednu zobrazovanou měnu."
+
+#: admin/components/rate-settings.js:181
+msgid "Current Rates"
+msgstr "Aktuální kurzy"
+
+#: admin/components/rate-settings.js:184
+msgid "Save Manual Rates"
+msgstr "Uložit ruční kurzy"
+
+#: admin/components/rate-settings.js:187
+msgid "Refresh Now"
+msgstr "Aktualizovat nyní"
+
+#: admin/components/rate-settings.js:192
+msgid "Base"
+msgstr "Základní měna"
+
+#: admin/components/rate-settings.js:195
+msgid "Quote"
+msgstr "Kotovaná měna"
+
+#: admin/components/rate-settings.js:198
+msgid "Rate"
+msgstr "Kurz"
+
+#: admin/components/rate-settings.js:201
+msgid "Provider"
+msgstr "Poskytovatel"
+
+#: admin/components/rate-settings.js:204
+msgid "Fetched"
+msgstr "Načteno"
+
+#: admin/components/rate-settings.js:207
+msgid "Status"
+msgstr "Stav"
+
+#: admin/components/switcher-settings.js:48
+msgid "Default Preset"
+msgstr "Výchozí předvolba"
+
+#: admin/components/switcher-settings.js:51
+msgid "Visual style used by switcher blocks that inherit global defaults."
+msgstr "Vzhled bloků přepínače, které přebírají globální výchozí nastavení."
+
+#: admin/components/switcher-settings.js:60
+#: blocks/currency-switcher/editor.js:406
+msgid "Default"
+msgstr "Výchozí"
+
+#: admin/components/switcher-settings.js:63
+#: blocks/currency-switcher/editor.js:407
+msgid "Pill"
+msgstr "Oválný"
+
+#: admin/components/switcher-settings.js:66
+#: blocks/currency-switcher/editor.js:408
+msgid "Minimal"
+msgstr "Minimalistický"
+
+#: admin/components/switcher-settings.js:69
+#: blocks/currency-switcher/editor.js:409
+msgid "Subtle"
+msgstr "Jemný"
+
+#: admin/components/switcher-settings.js:72
+#: blocks/currency-switcher/editor.js:410
+msgid "Glass"
+msgstr "Skleněný"
+
+#: admin/components/switcher-settings.js:75
+#: blocks/currency-switcher/editor.js:411
+msgid "Contrast"
+msgstr "Kontrastní"
+
+#: admin/components/switcher-settings.js:84
+msgid "Label Position"
+msgstr "Umístění popisku"
+
+#: admin/components/switcher-settings.js:87
+msgid "Where the optional label should sit relative to the switcher."
+msgstr "Kde má být volitelný popisek umístěn vzhledem k přepínači."
+
+#: admin/components/switcher-settings.js:93
+#: blocks/currency-switcher/editor.js:425
+msgid "Before"
+msgstr "Před"
+
+#: admin/components/switcher-settings.js:96
+#: blocks/currency-switcher/editor.js:426
+msgid "After"
+msgstr "Za"
+
+#: admin/components/switcher-settings.js:99
+#: blocks/currency-switcher/editor.js:427
+msgid "Above"
+msgstr "Nad"
+
+#: admin/components/switcher-settings.js:102
+#: blocks/currency-switcher/editor.js:428
+msgid "Below"
+msgstr "Pod"
+
+#: admin/components/switcher-settings.js:109
+msgid "Trigger Content"
+msgstr "Obsah tlačítka"
+
+#: admin/components/switcher-settings.js:114
+msgid "Trigger Elements"
+msgstr "Prvky tlačítka"
+
+#: admin/components/switcher-settings.js:117
+msgid "Choose what appears in the closed switcher button."
+msgstr "Vyberte, co se zobrazí na tlačítku sbaleného přepínače."
+
+#: admin/components/switcher-settings.js:122
+msgid "Flag"
+msgstr "Vlajka"
+
+#: admin/components/switcher-settings.js:125
+#: blocks/currency-switcher/editor.js:816
+msgid "Code"
+msgstr "Kód"
+
+#: admin/components/switcher-settings.js:131
+#: blocks/currency-switcher/editor.js:818
+msgid "Name"
+msgstr "Název"
+
+#: admin/components/switcher-settings.js:137
+msgid "Dropdown Content"
+msgstr "Obsah rozbalovací nabídky"
+
+#: admin/components/switcher-settings.js:142
+msgid "Option Elements"
+msgstr "Prvky položek"
+
+#: admin/components/switcher-settings.js:145
+msgid "Choose what each currency row displays inside the dropdown."
+msgstr "Vyberte, co se zobrazí na každém řádku měny v rozbalovací nabídce."
+
+#: admin/components/switcher-settings.js:150
+msgid "Flags"
+msgstr "Vlajky"
+
+#: admin/components/switcher-settings.js:153
+msgid "Codes"
+msgstr "Kódy"
+
+#: admin/components/switcher-settings.js:156
+msgid "Symbols"
+msgstr "Symboly"
+
+#: admin/components/switcher-settings.js:159
+msgid "Names"
+msgstr "Názvy"
+
+#: admin/components/switcher-settings.js:162
+msgid "Active check"
+msgstr "Označení aktivní měny"
+
+#: admin/components/switcher-settings.js:170
+msgid "Search Mode"
+msgstr "Režim vyhledávání"
+
+#: admin/components/switcher-settings.js:173
+msgid "Useful when you expose more than a handful of currencies."
+msgstr "Užitečné, pokud nabízíte více než několik měn."
+
+#: admin/components/switcher-settings.js:182
+#: blocks/currency-switcher/editor.js:506
+msgid "Inline search"
+msgstr "Vyhledávání v nabídce"
+
+#: admin/components/switcher-settings.js:191
+msgid "Favorite Currencies"
+msgstr "Oblíbené měny"
+
+#: admin/components/switcher-settings.js:194
+msgid "Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
+msgstr "Kódy ISO oddělené čárkami, připnuté nad ostatními, například: EUR, USD, GBP"
+
+#: admin/components/switcher-settings.js:204
+#: blocks/currency-switcher/editor.js:521
+#: blocks/currency-switcher/editor.js:961
+msgid "Show favorites first"
+msgstr "Zobrazit oblíbené jako první"
+
+#: admin/components/switcher-settings.js:213
+msgid "Layout Defaults"
+msgstr "Výchozí rozvržení"
+
+#: admin/components/switcher-settings.js:216
+msgid "Baseline geometry for inheriting switcher blocks."
+msgstr "Výchozí rozměry bloků přepínače, které přebírají globální nastavení."
+
+#: admin/components/switcher-settings.js:222
+#: blocks/currency-switcher/editor.js:593
+msgid "Size"
+msgstr "Velikost"
+
+#: admin/components/switcher-settings.js:226
+#: blocks/currency-switcher/editor.js:596
+msgid "Small"
+msgstr "Malá"
+
+#: admin/components/switcher-settings.js:229
+#: blocks/currency-switcher/editor.js:597
+msgid "Medium"
+msgstr "Střední"
+
+#: admin/components/switcher-settings.js:232
+#: blocks/currency-switcher/editor.js:598
+msgid "Large"
+msgstr "Velká"
+
+#: admin/components/switcher-settings.js:238
+#: blocks/currency-switcher/editor.js:605
+msgid "Width"
+msgstr "Šířka"
+
+#: admin/components/switcher-settings.js:242
+msgid "Auto width"
+msgstr "Automatická šířka"
+
+#: admin/components/switcher-settings.js:245
+#: blocks/currency-switcher/editor.js:609
+msgid "Full width"
+msgstr "Plná šířka"
+
+#: admin/components/switcher-settings.js:251
+#: blocks/currency-switcher/editor.js:528
+msgid "Dropdown position"
+msgstr "Umístění rozbalovací nabídky"
+
+#: admin/components/switcher-settings.js:255
+msgid "Auto position"
+msgstr "Automatické umístění"
+
+#: admin/components/switcher-settings.js:258
+#: blocks/currency-switcher/editor.js:532
+msgid "Start"
+msgstr "Na začátku"
+
+#: admin/components/switcher-settings.js:261
+#: blocks/currency-switcher/editor.js:533
+msgid "End"
+msgstr "Na konci"
+
+#: admin/components/switcher-settings.js:267
+#: blocks/currency-switcher/editor.js:540
+msgid "Dropdown direction"
+msgstr "Směr rozbalovací nabídky"
+
+#: admin/components/switcher-settings.js:271
+msgid "Auto direction"
+msgstr "Automatický směr"
+
+#: admin/components/switcher-settings.js:274
+#: blocks/currency-switcher/editor.js:544
+msgid "Down"
+msgstr "Dolů"
+
+#: admin/components/switcher-settings.js:277
+#: blocks/currency-switcher/editor.js:545
+msgid "Up"
+msgstr "Nahoru"
+
+#: admin/components/switcher-settings.js:287
+#: blocks/currency-switcher/editor.js:554
+msgid "Footer Context"
+msgstr "Informace v zápatí"
+
+#: admin/components/switcher-settings.js:290
+msgid "Optional trust-building context shown at the bottom of the dropdown. The freshness badge also requires the global Rate Freshness Badge gate on the Checkout tab."
+msgstr "Volitelné informace pro zvýšení důvěryhodnosti, zobrazené ve spodní části nabídky. Indikátor aktuálnosti navíc vyžaduje zapnutý hlavní přepínač „Indikátor aktuálnosti kurzů“ na kartě „Pokladna“."
+
+#: admin/components/switcher-settings.js:298
+msgid "Freshness badge"
+msgstr "Indikátor aktuálnosti"
+
+#: admin/components/switcher-settings.js:301
+msgid "Rate value"
+msgstr "Hodnota kurzu"
+
+#: admin/components/switcher-settings.js:304
+msgid "Checkout context"
+msgstr "Měna platby"
+
+#: admin/multi-currency-admin.js:47
+msgid "Network error. Please check your connection."
+msgstr "Chyba sítě. Zkontrolujte prosím své připojení."
+
+#: admin/multi-currency-admin.js:78
+msgid "Save"
+msgstr "Uložit"
+
+#: admin/multi-currency-admin.js:79
+msgid "Saving..."
+msgstr "Ukládání…"
+
+#: admin/multi-currency-admin.js:82
+msgid "General"
+msgstr "Obecné"
+
+#: admin/multi-currency-admin.js:83
+msgid "Currencies"
+msgstr "Měny"
+
+#: admin/multi-currency-admin.js:84
+msgid "Exchange Rates"
+msgstr "Směnné kurzy"
+
+#: admin/multi-currency-admin.js:85
+msgid "Switcher"
+msgstr "Přepínač"
+
+#: admin/multi-currency-admin.js:86
+msgid "Checkout"
+msgstr "Pokladna"
+
+#: admin/multi-currency-admin.js:87
+msgid "CRM"
+msgstr "CRM"
+
+#: admin/multi-currency-admin.js:88
+msgid "Diagnostics"
+msgstr "Diagnostika"
+
+#: admin/multi-currency-admin.js:130
+msgid "Failed to load settings."
+msgstr "Nastavení se nepodařilo načíst."
+
+#: admin/multi-currency-admin.js:156
+msgid "Failed to load exchange rates."
+msgstr "Směnné kurzy se nepodařilo načíst."
+
+#: admin/multi-currency-admin.js:171
+msgid "Failed to load diagnostics."
+msgstr "Diagnostiku se nepodařilo načíst."
+
+#: admin/multi-currency-admin.js:185
+msgid "FluentCRM fields created."
+msgstr "Pole FluentCRM byla vytvořena."
+
+#: admin/multi-currency-admin.js:189
+msgid "Could not create the FluentCRM fields."
+msgstr "Pole FluentCRM se nepodařilo vytvořit."
+
+#: admin/multi-currency-admin.js:200
+msgid "Rates refreshed."
+msgstr "Kurzy byly aktualizovány."
+
+#: admin/multi-currency-admin.js:204
+msgid "Rate refresh failed."
+msgstr "Aktualizace kurzů se nezdařila."
+
+#: admin/multi-currency-admin.js:218
+msgid "Manual rates saved."
+msgstr "Ruční kurzy byly uloženy."
+
+#: admin/multi-currency-admin.js:234
+msgid "Settings saved."
+msgstr "Nastavení bylo uloženo."
+
+#: admin/multi-currency-admin.js:239
+msgid "Failed to save settings."
+msgstr "Nastavení se nepodařilo uložit."
+
+#: admin/multi-currency-admin.js:271
+msgid "Multi-Currency settings"
+msgstr "Nastavení více měn"
+
+#: admin/switcher-preview.js:26
+msgid "US Dollar"
+msgstr "Americký dolar"
+
+#: admin/switcher-preview.js:32
+msgid "Euro"
+msgstr "Euro"
+
+#: admin/switcher-preview.js:38
+msgid "British Pound"
+msgstr "Britská libra"
+
+#: admin/switcher-preview.js:62
+msgid "%s minute"
+msgid_plural "%s minutes"
+msgstr[0] "%s minutou"
+msgstr[1] "%s minutami"
+msgstr[2] "%s minutami"
+
+#. translators: %1$s is the number of currencies shown, %2$s the total configured.
+#: admin/switcher-preview.js:118
+msgid "Showing %1$s of %2$s currencies. The full list appears on the frontend — this is just a taste."
+msgstr "Zobrazeny jsou %1$s z %2$s měn. Úplný seznam se zobrazí na webu — zde je jen malá ukázka."
+
+#: admin/switcher-preview.js:179
+msgid "Display prices only. Checkout charged in %s."
+msgstr "Měna slouží pouze k zobrazení cen. Platba bude účtována v měně %s."
+
+#: admin/switcher-preview.js:182
+msgid "Display prices only. Checkout is charged in the store currency."
+msgstr "Měna slouží pouze k zobrazení cen. Platba bude účtována v měně obchodu."
+
+#: admin/switcher-preview.js:206
+msgid "Preview"
+msgstr "Náhled"
+
+#: blocks/currency-switcher/editor.js:374
+msgid "Source"
+msgstr "Zdroj"
+
+#: blocks/currency-switcher/editor.js:376
+msgid "Use global switcher defaults"
+msgstr "Použít globální výchozí nastavení přepínače"
+
+#: blocks/currency-switcher/editor.js:383
+msgid "Label"
+msgstr "Popisek"
+
+#: blocks/currency-switcher/editor.js:391
+msgid "This block inherits its switcher behavior from the global defaults in Multi-Currency settings. Only the label stays instance-specific."
+msgstr "Tento blok přebírá chování přepínače z globálního výchozího nastavení více měn. Pouze popisek zůstává specifický pro tento blok."
+
+#: blocks/currency-switcher/editor.js:401
+#: blocks/currency-switcher/editor.js:403
+msgid "Preset"
+msgstr "Předvolba"
+
+#: blocks/currency-switcher/editor.js:420
+msgid "Trigger"
+msgstr "Tlačítko"
+
+#: blocks/currency-switcher/editor.js:422
+msgid "Label position"
+msgstr "Umístění popisku"
+
+#: blocks/currency-switcher/editor.js:435
+msgid "Show trigger flag"
+msgstr "Zobrazit vlajku na tlačítku"
+
+#: blocks/currency-switcher/editor.js:442
+msgid "Show trigger code"
+msgstr "Zobrazit kód na tlačítku"
+
+#: blocks/currency-switcher/editor.js:449
+msgid "Show trigger symbol"
+msgstr "Zobrazit symbol na tlačítku"
+
+#: blocks/currency-switcher/editor.js:456
+msgid "Show trigger name"
+msgstr "Zobrazit název na tlačítku"
+
+#: blocks/currency-switcher/editor.js:465
+msgid "Dropdown"
+msgstr "Rozbalovací nabídka"
+
+#: blocks/currency-switcher/editor.js:467
+msgid "Show option flags"
+msgstr "Zobrazit vlajky u položek"
+
+#: blocks/currency-switcher/editor.js:474
+msgid "Show option codes"
+msgstr "Zobrazit kódy u položek"
+
+#: blocks/currency-switcher/editor.js:481
+msgid "Show option symbols"
+msgstr "Zobrazit symboly u položek"
+
+#: blocks/currency-switcher/editor.js:488
+msgid "Show option names"
+msgstr "Zobrazit názvy u položek"
+
+#: blocks/currency-switcher/editor.js:495
+msgid "Show active indicator"
+msgstr "Zobrazit označení aktivní měny"
+
+#: blocks/currency-switcher/editor.js:502
+msgid "Search"
+msgstr "Vyhledávání"
+
+#: blocks/currency-switcher/editor.js:513
+#: blocks/currency-switcher/editor.js:953
+msgid "Favorite currencies"
+msgstr "Oblíbené měny"
+
+#: blocks/currency-switcher/editor.js:514
+#: blocks/currency-switcher/editor.js:954
+msgid "Comma-separated ISO codes, for example: EUR, USD, GBP"
+msgstr "Kódy ISO oddělené čárkami, například: EUR, USD, GBP"
+
+#: blocks/currency-switcher/editor.js:556
+msgid "Show freshness badge"
+msgstr "Zobrazit indikátor aktuálnosti"
+
+#: blocks/currency-switcher/editor.js:563
+msgid "Show rate value"
+msgstr "Zobrazit hodnotu kurzu"
+
+#: blocks/currency-switcher/editor.js:570
+msgid "Show checkout context note"
+msgstr "Zobrazit upozornění na měnu platby"
+
+#: blocks/currency-switcher/editor.js:579
+#: blocks/currency-switcher/editor.js:951
+msgid "Layout"
+msgstr "Rozvržení"
+
+#: blocks/currency-switcher/editor.js:581
+msgid "Alignment"
+msgstr "Zarovnání"
+
+#: blocks/currency-switcher/editor.js:584
+msgid "Left"
+msgstr "Vlevo"
+
+#: blocks/currency-switcher/editor.js:585
+msgid "Center"
+msgstr "Na střed"
+
+#: blocks/currency-switcher/editor.js:586
+msgid "Right"
+msgstr "Vpravo"
+
+#: blocks/currency-switcher/editor.js:625
+msgid "Editor preview uses your actual configured currencies and current global switcher defaults."
+msgstr "Náhled v editoru používá skutečně nastavené měny a aktuální globální výchozí nastavení přepínače."
+
+#: blocks/currency-switcher/editor.js:676
+msgid "Rates updated 2 hours ago"
+msgstr "Kurzy byly aktualizovány před 2 hodinami"
+
+#: blocks/currency-switcher/editor.js:680
+msgid "1 EUR = 1.1000 USD"
+msgstr "1 EUR = 1,1000 USD"
+
+#: blocks/currency-switcher/editor.js:683
+msgid "Display prices only. Checkout is charged in EUR."
+msgstr "Měna slouží pouze k zobrazení cen. Platba bude účtována v měně EUR."
+
+#: blocks/currency-switcher/editor.js:702
+msgid "Header Compact"
+msgstr "Kompaktní záhlaví"
+
+#: blocks/currency-switcher/editor.js:702
+msgid "Flag and code only, tuned for narrow header space."
+msgstr "Pouze vlajka a kód, přizpůsobené úzkému prostoru v záhlaví."
+
+#: blocks/currency-switcher/editor.js:718
+msgid "Footer Descriptive"
+msgstr "Popisné zápatí"
+
+#: blocks/currency-switcher/editor.js:718
+msgid "A more descriptive switcher for footer or utility content."
+msgstr "Podrobnější přepínač vhodný do zápatí nebo doplňkového obsahu."
+
+#: blocks/currency-switcher/editor.js:731
+msgid "Mobile Full Width"
+msgstr "Plná šířka na mobilu"
+
+#: blocks/currency-switcher/editor.js:731
+msgid "Full-width mobile-friendly switcher with room for more context."
+msgstr "Přepínač přes celou šířku, vhodný pro mobilní zařízení a s prostorem pro další informace."
+
+#: blocks/currency-switcher/editor.js:809
+#: blocks/currency-switcher/editor.js:852
+#: blocks/currency-switcher/editor.js:906
+msgid "Display"
+msgstr "Zobrazení"
+
+#: blocks/currency-switcher/editor.js:811
+#: blocks/currency-switcher/editor.js:908
+msgid "Mode"
+msgstr "Režim"
+
+#: blocks/currency-switcher/editor.js:814
+msgid "Flag + Code"
+msgstr "Vlajka + kód"
+
+#: blocks/currency-switcher/editor.js:815
+msgid "Flag + Name"
+msgstr "Vlajka + název"
+
+#: blocks/currency-switcher/editor.js:819
+msgid "Symbol + Code"
+msgstr "Symbol + kód"
+
+#: blocks/currency-switcher/editor.js:854
+msgid "Format"
+msgstr "Formát"
+
+#: blocks/currency-switcher/editor.js:857
+#: blocks/currency-switcher/editor.js:911
+msgid "Compact"
+msgstr "Kompaktní"
+
+#: blocks/currency-switcher/editor.js:858
+msgid "Sentence"
+msgstr "Věta"
+
+#: blocks/currency-switcher/editor.js:865
+msgid "Precision"
+msgstr "Přesnost"
+
+#: blocks/currency-switcher/editor.js:872
+#: blocks/currency-switcher/editor.js:920
+msgid "Hide when base currency is displayed"
+msgstr "Skrýt při zobrazení základní měny"
+
+#: blocks/currency-switcher/editor.js:912
+msgid "Checkout disclosure"
+msgstr "Upozornění v pokladně"
+
+#: blocks/currency-switcher/editor.js:913
+msgid "Full note"
+msgstr "Úplné upozornění"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block title"
+msgid "Currency Context Notice"
+msgstr "Upozornění na měnu"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block description"
+msgid "Show a currency context note such as display currency vs checkout currency."
+msgstr "Zobrazí informace o měně, například měnu zobrazení a měnu platby."
+
+#: blocks/currency-context-notice/block.json blocks/currency-current/block.json
+#: blocks/currency-selector-buttons/block.json
+#: blocks/currency-switcher/block.json blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "currency"
+msgstr "měna"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block keyword"
+msgid "notice"
+msgstr "upozornění"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block keyword"
+msgid "checkout"
+msgstr "pokladna"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block keyword"
+msgid "context"
+msgstr "kontext"
+
+#: blocks/currency-current/block.json
+msgctxt "block title"
+msgid "Current Currency"
+msgstr "Aktuální měna"
+
+#: blocks/currency-current/block.json
+msgctxt "block description"
+msgid "Display the visitor's current display currency in compact form."
+msgstr "V kompaktní podobě zobrazí měnu, ve které návštěvník právě vidí ceny."
+
+#: blocks/currency-current/block.json
+msgctxt "block keyword"
+msgid "current"
+msgstr "aktuální"
+
+#: blocks/currency-current/block.json
+msgctxt "block keyword"
+msgid "display"
+msgstr "zobrazení"
+
+#: blocks/currency-current/block.json blocks/currency-switcher/block.json
+msgctxt "block keyword"
+msgid "money"
+msgstr "peníze"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block title"
+msgid "Currency Selector Buttons"
+msgstr "Tlačítka pro výběr měny"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block description"
+msgid "A button-group alternative to the dropdown switcher for stores with a few main currencies."
+msgstr "Alternativa k rozbalovacímu přepínači v podobě skupiny tlačítek pro obchody s několika hlavními měnami."
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block keyword"
+msgid "selector"
+msgstr "výběr"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block keyword"
+msgid "buttons"
+msgstr "tlačítka"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block keyword"
+msgid "toggle"
+msgstr "přepínač"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block title"
+msgid "Currency Switcher"
+msgstr "Přepínač měn"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block description"
+msgid "Display the FCHub Multi-Currency switcher in posts, pages, templates, and template parts."
+msgstr "Zobrazí přepínač FCHub Multi-Currency v příspěvcích, stránkách, šablonách a částech šablon."
+
+#: blocks/currency-switcher/block.json
+msgctxt "block keyword"
+msgid "switcher"
+msgstr "přepínač"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block keyword"
+msgid "multi-currency"
+msgstr "více měn"
+
+#: blocks/currency-switcher/block.json blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "exchange"
+msgstr "směna"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Default"
+msgstr "Výchozí"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Pill"
+msgstr "Oválný"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Minimal"
+msgstr "Minimalistický"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Subtle"
+msgstr "Jemný"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Glass"
+msgstr "Skleněný"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Contrast"
+msgstr "Kontrastní"
+
+#: blocks/exchange-rate/block.json
+msgctxt "block title"
+msgid "Exchange Rate"
+msgstr "Směnný kurz"
+
+#: blocks/exchange-rate/block.json
+msgctxt "block description"
+msgid "Display the current exchange rate between the store base currency and the visitor display currency."
+msgstr "Zobrazí aktuální směnný kurz mezi základní měnou obchodu a měnou, ve které návštěvník vidí ceny."
+
+#: blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "rate"
+msgstr "kurz"
+
+#: blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "fx"
+msgstr "fx"
