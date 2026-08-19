@@ -38,6 +38,29 @@ final class CurrencyGeographyTest extends TestCase
         self::assertSame([], CurrencyGeography::timezoneMap(['XXX']));
     }
 
+    /**
+     * ICU — the engine behind Intl in Chrome and Node — reports
+     * CLDR-canonical zone ids, which for a handful of zones are the OLD
+     * IANA names: Asia/Calcutta, Europe/Kiev, America/Buenos_Aires. PHP
+     * only lists IANA-canonical names per country, so without the alias
+     * rows a Chrome visitor in India would never match the map.
+     */
+    #[Test]
+    public function testCoversTheAliasSpellingsBrowsersActuallyReport(): void
+    {
+        self::assertSame('INR', CurrencyGeography::timezoneMap(['INR'])['Asia/Calcutta']);
+        self::assertSame('UAH', CurrencyGeography::timezoneMap(['UAH'])['Europe/Kiev']);
+        self::assertSame('VND', CurrencyGeography::timezoneMap(['VND'])['Asia/Saigon']);
+        self::assertSame('ARS', CurrencyGeography::timezoneMap(['ARS'])['America/Buenos_Aires']);
+        self::assertSame('USD', CurrencyGeography::timezoneMap(['USD'])['America/Indianapolis']);
+
+        self::assertArrayNotHasKey(
+            'Asia/Calcutta',
+            CurrencyGeography::timezoneMap(['PLN']),
+            'An alias ships only when its currency is offered, like every other zone.',
+        );
+    }
+
     #[Test]
     public function testLowercaseInputResolvesTheSameMap(): void
     {

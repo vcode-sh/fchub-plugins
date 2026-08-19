@@ -74,6 +74,27 @@ final class CurrencyGeography
     ];
 
     /**
+     * The zone spellings ICU actually reports that PHP's canonical list
+     * lacks. Intl in Chrome and Node returns CLDR-canonical ids, which for
+     * these zones are the pre-rename IANA names; PHP cannot derive them
+     * (getLocation() on a link returns no country), so they are pinned here,
+     * keyed by the canonical zone whose presence in the map earns them.
+     */
+    private const CLDR_ALIASES = [
+        'Asia/Kolkata'                     => ['Asia/Calcutta'],
+        'Asia/Ho_Chi_Minh'                 => ['Asia/Saigon'],
+        'Europe/Kyiv'                      => ['Europe/Kiev', 'Europe/Uzhgorod', 'Europe/Zaporozhye'],
+        'America/Argentina/Buenos_Aires'   => ['America/Buenos_Aires'],
+        'America/Argentina/Catamarca'      => ['America/Catamarca'],
+        'America/Argentina/Cordoba'        => ['America/Cordoba'],
+        'America/Argentina/Jujuy'          => ['America/Jujuy'],
+        'America/Argentina/Mendoza'        => ['America/Mendoza'],
+        'America/Indiana/Indianapolis'     => ['America/Indianapolis'],
+        'America/Kentucky/Louisville'      => ['America/Louisville'],
+        'America/Atikokan'                 => ['America/Coral_Harbour'],
+    ];
+
+    /**
      * @param array<int, string> $offeredCodes
      * @return array<string, string> IANA timezone => offered currency code
      */
@@ -87,6 +108,10 @@ final class CurrencyGeography
             foreach (self::COUNTRIES[$code] ?? [] as $country) {
                 foreach (\DateTimeZone::listIdentifiers(\DateTimeZone::PER_COUNTRY, $country) as $zone) {
                     $map[$zone] ??= $code;
+
+                    foreach (self::CLDR_ALIASES[$zone] ?? [] as $alias) {
+                        $map[$alias] ??= $code;
+                    }
                 }
             }
         }
