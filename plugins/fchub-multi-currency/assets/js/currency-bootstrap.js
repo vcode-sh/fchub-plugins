@@ -101,6 +101,27 @@
 		return offered(code) ? code : "";
 	}
 
+	/**
+	 * A first-visit guess from the visitor's own clock: the timezone implies a
+	 * country, the country an offered currency. Nothing leaves the browser and
+	 * nothing is stored — a guess must never outrank a remembered choice, and
+	 * an explicit switch replaces it through the normal persistence path. The
+	 * catch also covers hosts without Intl at all.
+	 */
+	function localeCurrency() {
+		if (config.geoEnabled !== true) return "";
+
+		let zone = "";
+		try {
+			zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+		} catch {
+			return "";
+		}
+
+		const code = normalizeCode(config.localeCurrencies?.[zone]);
+		return offered(code) ? code : "";
+	}
+
 	/** Mirrors the server's resolver order, so a page and its scripts never disagree. */
 	function resolve() {
 		if (config.cookiePersistenceEnabled !== true) forget();
@@ -114,6 +135,7 @@
 			storedCurrency() ||
 			accountCurrency() ||
 			(offered(cookie) ? cookie : "") ||
+			localeCurrency() ||
 			(offered(fallback) ? fallback : "") ||
 			(offered(base) ? base : "")
 		);

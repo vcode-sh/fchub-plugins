@@ -163,3 +163,60 @@ describe("currency bootstrap price shield", () => {
 		assert.equal(loadBootstrap({ config, search: "?currency=EUR" }).pending, false);
 	});
 });
+
+describe("locale hint on a true first visit", () => {
+	const geoConfig = (overrides = {}) =>
+		baseConfig({
+			geoEnabled: true,
+			localeCurrencies: { "Europe/Berlin": "EUR" },
+			...overrides,
+		});
+
+	it("resolves the offered currency implied by the visitor's timezone", () => {
+		const { currency } = loadBootstrap({
+			intlTimeZone: "Europe/Berlin",
+			config: geoConfig(),
+		});
+
+		assert.equal(currency, "EUR");
+	});
+
+	it("never outranks a remembered choice", () => {
+		const { currency } = loadBootstrap({
+			intlTimeZone: "Europe/Berlin",
+			cookie: "fchub_mc_currency=USD",
+			config: geoConfig(),
+		});
+
+		assert.equal(currency, "USD", "The cookie is a real preference; the timezone is a guess.");
+	});
+
+	it("stays silent when detection is off, the zone is unmapped, or Intl is absent", () => {
+		const off = loadBootstrap({ intlTimeZone: "Europe/Berlin", config: geoConfig({ geoEnabled: false }) });
+		assert.equal(off.currency, "USD");
+
+		const unmapped = loadBootstrap({ intlTimeZone: "Pacific/Kiritimati", config: geoConfig() });
+		assert.equal(unmapped.currency, "USD");
+
+		const noIntl = loadBootstrap({ config: geoConfig() });
+		assert.equal(noIntl.currency, "USD", "A sandbox without Intl mirrors an exotic embedder; the guard swallows it.");
+	});
+
+	it("ignores a mapped currency the store no longer offers", () => {
+		const { currency } = loadBootstrap({
+			intlTimeZone: "Europe/Warsaw",
+			config: geoConfig({ localeCurrencies: { "Europe/Warsaw": "PLN" } }),
+		});
+
+		assert.equal(currency, "USD", "A stale cached map must not resolve to a currency without a rate.");
+	});
+
+	it("raises the price shield for a locale-resolved non-base currency", () => {
+		const { pending } = loadBootstrap({
+			intlTimeZone: "Europe/Berlin",
+			config: geoConfig(),
+		});
+
+		assert.equal(pending, true, "A first paint that will convert must not flash base prices.");
+	});
+});

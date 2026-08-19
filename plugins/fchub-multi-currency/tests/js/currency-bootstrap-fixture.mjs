@@ -29,7 +29,14 @@ export function baseConfig(overrides = {}) {
  * Runs the bootstrap against a minimal fake window and returns what a page would
  * be able to observe afterwards.
  */
-export function loadBootstrap({ config = baseConfig(), search = "", cookie = "", storage = {}, storageThrows = false } = {}) {
+export function loadBootstrap({
+	config = baseConfig(),
+	search = "",
+	cookie = "",
+	storage = {},
+	storageThrows = false,
+	intlTimeZone = undefined,
+} = {}) {
 	const values = new Map(Object.entries(storage));
 	const classes = new Set();
 	const localStorage = {
@@ -64,6 +71,14 @@ export function loadBootstrap({ config = baseConfig(), search = "", cookie = "",
 		},
 		URLSearchParams,
 	};
+
+	// Only an explicit test opts into Intl; the default sandbox stays without
+	// it, mirroring the exotic embedders the implementation must survive.
+	if (intlTimeZone !== undefined) {
+		sandbox.Intl = {
+			DateTimeFormat: () => ({ resolvedOptions: () => ({ timeZone: intlTimeZone }) }),
+		};
+	}
 
 	vm.runInNewContext(readFileSync(scriptPath, "utf8"), sandbox, { filename: scriptPath.pathname });
 
