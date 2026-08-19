@@ -1,0 +1,1821 @@
+# Copyright (C) 2026 Vibe Code
+# This file is distributed under the GPLv2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-"
+"currency\n"
+"Last-Translator: \n"
+"Language-Team: Croatian\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-08-18T19:36:27+00:00\n"
+"PO-Revision-Date: 2026-08-19 02:00+0300\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: fchub-multi-currency\n"
+"Language: hr\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+#. Plugin Name of the plugin
+#: fchub-multi-currency.php app/Bootstrap/Modules/BlocksModule.php:77
+#: app/GDPR/PersonalDataHandler.php:24 app/GDPR/PersonalDataHandler.php:34
+#: app/Integration/AddonsRegistration.php:23
+msgid "FCHub Multi-Currency"
+msgstr "FCHub Multi-Currency"
+
+#. Plugin URI of the plugin
+#: fchub-multi-currency.php
+msgid "https://fchub.co/docs/fchub-multi-currency"
+msgstr "https://fchub.co/docs/fchub-multi-currency"
+
+#. Description of the plugin
+#: fchub-multi-currency.php
+msgid ""
+"Display-layer multi-currency for FluentCart with exchange rate management "
+"and checkout disclosure"
+msgstr ""
+"Više valuta u prikazu za FluentCart, uz upravljanje tečajevima i obavijest "
+"pri plaćanju"
+
+#. Author of the plugin
+#: fchub-multi-currency.php
+msgid "Vibe Code"
+msgstr "Vibe Code"
+
+#. Author URI of the plugin
+#: fchub-multi-currency.php
+msgid "https://x.com/vcode_sh"
+msgstr "https://x.com/vcode_sh"
+
+#: app/Bootstrap/Modules/BlocksModule.php:81
+msgid "Currency Showcase"
+msgstr "Pregled valuta"
+
+#: app/Bootstrap/Modules/BlocksModule.php:83
+msgid "A ready-made showcase of the full currency block family."
+msgstr "Gotov prikaz cijele skupine blokova za valute."
+
+#: app/Bootstrap/Modules/DiagnosticsModule.php:71
+msgid ""
+"FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics "
+"page or trigger a manual refresh."
+msgstr ""
+"FCHub Multi-Currency: Neki su tečajevi zastarjeli. Provjerite stranicu "
+"dijagnostike ili pokrenite ručno osvježavanje."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:37
+msgid "Switch the rate provider to Manual rates before saving."
+msgstr "Prije spremanja promijenite pružatelja tečajeva na Ručni tečajevi."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:43
+msgid "Add at least one display currency before saving manual rates."
+msgstr "Prije spremanja ručnih tečajeva dodajte barem jednu prikaznu valutu."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:48
+msgid "Provide one rate for every configured display currency."
+msgstr "Unesite tečaj za svaku konfiguriranu prikaznu valutu."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:51
+#: app/Domain/Actions/SaveManualRatesAction.php:98
+msgid "Rates may only be saved for configured display currencies."
+msgstr "Tečajevi se mogu spremiti samo za konfigurirane prikazne valute."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:67
+#: app/Http/Controllers/Admin/RatesAdminController.php:104
+#: admin/multi-currency-admin.js:222
+msgid "Manual rates could not be saved."
+msgstr "Ručne tečajeve nije moguće spremiti."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:110
+#: app/Domain/Actions/SaveManualRatesAction.php:117
+msgid ""
+"Each manual rate must be a positive decimal string with up to 8 decimal "
+"places."
+msgstr ""
+"Svaki ručni tečaj mora biti pozitivan decimalni broj s najviše 8 decimalnih "
+"mjesta."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:121
+msgid "Each manual rate must be greater than zero."
+msgstr "Svaki ručni tečaj mora biti veći od nule."
+
+#: app/Domain/Enums/RateProvider.php:19 admin/components/rate-settings.js:52
+msgid "ExchangeRate-API (free tier)"
+msgstr "ExchangeRate-API (besplatni paket)"
+
+#: app/Domain/Enums/RateProvider.php:20 admin/components/rate-settings.js:55
+msgid "Open Exchange Rates"
+msgstr "Open Exchange Rates"
+
+#: app/Domain/Enums/RateProvider.php:21
+msgid "European Central Bank (EUR base, free)"
+msgstr "Europska središnja banka (osnovna valuta EUR, besplatno)"
+
+#: app/Domain/Enums/RateProvider.php:22 admin/components/rate-settings.js:61
+msgid "Manual rates"
+msgstr "Ručni tečajevi"
+
+#: app/Domain/Enums/ResolverSource.php:20
+msgid "URL parameter"
+msgstr "Parametar URL-a"
+
+#: app/Domain/Enums/ResolverSource.php:21
+msgid "User preference"
+msgstr "Korisnička postavka"
+
+#: app/Domain/Enums/ResolverSource.php:22
+msgid "Cookie (guest)"
+msgstr "Kolačić (gost)"
+
+#: app/Domain/Enums/ResolverSource.php:23
+#: admin/components/general-settings.js:225
+msgid "Geolocation"
+msgstr "Geolokacija"
+
+#: app/Domain/Enums/ResolverSource.php:24
+msgid "Store default"
+msgstr "Zadana postavka trgovine"
+
+#: app/Domain/Enums/RoundingMode.php:20 admin/components/rate-settings.js:143
+msgid "Truncate (no rounding)"
+msgstr "Skrati (bez zaokruživanja)"
+
+#: app/Domain/Enums/RoundingMode.php:21 admin/components/rate-settings.js:146
+msgid "Round half up (standard)"
+msgstr "Zaokruži polovicu naviše (standardno)"
+
+#: app/Domain/Enums/RoundingMode.php:22 admin/components/rate-settings.js:149
+msgid "Round half down"
+msgstr "Zaokruži polovicu naniže"
+
+#: app/Domain/Enums/RoundingMode.php:23 admin/components/rate-settings.js:152
+msgid "Always round up"
+msgstr "Uvijek zaokruži naviše"
+
+#: app/Domain/Enums/RoundingMode.php:24 admin/components/rate-settings.js:155
+msgid "Always round down"
+msgstr "Uvijek zaokruži naniže"
+
+#. translators: {base_currency} is a literal placeholder token replaced with the currency code.
+#: app/Domain/Services/CheckoutDisclosureService.php:33
+msgid "Your payment will be processed in {base_currency}."
+msgstr "Vaše će plaćanje biti obrađeno u valuti {base_currency}."
+
+#. translators: %s is a human-readable time difference, e.g. "2 hours".
+#. translators: %s: human-readable time difference, e.g. "2 hours"
+#: app/Frontend/CurrencyContextPresentation.php:36
+#: app/Frontend/CurrencyContextPresentation.php:312
+#: admin/switcher-preview.js:163
+#, php-format
+msgid "Rates updated %s ago"
+msgstr "Tečajevi su ažurirani prije %s"
+
+#. translators: %1$s is the base currency code, %2$s the exchange rate, %3$s the display currency code.
+#. translators: 1: base currency code, 2: rate, 3: display currency code
+#. translators: 1: base currency code, 2: exchange rate, 3: display currency code
+#: app/Frontend/CurrencyContextPresentation.php:46
+#: app/Frontend/CurrencyContextPresentation.php:201
+#: app/Frontend/CurrencyContextPresentation.php:332
+#: admin/switcher-preview.js:169
+#, php-format
+msgid "1 %1$s = %2$s %3$s"
+msgstr "1 %1$s = %2$s %3$s"
+
+#. translators: %1$s is the base currency code, %2$s the exchange rate, %3$s the display currency code.
+#. translators: 1: base currency code, 2: rate, 3: display currency code
+#: app/Frontend/CurrencyContextPresentation.php:48
+#: app/Frontend/CurrencyContextPresentation.php:194
+#, php-format
+msgid "Current rate: 1 %1$s = %2$s %3$s"
+msgstr "Trenutačni tečaj: 1 %1$s = %2$s %3$s"
+
+#. translators: %1$s is the display currency code, %2$s the base currency code.
+#. translators: 1: display currency code, 2: base currency code
+#: app/Frontend/CurrencyContextPresentation.php:50
+#: app/Frontend/CurrencyContextPresentation.php:233
+#, php-format
+msgid "Viewing prices in %1$s. Checkout in %2$s."
+msgstr "Cijene se prikazuju u valuti %1$s. Plaćanje je u valuti %2$s."
+
+#. translators: %1$s is the display currency code, %2$s the base currency code.
+#. translators: 1: display currency code, 2: base currency code
+#: app/Frontend/CurrencyContextPresentation.php:52
+#: app/Frontend/CurrencyContextPresentation.php:227
+#, php-format
+msgid "Prices shown in %1$s are approximate. Checkout is charged in %2$s."
+msgstr "Cijene prikazane u valuti %1$s približne su. Naplata je u valuti %2$s."
+
+#: app/Frontend/CurrencyContextPresentation.php:56
+#: app/Frontend/CurrencyContextPresentation.php:326
+msgid "Base currency currently in use."
+msgstr "Trenutačno se upotrebljava osnovna valuta."
+
+#. translators: %s is the base currency code.
+#. translators: %s: base currency code
+#: app/Frontend/CurrencyContextPresentation.php:58
+#: app/Frontend/CurrencyContextPresentation.php:351
+#, php-format
+msgid "Display prices only. Checkout is charged in %s."
+msgstr "Valuta služi samo za prikaz cijena. Naplata je u valuti %s."
+
+#: app/Frontend/CurrencyContextPresentation.php:59
+#: app/Frontend/CurrencyContextPresentation.php:345
+msgid "You are viewing the store base currency."
+msgstr "Cijene su prikazane u osnovnoj valuti trgovine."
+
+#: app/Frontend/CurrencyContextPresentation.php:60
+msgid "That currency is not available right now."
+msgstr "Ta valuta trenutačno nije dostupna."
+
+#. translators: %s is the display currency name.
+#: app/Frontend/CurrencyContextPresentation.php:65
+#, php-format
+msgid "Prices are now shown in %s."
+msgstr "Cijene se sada prikazuju u valuti %s."
+
+#. translators: %s is a number of minutes.
+#: app/Frontend/CurrencyContextPresentation.php:123
+#, php-format
+msgid "%s min"
+msgid_plural "%s mins"
+msgstr[0] "%s min"
+msgstr[1] "%s min"
+msgstr[2] "%s min"
+
+#. translators: %s is a number of hours.
+#: app/Frontend/CurrencyContextPresentation.php:125
+#: admin/switcher-preview.js:63
+#, php-format
+msgid "%s hour"
+msgid_plural "%s hours"
+msgstr[0] "%s sat"
+msgstr[1] "%s sata"
+msgstr[2] "%s sati"
+
+#. translators: %s is a number of days.
+#: app/Frontend/CurrencyContextPresentation.php:127
+#: admin/switcher-preview.js:64
+#, php-format
+msgid "%s day"
+msgid_plural "%s days"
+msgstr[0] "%s dan"
+msgstr[1] "%s dana"
+msgstr[2] "%s dana"
+
+#. translators: %s is a number of weeks.
+#: app/Frontend/CurrencyContextPresentation.php:129
+#: admin/switcher-preview.js:65
+#, php-format
+msgid "%s week"
+msgid_plural "%s weeks"
+msgstr[0] "%s tjedan"
+msgstr[1] "%s tjedna"
+msgstr[2] "%s tjedana"
+
+#. translators: %s is a number of months.
+#: app/Frontend/CurrencyContextPresentation.php:131
+#, php-format
+msgid "%s month"
+msgid_plural "%s months"
+msgstr[0] "%s mjesec"
+msgstr[1] "%s mjeseca"
+msgstr[2] "%s mjeseci"
+
+#. translators: %s is a number of years.
+#: app/Frontend/CurrencyContextPresentation.php:133
+#, php-format
+msgid "%s year"
+msgid_plural "%s years"
+msgstr[0] "%s godina"
+msgstr[1] "%s godine"
+msgstr[2] "%s godina"
+
+#: app/Frontend/CurrencySwitcherRenderer.php:310 admin/switcher-preview.js:222
+#: blocks/currency-switcher/editor.js:655
+msgid "Search currency"
+msgstr "Pretraži valute"
+
+#: app/Frontend/CurrencySwitcherRenderer.php:315
+#: app/Frontend/CurrencySwitcherRenderer.php:617
+#: admin/components/general-settings.js:114
+msgid "Select currency"
+msgstr "Odaberite valutu"
+
+#: app/Frontend/CurrencySwitcherRenderer.php:637
+msgid "Apply"
+msgstr "Primijeni"
+
+#: app/GDPR/PersonalDataHandler.php:57
+msgid "Multi-Currency Preferences"
+msgstr "Postavke više valuta"
+
+#: app/GDPR/PersonalDataHandler.php:61
+#: app/Http/Controllers/Admin/DiagnosticsController.php:77
+msgid "Preferred Currency"
+msgstr "Preferirana valuta"
+
+#: app/GDPR/PersonalDataHandler.php:76
+msgid "Multi-Currency Activity"
+msgstr "Aktivnost više valuta"
+
+#: app/GDPR/PersonalDataHandler.php:80
+msgid "Event"
+msgstr "Događaj"
+
+#: app/GDPR/PersonalDataHandler.php:84
+msgid "Date"
+msgstr "Datum"
+
+#: app/Http/Controllers/Admin/DiagnosticsController.php:70
+msgid "FluentCRM is not active, so there is nowhere to create the fields."
+msgstr "FluentCRM nije aktivan pa se polja nemaju gdje izraditi."
+
+#: app/Http/Controllers/Admin/DiagnosticsController.php:78
+msgid "Last Order Display Currency"
+msgstr "Prikazna valuta posljednje narudžbe"
+
+#: app/Http/Controllers/Admin/DiagnosticsController.php:79
+msgid "Last Order FX Rate"
+msgstr "Tečaj posljednje narudžbe"
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:53
+msgid "Manual rates are saved explicitly and cannot be refreshed."
+msgstr "Ručni tečajevi spremaju se izričito i ne mogu se osvježavati."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:69
+msgid "Failed to refresh exchange rates. Check the logs for details."
+msgstr "Osvježavanje tečajeva nije uspjelo. Pojedinosti provjerite u zapisnicima."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:77
+msgid "Exchange rates refreshed successfully."
+msgstr "Tečajevi su uspješno osvježeni."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:89
+msgid "Provide manual rates as a currency-to-rate object."
+msgstr "Unesite ručne tečajeve kao objekt koji povezuje valute s tečajevima."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:112
+msgid "Manual rates saved successfully."
+msgstr "Ručni tečajevi uspješno su spremljeni."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:37
+#: app/Http/Controllers/Pub/ContextController.php:110
+msgid "Invalid JSON payload."
+msgstr "Neispravni JSON podaci."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:52
+msgid "Select a valid exchange-rate provider."
+msgstr "Odaberite valjanog pružatelja tečajeva."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:105
+msgid "An API key is required for the selected exchange-rate provider."
+msgstr "Za odabranog pružatelja tečajeva potreban je API ključ."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:136
+msgid "Settings saved successfully."
+msgstr "Postavke su uspješno spremljene."
+
+#: app/Http/Controllers/Pub/ContextController.php:46
+#: app/Http/Controllers/Pub/ContextController.php:131
+msgid "Invalid currency code."
+msgstr "Neispravna šifra valute."
+
+#: app/Http/Controllers/Pub/ContextController.php:75
+msgid "Multi-Currency is disabled."
+msgstr "Više valuta je onemogućeno."
+
+#: app/Http/Controllers/Pub/ContextController.php:95
+msgid "Too many requests. Please try again later."
+msgstr "Previše zahtjeva. Pokušajte ponovno poslije."
+
+#: app/Http/Controllers/Pub/ContextController.php:120
+msgid "Currency code is required."
+msgstr "Šifra valute je obavezna."
+
+#: app/Http/Controllers/Pub/ContextController.php:144
+msgid ""
+"This currency cannot be selected because no usable exchange rate is "
+"available. Please try again later."
+msgstr ""
+"Ovu valutu nije moguće odabrati jer nema dostupnog upotrebljivog tečaja. "
+"Pokušajte ponovno poslije."
+
+#: app/Http/Controllers/Pub/ContextController.php:177
+msgid ""
+"Currency preference could not be saved because both cookie and account "
+"persistence are disabled."
+msgstr ""
+"Preferiranu valutu nije moguće spremiti jer su onemogućeni kolačići i "
+"spremanje na račun."
+
+#: app/Http/Controllers/Pub/ContextController.php:181
+msgid ""
+"Currency preference could not be saved. Cookie persistence is disabled, so "
+"logged-out visitors cannot keep a currency choice."
+msgstr ""
+"Preferiranu valutu nije moguće spremiti. Spremanje u kolačić je onemogućeno "
+"pa odjavljeni posjetitelji ne mogu zadržati odabranu valutu."
+
+#: app/Http/Controllers/Pub/ContextController.php:204
+msgid "Currency preference saved."
+msgstr "Preferirana valuta je spremljena."
+
+#: app/Integration/AddonsRegistration.php:24
+msgid ""
+"Display-layer multi-currency with exchange rate management and checkout "
+"disclosure."
+msgstr ""
+"Više valuta u prikazu, uz upravljanje tečajevima i obavijest pri plaćanju."
+
+#: app/Integration/FluentCrmSmartCodes.php:189
+msgid "Multi-Currency Order"
+msgstr "Narudžba s više valuta"
+
+#: app/Integration/FluentCrmSmartCodes.php:190
+msgid "Currency and exchange rate values captured on the order."
+msgstr "Vrijednosti valute i tečaja zabilježene uz narudžbu."
+
+#: app/Integration/FluentCrmSmartCodes.php:201
+msgid "Display Currency Code"
+msgstr "Šifra prikazne valute"
+
+#: app/Integration/FluentCrmSmartCodes.php:202
+msgid "Base Currency Code"
+msgstr "Šifra osnovne valute"
+
+#: app/Integration/FluentCrmSmartCodes.php:203
+msgid "Total in Display Currency"
+msgstr "Ukupan iznos u prikaznoj valuti"
+
+#: app/Integration/FluentCrmSmartCodes.php:204
+msgid "Subtotal in Display Currency"
+msgstr "Međuzbroj u prikaznoj valuti"
+
+#: app/Integration/FluentCrmSmartCodes.php:205
+msgid "Exchange Rate Used"
+msgstr "Upotrijebljeni tečaj"
+
+#: app/Integration/FluentCrmSmartCodes.php:206
+msgid "Checkout Currency Notice"
+msgstr "Obavijest o valuti plaćanja"
+
+#: app/Integration/MultiCurrencySettings.php:39
+msgid "Save Settings"
+msgstr "Spremi postavke"
+
+#: app/Integration/MultiCurrencySettings.php:40
+msgid "Multi-Currency integration is active"
+msgstr "Integracija više valuta je aktivna"
+
+#: app/Integration/MultiCurrencySettings.php:41
+msgid "Multi-Currency integration is disabled"
+msgstr "Integracija više valuta je onemogućena"
+
+#: app/Integration/MultiCurrencySettings.php:45
+msgid "Enable Multi-Currency"
+msgstr "Omogući više valuta"
+
+#: app/Integration/MultiCurrencySettings.php:46
+#: admin/components/general-settings.js:68
+msgid "Master switch for display-layer multi-currency across the store."
+msgstr "Glavni prekidač za prikaz više valuta u cijeloj trgovini."
+
+#: app/Integration/MultiCurrencySettings.php:48
+#: app/Integration/MultiCurrencySettings.php:57
+#: app/Integration/MultiCurrencySettings.php:66
+#: admin/components/crm-settings.js:57
+msgid "Yes"
+msgstr "Da"
+
+#: app/Integration/MultiCurrencySettings.php:49
+#: app/Integration/MultiCurrencySettings.php:58
+#: app/Integration/MultiCurrencySettings.php:67
+#: admin/components/crm-settings.js:60
+msgid "No"
+msgstr "Ne"
+
+#: app/Integration/MultiCurrencySettings.php:54
+#: admin/components/checkout-settings.js:23
+msgid "Checkout Disclosure"
+msgstr "Obavijest pri plaćanju"
+
+#: app/Integration/MultiCurrencySettings.php:55
+#: admin/components/checkout-settings.js:26
+msgid ""
+"Show a notice at checkout that payment is processed in the base currency."
+msgstr ""
+"Prikažite pri plaćanju obavijest da se plaćanje obrađuje u osnovnoj valuti."
+
+#: app/Integration/MultiCurrencySettings.php:63
+#: admin/components/crm-settings.js:23
+msgid "FluentCRM Sync"
+msgstr "Sinkronizacija s FluentCRM-om"
+
+#: app/Integration/MultiCurrencySettings.php:64
+msgid "Tag contacts in FluentCRM based on their currency preference."
+msgstr "Označite kontakte u FluentCRM-u prema njihovoj preferiranoj valuti."
+
+#: app/Integration/MultiCurrencySettings.php:72
+msgid "Full Settings"
+msgstr "Sve postavke"
+
+#: app/Integration/MultiCurrencySettings.php:73
+msgid "Configure currencies, exchange rates, checkout disclosure, and more."
+msgstr "Konfigurirajte valute, tečajeve, obavijest pri plaćanju i ostalo."
+
+#: app/Integration/MultiCurrencySettings.php:98
+msgid "Multi-Currency settings saved."
+msgstr "Postavke više valuta su spremljene."
+
+#: app/Support/AdminMenu.php:19 admin/multi-currency-admin.js:107
+#: admin/multi-currency-admin.js:259 admin/multi-currency-admin.js:327
+#: admin/multi-currency-admin.js:385
+msgid "Multi-Currency"
+msgstr "Više valuta"
+
+#. translators: %d is the number of hours between rate refreshes
+#: fchub-multi-currency.php:89
+#, php-format
+msgid "Every %d Hours"
+msgstr "Svakih %d h"
+
+#: fchub-multi-currency.php:175
+msgid "FCHub Multi-Currency requires FluentCart to be installed and activated."
+msgstr "FCHub Multi-Currency zahtijeva instaliran i aktiviran FluentCart."
+
+#: admin/components/checkout-settings.js:35
+#: admin/components/checkout-settings.js:78 admin/components/crm-settings.js:35
+#: admin/components/crm-settings.js:129 admin/components/general-settings.js:77
+#: admin/components/general-settings.js:133
+#: admin/components/general-settings.js:170
+#: admin/components/general-settings.js:213
+#: admin/components/general-settings.js:239
+msgid "Enabled"
+msgstr "Omogućeno"
+
+#: admin/components/checkout-settings.js:38
+#: admin/components/checkout-settings.js:81 admin/components/crm-settings.js:38
+#: admin/components/crm-settings.js:132 admin/components/general-settings.js:80
+#: admin/components/general-settings.js:136
+#: admin/components/general-settings.js:173
+#: admin/components/general-settings.js:216
+#: admin/components/general-settings.js:242
+msgid "Disabled"
+msgstr "Onemogućeno"
+
+#: admin/components/checkout-settings.js:48
+msgid "Disclosure Text"
+msgstr "Tekst obavijesti"
+
+#: admin/components/checkout-settings.js:51
+msgid "Supports placeholders: {base_currency}, {display_currency}, {rate}"
+msgstr "Podržava rezervirana mjesta: {base_currency}, {display_currency}, {rate}"
+
+#: admin/components/checkout-settings.js:66
+msgid "Rate Freshness Badge"
+msgstr "Oznaka svježine tečaja"
+
+#: admin/components/checkout-settings.js:69
+msgid ""
+"Global gate for the rates-updated badge. When disabled, no surface shows it "
+"— including the switcher dropdown footer."
+msgstr ""
+"Globalni prekidač za oznaku ažuriranosti tečajeva. Kada je onemogućen, "
+"oznaka se ne prikazuje nigdje — ni u podnožju padajućeg izbornika valute."
+
+#: admin/components/crm-settings.js:26
+msgid "Tag contacts and update custom fields based on currency preference."
+msgstr "Označite kontakte i ažurirajte prilagođena polja prema preferiranoj valuti."
+
+#: admin/components/crm-settings.js:48
+msgid "Auto-create Tags"
+msgstr "Automatski izradi oznake"
+
+#: admin/components/crm-settings.js:51
+msgid "Automatically create tags for each currency."
+msgstr "Automatski izradi oznake za svaku valutu."
+
+#: admin/components/crm-settings.js:69
+msgid "Tag Prefix"
+msgstr "Prefiks oznake"
+
+#: admin/components/crm-settings.js:72
+msgid "Tags created as {prefix}{CODE}, e.g. currency:EUR"
+msgstr "Oznake se izrađuju kao {prefix}{CODE}, npr. currency:EUR"
+
+#: admin/components/crm-settings.js:83
+msgid "Preferred Currency Field"
+msgstr "Polje preferirane valute"
+
+#: admin/components/crm-settings.js:94
+msgid "Last Order Currency Field"
+msgstr "Polje valute posljednje narudžbe"
+
+#: admin/components/crm-settings.js:105
+msgid "Last Order FX Rate Field"
+msgstr "Polje tečaja posljednje narudžbe"
+
+#: admin/components/crm-settings.js:115
+msgid "FluentCommunity"
+msgstr "FluentCommunity"
+
+#: admin/components/crm-settings.js:120
+msgid "FluentCommunity Sync"
+msgstr "Sinkronizacija s FluentCommunityjem"
+
+#: admin/components/crm-settings.js:123
+msgid "Sync currency preference to FluentCommunity user meta."
+msgstr "Sinkronizirajte preferiranu valutu s korisničkim metapodacima FluentCommunityja."
+
+#: admin/components/currency-settings.js:113
+msgid "Search and add a currency…"
+msgstr "Pretražite i dodajte valutu…"
+
+#: admin/components/currency-settings.js:130
+msgid "Currency"
+msgstr "Valuta"
+
+#: admin/components/currency-settings.js:133
+#: admin/components/switcher-settings.js:128
+#: blocks/currency-switcher/editor.js:817
+msgid "Symbol"
+msgstr "Simbol"
+
+#: admin/components/currency-settings.js:136
+msgid "Decimals"
+msgstr "Decimalna mjesta"
+
+#: admin/components/currency-settings.js:139
+msgid "Decimal"
+msgstr "Decimalni znak"
+
+#: admin/components/currency-settings.js:142
+msgid "Thousands"
+msgstr "Tisućice"
+
+#: admin/components/currency-settings.js:145
+msgid "Position"
+msgstr "Položaj"
+
+#: admin/components/currency-settings.js:153
+msgid "Drag to reorder"
+msgstr "Povucite za promjenu redoslijeda"
+
+#: admin/components/currency-settings.js:172
+#: admin/components/currency-settings.js:185
+#: blocks/currency-switcher/editor.js:531
+#: blocks/currency-switcher/editor.js:543
+#: blocks/currency-switcher/editor.js:608
+msgid "Auto"
+msgstr "Automatski"
+
+#: admin/components/currency-settings.js:175
+#: admin/components/currency-settings.js:191
+msgid "Dot (.)"
+msgstr "Točka (.)"
+
+#: admin/components/currency-settings.js:178
+#: admin/components/currency-settings.js:188
+msgid "Comma (,)"
+msgstr "Zarez (,)"
+
+#: admin/components/currency-settings.js:194
+msgid "Space"
+msgstr "Razmak"
+
+#: admin/components/currency-settings.js:197
+msgid "None"
+msgstr "Bez znaka"
+
+#: admin/components/currency-settings.js:204
+msgid "Left ($100)"
+msgstr "Lijevo ($100)"
+
+#: admin/components/currency-settings.js:207
+msgid "Right (100$)"
+msgstr "Desno (100$)"
+
+#: admin/components/currency-settings.js:210
+msgid "Left space ($ 100)"
+msgstr "Lijevo s razmakom ($ 100)"
+
+#: admin/components/currency-settings.js:213
+msgid "Right space (100 $)"
+msgstr "Desno s razmakom (100 $)"
+
+#: admin/components/currency-settings.js:225
+msgid ""
+"No display currencies added yet. Use the picker above to add currencies."
+msgstr ""
+"Još nema dodanih prikaznih valuta. Dodajte ih pomoću izbornika iznad."
+
+#: admin/components/diagnostics-view.js:24
+msgid "Available"
+msgstr "Dostupno"
+
+#: admin/components/diagnostics-view.js:25
+#: admin/components/diagnostics-view.js:85
+msgid "Missing"
+msgstr "Nedostaje"
+
+#: admin/components/diagnostics-view.js:26
+msgid "Active"
+msgstr "Aktivno"
+
+#: admin/components/diagnostics-view.js:27
+msgid "Not found"
+msgstr "Nije pronađeno"
+
+#: admin/components/diagnostics-view.js:28
+msgid "On"
+msgstr "Uključeno"
+
+#: admin/components/diagnostics-view.js:29
+#: admin/components/switcher-settings.js:179
+#: blocks/currency-switcher/editor.js:505
+msgid "Off"
+msgstr "Isključeno"
+
+#: admin/components/diagnostics-view.js:53
+msgid "Plugin"
+msgstr "Dodatak"
+
+#: admin/components/diagnostics-view.js:56
+msgid "Version"
+msgstr "Verzija"
+
+#: admin/components/diagnostics-view.js:59
+msgid "DB Version"
+msgstr "Verzija baze podataka"
+
+#: admin/components/diagnostics-view.js:62
+#: admin/components/general-settings.js:89
+msgid "Base Currency"
+msgstr "Osnovna valuta"
+
+#: admin/components/diagnostics-view.js:71
+msgid "Dependencies"
+msgstr "Ovisnosti"
+
+#: admin/components/diagnostics-view.js:77
+msgid "FluentCRM Custom Fields"
+msgstr "Prilagođena polja FluentCRM-a"
+
+#: admin/components/diagnostics-view.js:82
+msgid "Found"
+msgstr "Pronađeno"
+
+#: admin/components/diagnostics-view.js:88
+msgid "Unknown"
+msgstr "Nepoznato"
+
+#: admin/components/diagnostics-view.js:93
+msgid "Create missing fields"
+msgstr "Izradi polja koja nedostaju"
+
+#: admin/components/diagnostics-view.js:102
+msgid "Rates"
+msgstr "Tečajevi"
+
+#: admin/components/diagnostics-view.js:105
+msgid "Total rates"
+msgstr "Ukupno tečajeva"
+
+#: admin/components/diagnostics-view.js:108
+msgid "Stale rates"
+msgstr "Zastarjeli tečajevi"
+
+#: admin/components/diagnostics-view.js:115
+msgid "Feature Flags"
+msgstr "Prekidači značajki"
+
+#: admin/components/diagnostics-view.js:126
+msgid "Switcher Events"
+msgstr "Događaji promjene valute"
+
+#: admin/components/diagnostics-view.js:134
+msgid "No event data yet."
+msgstr "Još nema podataka o događajima."
+
+#: admin/components/diagnostics-view.js:142
+msgid "Top Switched Currencies"
+msgstr "Najčešće odabrane valute"
+
+#: admin/components/diagnostics-view.js:150
+msgid "No switch data yet."
+msgstr "Još nema podataka o promjenama valute."
+
+#: admin/components/diagnostics-view.js:158
+msgid "No diagnostics data."
+msgstr "Nema dijagnostičkih podataka."
+
+#: admin/components/general-settings.js:44
+msgid "Same as base currency (%s) — recommended"
+msgstr "Jednaka osnovnoj valuti (%s) — preporučeno"
+
+#: admin/components/general-settings.js:45
+msgid "store base"
+msgstr "osnovna valuta trgovine"
+
+#: admin/components/general-settings.js:65
+msgid "Multi-Currency Enabled"
+msgstr "Više valuta omogućeno"
+
+#: admin/components/general-settings.js:92
+msgid ""
+"Managed in FluentCart Store Setup. Checkout and payment gateways use this "
+"currency."
+msgstr ""
+"Upravlja se u postavkama trgovine FluentCart. Plaćanje i pristupnici za "
+"plaćanje upotrebljavaju ovu valutu."
+
+#: admin/components/general-settings.js:106
+msgid "Default Display Currency"
+msgstr "Zadana prikazna valuta"
+
+#: admin/components/general-settings.js:109
+msgid "Currency shown to visitors before any preference is detected."
+msgstr "Valuta koja se prikazuje posjetiteljima prije otkrivanja preferencija."
+
+#: admin/components/general-settings.js:124
+msgid "URL Parameter"
+msgstr "Parametar URL-a"
+
+#: admin/components/general-settings.js:127
+msgid "Allow currency switching via URL (e.g. ?currency=EUR)."
+msgstr "Omogućite promjenu valute putem URL-a (npr. ?currency=EUR)."
+
+#: admin/components/general-settings.js:146
+msgid "URL Parameter Key"
+msgstr "Ključ parametra URL-a"
+
+#: admin/components/general-settings.js:158
+msgid "Cookie Persistence"
+msgstr "Spremanje u kolačić"
+
+#: admin/components/general-settings.js:161
+msgid ""
+"Remember a guest currency in a cookie and matching browser-storage fallback. "
+"Disable this and logged-out visitors cannot keep a currency choice at all — "
+"the switch is reported as failed rather than silently ignored."
+msgstr ""
+"Zapamtite valutu gosta u kolačiću i odgovarajućoj pričuvnoj pohrani "
+"preglednika. Ako to onemogućite, odjavljeni posjetitelji uopće ne mogu "
+"zadržati odabranu valutu — promjena se prijavljuje kao neuspješna umjesto da "
+"se tiho zanemari."
+
+#: admin/components/general-settings.js:177
+msgid ""
+"Currency switching is now a logged-in-only feature. Guests will be told "
+"their preference could not be saved."
+msgstr ""
+"Promjena valute sada je dostupna samo prijavljenim korisnicima. Gosti će "
+"dobiti obavijest da njihovu preferenciju nije moguće spremiti."
+
+#: admin/components/general-settings.js:189
+msgid "Cookie Lifetime (days)"
+msgstr "Trajanje kolačića (dani)"
+
+#: admin/components/general-settings.js:201
+msgid "Account Persistence"
+msgstr "Spremanje na račun"
+
+#: admin/components/general-settings.js:204
+msgid ""
+"Remember currency preference in the logged-in user account. Disable this if "
+"you want logged-in sessions to respect the default display currency on every "
+"fresh visit."
+msgstr ""
+"Zapamtite preferiranu valutu na računu prijavljenog korisnika. Onemogućite "
+"ovu opciju ako želite da prijavljene sesije pri svakom novom posjetu "
+"upotrebljavaju zadanu prikaznu valutu."
+
+#: admin/components/general-settings.js:227
+msgid "Coming Soon"
+msgstr "Uskoro"
+
+#: admin/components/general-settings.js:230
+msgid ""
+"Automatically detect visitor currency based on their country. Requires a "
+"geolocation provider."
+msgstr ""
+"Automatski otkrijte valutu posjetitelja prema zemlji iz koje dolazi. Potreban "
+"je pružatelj geolokacije."
+
+#: admin/components/general-settings.js:251
+msgid "Remove Data on Uninstall"
+msgstr "Ukloni podatke pri deinstalaciji"
+
+#: admin/components/general-settings.js:254
+msgid ""
+"If enabled, all tables and settings will be removed when the plugin is "
+"uninstalled."
+msgstr ""
+"Ako je omogućeno, sve tablice i postavke uklonit će se pri deinstalaciji "
+"dodatka."
+
+#: admin/components/general-settings.js:263
+msgid "Keep data"
+msgstr "Zadrži podatke"
+
+#: admin/components/general-settings.js:266
+msgid "Delete all"
+msgstr "Izbriši sve"
+
+#: admin/components/rate-settings.js:28
+msgid "Stale"
+msgstr "Zastarjelo"
+
+#: admin/components/rate-settings.js:29
+msgid "OK"
+msgstr "U redu"
+
+#: admin/components/rate-settings.js:30
+msgid "No manual rates saved yet."
+msgstr "Još nema spremljenih ručnih tečajeva."
+
+#: admin/components/rate-settings.js:31
+msgid "No exchange rates yet. Add display currencies and trigger a refresh."
+msgstr "Još nema tečajeva. Dodajte prikazne valute i pokrenite osvježavanje."
+
+#: admin/components/rate-settings.js:43
+msgid "Rate Provider"
+msgstr "Pružatelj tečajeva"
+
+#: admin/components/rate-settings.js:46
+msgid "Service used to fetch exchange rates."
+msgstr "Usluga za dohvaćanje tečajeva."
+
+#: admin/components/rate-settings.js:58
+msgid "European Central Bank (free)"
+msgstr "Europska središnja banka (besplatno)"
+
+#: admin/components/rate-settings.js:71
+msgid "API Key"
+msgstr "API ključ"
+
+#: admin/components/rate-settings.js:84
+msgid "Refresh Interval (hours)"
+msgstr "Interval osvježavanja (sati)"
+
+#: admin/components/rate-settings.js:87
+msgid "How often to fetch new exchange rates."
+msgstr "Koliko često dohvatiti nove tečajeve."
+
+#: admin/components/rate-settings.js:99
+msgid "Stale Threshold (hours)"
+msgstr "Prag zastarjelosti (sati)"
+
+#: admin/components/rate-settings.js:102
+msgid "Rates older than this will trigger an admin warning."
+msgstr "Tečajevi stariji od ovog praga pokrenut će upozorenje administratoru."
+
+#: admin/components/rate-settings.js:113
+msgid "Stale Rate Fallback"
+msgstr "Postupanje sa zastarjelim tečajem"
+
+#: admin/components/rate-settings.js:116
+msgid "What to do when rates are outdated beyond the threshold."
+msgstr "Što učiniti kada su tečajevi stariji od zadanog praga."
+
+#: admin/components/rate-settings.js:122
+msgid "Show base currency"
+msgstr "Prikaži osnovnu valutu"
+
+#: admin/components/rate-settings.js:125
+msgid "Use last known rate"
+msgstr "Upotrijebi posljednji poznati tečaj"
+
+#: admin/components/rate-settings.js:134
+msgid "Rounding Mode"
+msgstr "Način zaokruživanja"
+
+#: admin/components/rate-settings.js:137
+msgid "How converted prices are rounded."
+msgstr "Kako se zaokružuju preračunate cijene."
+
+#: admin/components/rate-settings.js:162
+msgid "Manual Rates"
+msgstr "Ručni tečajevi"
+
+#: admin/components/rate-settings.js:165
+msgid "Save the provider change before entering manual rates."
+msgstr "Spremite promjenu pružatelja prije unosa ručnih tečajeva."
+
+#: admin/components/rate-settings.js:168
+msgid "Add and save at least one display currency first."
+msgstr "Najprije dodajte i spremite barem jednu prikaznu valutu."
+
+#: admin/components/rate-settings.js:181
+msgid "Current Rates"
+msgstr "Trenutačni tečajevi"
+
+#: admin/components/rate-settings.js:184
+msgid "Save Manual Rates"
+msgstr "Spremi ručne tečajeve"
+
+#: admin/components/rate-settings.js:187
+msgid "Refresh Now"
+msgstr "Osvježi sada"
+
+#: admin/components/rate-settings.js:192
+msgid "Base"
+msgstr "Osnovna"
+
+#: admin/components/rate-settings.js:195
+msgid "Quote"
+msgstr "Kotirana"
+
+#: admin/components/rate-settings.js:198
+msgid "Rate"
+msgstr "Tečaj"
+
+#: admin/components/rate-settings.js:201
+msgid "Provider"
+msgstr "Pružatelj"
+
+#: admin/components/rate-settings.js:204
+msgid "Fetched"
+msgstr "Dohvaćeno"
+
+#: admin/components/rate-settings.js:207
+msgid "Status"
+msgstr "Status"
+
+#: admin/components/switcher-settings.js:48
+msgid "Default Preset"
+msgstr "Zadana postavka izgleda"
+
+#: admin/components/switcher-settings.js:51
+msgid "Visual style used by switcher blocks that inherit global defaults."
+msgstr "Vizualni stil blokova za promjenu valute koji nasljeđuju globalne postavke."
+
+#: admin/components/switcher-settings.js:60
+#: blocks/currency-switcher/editor.js:406
+msgid "Default"
+msgstr "Zadano"
+
+#: admin/components/switcher-settings.js:63
+#: blocks/currency-switcher/editor.js:407
+msgid "Pill"
+msgstr "Kapsula"
+
+#: admin/components/switcher-settings.js:66
+#: blocks/currency-switcher/editor.js:408
+msgid "Minimal"
+msgstr "Minimalno"
+
+#: admin/components/switcher-settings.js:69
+#: blocks/currency-switcher/editor.js:409
+msgid "Subtle"
+msgstr "Nenametljivo"
+
+#: admin/components/switcher-settings.js:72
+#: blocks/currency-switcher/editor.js:410
+msgid "Glass"
+msgstr "Staklo"
+
+#: admin/components/switcher-settings.js:75
+#: blocks/currency-switcher/editor.js:411
+msgid "Contrast"
+msgstr "Kontrastno"
+
+#: admin/components/switcher-settings.js:84
+msgid "Label Position"
+msgstr "Položaj oznake"
+
+#: admin/components/switcher-settings.js:87
+msgid "Where the optional label should sit relative to the switcher."
+msgstr "Gdje se neobavezna oznaka nalazi u odnosu na izbornik valute."
+
+#: admin/components/switcher-settings.js:93
+#: blocks/currency-switcher/editor.js:425
+msgid "Before"
+msgstr "Prije"
+
+#: admin/components/switcher-settings.js:96
+#: blocks/currency-switcher/editor.js:426
+msgid "After"
+msgstr "Poslije"
+
+#: admin/components/switcher-settings.js:99
+#: blocks/currency-switcher/editor.js:427
+msgid "Above"
+msgstr "Iznad"
+
+#: admin/components/switcher-settings.js:102
+#: blocks/currency-switcher/editor.js:428
+msgid "Below"
+msgstr "Ispod"
+
+#: admin/components/switcher-settings.js:109
+msgid "Trigger Content"
+msgstr "Sadržaj gumba"
+
+#: admin/components/switcher-settings.js:114
+msgid "Trigger Elements"
+msgstr "Elementi gumba"
+
+#: admin/components/switcher-settings.js:117
+msgid "Choose what appears in the closed switcher button."
+msgstr "Odaberite što se prikazuje na zatvorenom gumbu za promjenu valute."
+
+#: admin/components/switcher-settings.js:122
+msgid "Flag"
+msgstr "Zastava"
+
+#: admin/components/switcher-settings.js:125
+#: blocks/currency-switcher/editor.js:816
+msgid "Code"
+msgstr "Šifra"
+
+#: admin/components/switcher-settings.js:131
+#: blocks/currency-switcher/editor.js:818
+msgid "Name"
+msgstr "Naziv"
+
+#: admin/components/switcher-settings.js:137
+msgid "Dropdown Content"
+msgstr "Sadržaj padajućeg izbornika"
+
+#: admin/components/switcher-settings.js:142
+msgid "Option Elements"
+msgstr "Elementi opcije"
+
+#: admin/components/switcher-settings.js:145
+msgid "Choose what each currency row displays inside the dropdown."
+msgstr "Odaberite što prikazuje svaki redak valute u padajućem izborniku."
+
+#: admin/components/switcher-settings.js:150
+msgid "Flags"
+msgstr "Zastave"
+
+#: admin/components/switcher-settings.js:153
+msgid "Codes"
+msgstr "Šifre"
+
+#: admin/components/switcher-settings.js:156
+msgid "Symbols"
+msgstr "Simboli"
+
+#: admin/components/switcher-settings.js:159
+msgid "Names"
+msgstr "Nazivi"
+
+#: admin/components/switcher-settings.js:162
+msgid "Active check"
+msgstr "Kvačica aktivne valute"
+
+#: admin/components/switcher-settings.js:170
+msgid "Search Mode"
+msgstr "Način pretraživanja"
+
+#: admin/components/switcher-settings.js:173
+msgid "Useful when you expose more than a handful of currencies."
+msgstr "Korisno kada prikazujete više od nekoliko valuta."
+
+#: admin/components/switcher-settings.js:182
+#: blocks/currency-switcher/editor.js:506
+msgid "Inline search"
+msgstr "Pretraživanje u izborniku"
+
+#: admin/components/switcher-settings.js:191
+msgid "Favorite Currencies"
+msgstr "Omiljene valute"
+
+#: admin/components/switcher-settings.js:194
+msgid ""
+"Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
+msgstr ""
+"ISO šifre odvojene zarezima koje se prikazuju iznad ostalih, primjerice: "
+"EUR, USD, GBP"
+
+#: admin/components/switcher-settings.js:204
+#: blocks/currency-switcher/editor.js:521
+#: blocks/currency-switcher/editor.js:961
+msgid "Show favorites first"
+msgstr "Prvo prikaži omiljene"
+
+#: admin/components/switcher-settings.js:213
+msgid "Layout Defaults"
+msgstr "Zadane postavke rasporeda"
+
+#: admin/components/switcher-settings.js:216
+msgid "Baseline geometry for inheriting switcher blocks."
+msgstr "Osnovna geometrija za blokove za promjenu valute koji nasljeđuju postavke."
+
+#: admin/components/switcher-settings.js:222
+#: blocks/currency-switcher/editor.js:593
+msgid "Size"
+msgstr "Veličina"
+
+#: admin/components/switcher-settings.js:226
+#: blocks/currency-switcher/editor.js:596
+msgid "Small"
+msgstr "Malo"
+
+#: admin/components/switcher-settings.js:229
+#: blocks/currency-switcher/editor.js:597
+msgid "Medium"
+msgstr "Srednje"
+
+#: admin/components/switcher-settings.js:232
+#: blocks/currency-switcher/editor.js:598
+msgid "Large"
+msgstr "Veliko"
+
+#: admin/components/switcher-settings.js:238
+#: blocks/currency-switcher/editor.js:605
+msgid "Width"
+msgstr "Širina"
+
+#: admin/components/switcher-settings.js:242
+msgid "Auto width"
+msgstr "Automatska širina"
+
+#: admin/components/switcher-settings.js:245
+#: blocks/currency-switcher/editor.js:609
+msgid "Full width"
+msgstr "Puna širina"
+
+#: admin/components/switcher-settings.js:251
+#: blocks/currency-switcher/editor.js:528
+msgid "Dropdown position"
+msgstr "Položaj padajućeg izbornika"
+
+#: admin/components/switcher-settings.js:255
+msgid "Auto position"
+msgstr "Automatski položaj"
+
+#: admin/components/switcher-settings.js:258
+#: blocks/currency-switcher/editor.js:532
+msgid "Start"
+msgstr "Početak"
+
+#: admin/components/switcher-settings.js:261
+#: blocks/currency-switcher/editor.js:533
+msgid "End"
+msgstr "Kraj"
+
+#: admin/components/switcher-settings.js:267
+#: blocks/currency-switcher/editor.js:540
+msgid "Dropdown direction"
+msgstr "Smjer padajućeg izbornika"
+
+#: admin/components/switcher-settings.js:271
+msgid "Auto direction"
+msgstr "Automatski smjer"
+
+#: admin/components/switcher-settings.js:274
+#: blocks/currency-switcher/editor.js:544
+msgid "Down"
+msgstr "Prema dolje"
+
+#: admin/components/switcher-settings.js:277
+#: blocks/currency-switcher/editor.js:545
+msgid "Up"
+msgstr "Prema gore"
+
+#: admin/components/switcher-settings.js:287
+#: blocks/currency-switcher/editor.js:554
+msgid "Footer Context"
+msgstr "Kontekst u podnožju"
+
+#: admin/components/switcher-settings.js:290
+msgid ""
+"Optional trust-building context shown at the bottom of the dropdown. The "
+"freshness badge also requires the global Rate Freshness Badge gate on the "
+"Checkout tab."
+msgstr ""
+"Neobavezne informacije koje ulijevaju povjerenje prikazuju se na dnu "
+"padajućeg izbornika. Za oznaku svježine mora biti uključen i globalni "
+"prekidač „Oznaka svježine tečaja” na kartici „Plaćanje”."
+
+#: admin/components/switcher-settings.js:298
+msgid "Freshness badge"
+msgstr "Oznaka svježine"
+
+#: admin/components/switcher-settings.js:301
+msgid "Rate value"
+msgstr "Vrijednost tečaja"
+
+#: admin/components/switcher-settings.js:304
+msgid "Checkout context"
+msgstr "Kontekst plaćanja"
+
+#: admin/multi-currency-admin.js:47
+msgid "Network error. Please check your connection."
+msgstr "Mrežna pogreška. Provjerite vezu."
+
+#: admin/multi-currency-admin.js:78
+msgid "Save"
+msgstr "Spremi"
+
+#: admin/multi-currency-admin.js:79
+msgid "Saving..."
+msgstr "Spremanje…"
+
+#: admin/multi-currency-admin.js:82
+msgid "General"
+msgstr "Općenito"
+
+#: admin/multi-currency-admin.js:83
+msgid "Currencies"
+msgstr "Valute"
+
+#: admin/multi-currency-admin.js:84
+msgid "Exchange Rates"
+msgstr "Tečajevi"
+
+#: admin/multi-currency-admin.js:85
+msgid "Switcher"
+msgstr "Izbornik valute"
+
+#: admin/multi-currency-admin.js:86
+msgid "Checkout"
+msgstr "Plaćanje"
+
+#: admin/multi-currency-admin.js:87
+msgid "CRM"
+msgstr "CRM"
+
+#: admin/multi-currency-admin.js:88
+msgid "Diagnostics"
+msgstr "Dijagnostika"
+
+#: admin/multi-currency-admin.js:130
+msgid "Failed to load settings."
+msgstr "Učitavanje postavki nije uspjelo."
+
+#: admin/multi-currency-admin.js:156
+msgid "Failed to load exchange rates."
+msgstr "Učitavanje tečajeva nije uspjelo."
+
+#: admin/multi-currency-admin.js:171
+msgid "Failed to load diagnostics."
+msgstr "Učitavanje dijagnostike nije uspjelo."
+
+#: admin/multi-currency-admin.js:185
+msgid "FluentCRM fields created."
+msgstr "Polja FluentCRM-a su izrađena."
+
+#: admin/multi-currency-admin.js:189
+msgid "Could not create the FluentCRM fields."
+msgstr "Polja FluentCRM-a nije moguće izraditi."
+
+#: admin/multi-currency-admin.js:200
+msgid "Rates refreshed."
+msgstr "Tečajevi su osvježeni."
+
+#: admin/multi-currency-admin.js:204
+msgid "Rate refresh failed."
+msgstr "Osvježavanje tečajeva nije uspjelo."
+
+#: admin/multi-currency-admin.js:218
+msgid "Manual rates saved."
+msgstr "Ručni tečajevi su spremljeni."
+
+#: admin/multi-currency-admin.js:234
+msgid "Settings saved."
+msgstr "Postavke su spremljene."
+
+#: admin/multi-currency-admin.js:239
+msgid "Failed to save settings."
+msgstr "Spremanje postavki nije uspjelo."
+
+#: admin/multi-currency-admin.js:271
+msgid "Multi-Currency settings"
+msgstr "Postavke više valuta"
+
+#: admin/switcher-preview.js:26
+msgid "US Dollar"
+msgstr "Američki dolar"
+
+#: admin/switcher-preview.js:32
+msgid "Euro"
+msgstr "Euro"
+
+#: admin/switcher-preview.js:38
+msgid "British Pound"
+msgstr "Britanska funta"
+
+#: admin/switcher-preview.js:62
+msgid "%s minute"
+msgid_plural "%s minutes"
+msgstr[0] "%s minuta"
+msgstr[1] "%s minute"
+msgstr[2] "%s minuta"
+
+#. translators: %1$s is the number of currencies shown, %2$s the total configured.
+#: admin/switcher-preview.js:118
+msgid ""
+"Showing %1$s of %2$s currencies. The full list appears on the frontend — "
+"this is just a taste."
+msgstr ""
+"Prikazano: %1$s od %2$s valuta. Cijeli popis prikazuje se na korisničkoj "
+"strani — ovo je samo kratki pregled."
+
+#: admin/switcher-preview.js:179
+msgid "Display prices only. Checkout charged in %s."
+msgstr "Valuta služi samo za prikaz cijena. Naplata je u valuti %s."
+
+#: admin/switcher-preview.js:182
+msgid "Display prices only. Checkout is charged in the store currency."
+msgstr "Valuta služi samo za prikaz cijena. Naplata je u valuti trgovine."
+
+#: admin/switcher-preview.js:206
+msgid "Preview"
+msgstr "Pretpregled"
+
+#: blocks/currency-switcher/editor.js:374
+msgid "Source"
+msgstr "Izvor"
+
+#: blocks/currency-switcher/editor.js:376
+msgid "Use global switcher defaults"
+msgstr "Upotrijebi globalne zadane postavke izbornika valute"
+
+#: blocks/currency-switcher/editor.js:383
+msgid "Label"
+msgstr "Oznaka"
+
+#: blocks/currency-switcher/editor.js:391
+msgid ""
+"This block inherits its switcher behavior from the global defaults in Multi-"
+"Currency settings. Only the label stays instance-specific."
+msgstr ""
+"Ovaj blok nasljeđuje ponašanje izbornika valute iz globalnih zadanih "
+"postavki za više valuta. Samo oznaka ostaje zasebna za ovaj primjerak bloka."
+
+#: blocks/currency-switcher/editor.js:401
+#: blocks/currency-switcher/editor.js:403
+msgid "Preset"
+msgstr "Postavka izgleda"
+
+#: blocks/currency-switcher/editor.js:420
+msgid "Trigger"
+msgstr "Gumb"
+
+#: blocks/currency-switcher/editor.js:422
+msgid "Label position"
+msgstr "Položaj oznake"
+
+#: blocks/currency-switcher/editor.js:435
+msgid "Show trigger flag"
+msgstr "Prikaži zastavu na gumbu"
+
+#: blocks/currency-switcher/editor.js:442
+msgid "Show trigger code"
+msgstr "Prikaži šifru na gumbu"
+
+#: blocks/currency-switcher/editor.js:449
+msgid "Show trigger symbol"
+msgstr "Prikaži simbol na gumbu"
+
+#: blocks/currency-switcher/editor.js:456
+msgid "Show trigger name"
+msgstr "Prikaži naziv na gumbu"
+
+#: blocks/currency-switcher/editor.js:465
+msgid "Dropdown"
+msgstr "Padajući izbornik"
+
+#: blocks/currency-switcher/editor.js:467
+msgid "Show option flags"
+msgstr "Prikaži zastave opcija"
+
+#: blocks/currency-switcher/editor.js:474
+msgid "Show option codes"
+msgstr "Prikaži šifre opcija"
+
+#: blocks/currency-switcher/editor.js:481
+msgid "Show option symbols"
+msgstr "Prikaži simbole opcija"
+
+#: blocks/currency-switcher/editor.js:488
+msgid "Show option names"
+msgstr "Prikaži nazive opcija"
+
+#: blocks/currency-switcher/editor.js:495
+msgid "Show active indicator"
+msgstr "Prikaži pokazatelj aktivne valute"
+
+#: blocks/currency-switcher/editor.js:502
+msgid "Search"
+msgstr "Pretraživanje"
+
+#: blocks/currency-switcher/editor.js:513
+#: blocks/currency-switcher/editor.js:953
+msgid "Favorite currencies"
+msgstr "Omiljene valute"
+
+#: blocks/currency-switcher/editor.js:514
+#: blocks/currency-switcher/editor.js:954
+msgid "Comma-separated ISO codes, for example: EUR, USD, GBP"
+msgstr "ISO šifre odvojene zarezima, primjerice: EUR, USD, GBP"
+
+#: blocks/currency-switcher/editor.js:556
+msgid "Show freshness badge"
+msgstr "Prikaži oznaku svježine"
+
+#: blocks/currency-switcher/editor.js:563
+msgid "Show rate value"
+msgstr "Prikaži vrijednost tečaja"
+
+#: blocks/currency-switcher/editor.js:570
+msgid "Show checkout context note"
+msgstr "Prikaži napomenu o kontekstu plaćanja"
+
+#: blocks/currency-switcher/editor.js:579
+#: blocks/currency-switcher/editor.js:951
+msgid "Layout"
+msgstr "Raspored"
+
+#: blocks/currency-switcher/editor.js:581
+msgid "Alignment"
+msgstr "Poravnanje"
+
+#: blocks/currency-switcher/editor.js:584
+msgid "Left"
+msgstr "Lijevo"
+
+#: blocks/currency-switcher/editor.js:585
+msgid "Center"
+msgstr "Sredina"
+
+#: blocks/currency-switcher/editor.js:586
+msgid "Right"
+msgstr "Desno"
+
+#: blocks/currency-switcher/editor.js:625
+msgid ""
+"Editor preview uses your actual configured currencies and current global "
+"switcher defaults."
+msgstr ""
+"Pretpregled u uređivaču upotrebljava stvarne konfigurirane valute i "
+"trenutačne globalne zadane postavke izbornika valute."
+
+#: blocks/currency-switcher/editor.js:676
+msgid "Rates updated 2 hours ago"
+msgstr "Tečajevi su ažurirani prije 2 sata"
+
+#: blocks/currency-switcher/editor.js:680
+msgid "1 EUR = 1.1000 USD"
+msgstr "1 EUR = 1,1000 USD"
+
+#: blocks/currency-switcher/editor.js:683
+msgid "Display prices only. Checkout is charged in EUR."
+msgstr "Valuta služi samo za prikaz cijena. Naplata je u valuti EUR."
+
+#: blocks/currency-switcher/editor.js:702
+msgid "Header Compact"
+msgstr "Kompaktno zaglavlje"
+
+#: blocks/currency-switcher/editor.js:702
+msgid "Flag and code only, tuned for narrow header space."
+msgstr "Samo zastava i šifra, prilagođeno uskom prostoru zaglavlja."
+
+#: blocks/currency-switcher/editor.js:718
+msgid "Footer Descriptive"
+msgstr "Opisno podnožje"
+
+#: blocks/currency-switcher/editor.js:718
+msgid "A more descriptive switcher for footer or utility content."
+msgstr "Opisniji izbornik valute za podnožje ili pomoćni sadržaj."
+
+#: blocks/currency-switcher/editor.js:731
+msgid "Mobile Full Width"
+msgstr "Puna širina na mobilnim uređajima"
+
+#: blocks/currency-switcher/editor.js:731
+msgid "Full-width mobile-friendly switcher with room for more context."
+msgstr ""
+"Izbornik valute pune širine, prilagođen mobilnim uređajima, s prostorom za "
+"više konteksta."
+
+#: blocks/currency-switcher/editor.js:809
+#: blocks/currency-switcher/editor.js:852
+#: blocks/currency-switcher/editor.js:906
+msgid "Display"
+msgstr "Prikaz"
+
+#: blocks/currency-switcher/editor.js:811
+#: blocks/currency-switcher/editor.js:908
+msgid "Mode"
+msgstr "Način"
+
+#: blocks/currency-switcher/editor.js:814
+msgid "Flag + Code"
+msgstr "Zastava + šifra"
+
+#: blocks/currency-switcher/editor.js:815
+msgid "Flag + Name"
+msgstr "Zastava + naziv"
+
+#: blocks/currency-switcher/editor.js:819
+msgid "Symbol + Code"
+msgstr "Simbol + šifra"
+
+#: blocks/currency-switcher/editor.js:854
+msgid "Format"
+msgstr "Format"
+
+#: blocks/currency-switcher/editor.js:857
+#: blocks/currency-switcher/editor.js:911
+msgid "Compact"
+msgstr "Sažeto"
+
+#: blocks/currency-switcher/editor.js:858
+msgid "Sentence"
+msgstr "Rečenica"
+
+#: blocks/currency-switcher/editor.js:865
+msgid "Precision"
+msgstr "Preciznost"
+
+#: blocks/currency-switcher/editor.js:872
+#: blocks/currency-switcher/editor.js:920
+msgid "Hide when base currency is displayed"
+msgstr "Sakrij kada se prikazuje osnovna valuta"
+
+#: blocks/currency-switcher/editor.js:912
+msgid "Checkout disclosure"
+msgstr "Obavijest pri plaćanju"
+
+#: blocks/currency-switcher/editor.js:913
+msgid "Full note"
+msgstr "Puna napomena"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block title"
+msgid "Currency Context Notice"
+msgstr "Obavijest o kontekstu valute"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block description"
+msgid ""
+"Show a currency context note such as display currency vs checkout currency."
+msgstr ""
+"Prikažite napomenu o kontekstu valute, primjerice prikazna valuta u odnosu "
+"na valutu plaćanja."
+
+#: blocks/currency-context-notice/block.json blocks/currency-current/block.json
+#: blocks/currency-selector-buttons/block.json
+#: blocks/currency-switcher/block.json blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "currency"
+msgstr "valuta"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block keyword"
+msgid "notice"
+msgstr "obavijest"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block keyword"
+msgid "checkout"
+msgstr "plaćanje"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block keyword"
+msgid "context"
+msgstr "kontekst"
+
+#: blocks/currency-current/block.json
+msgctxt "block title"
+msgid "Current Currency"
+msgstr "Trenutačna valuta"
+
+#: blocks/currency-current/block.json
+msgctxt "block description"
+msgid "Display the visitor's current display currency in compact form."
+msgstr "Prikažite trenutačnu prikaznu valutu posjetitelja u sažetom obliku."
+
+#: blocks/currency-current/block.json
+msgctxt "block keyword"
+msgid "current"
+msgstr "trenutačna"
+
+#: blocks/currency-current/block.json
+msgctxt "block keyword"
+msgid "display"
+msgstr "prikaz"
+
+#: blocks/currency-current/block.json blocks/currency-switcher/block.json
+msgctxt "block keyword"
+msgid "money"
+msgstr "novac"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block title"
+msgid "Currency Selector Buttons"
+msgstr "Gumbi za odabir valute"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block description"
+msgid ""
+"A button-group alternative to the dropdown switcher for stores with a few "
+"main currencies."
+msgstr ""
+"Skupina gumba kao alternativa padajućem izborniku za trgovine s nekoliko "
+"glavnih valuta."
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block keyword"
+msgid "selector"
+msgstr "odabir"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block keyword"
+msgid "buttons"
+msgstr "gumbi"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block keyword"
+msgid "toggle"
+msgstr "prebacivanje"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block title"
+msgid "Currency Switcher"
+msgstr "Izbornik valute"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block description"
+msgid ""
+"Display the FCHub Multi-Currency switcher in posts, pages, templates, and "
+"template parts."
+msgstr ""
+"Prikažite izbornik valute FCHub Multi-Currency u objavama, stranicama, "
+"predlošcima i dijelovima predložaka."
+
+#: blocks/currency-switcher/block.json
+msgctxt "block keyword"
+msgid "switcher"
+msgstr "izbornik"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block keyword"
+msgid "multi-currency"
+msgstr "više valuta"
+
+#: blocks/currency-switcher/block.json blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "exchange"
+msgstr "razmjena"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Default"
+msgstr "Zadano"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Pill"
+msgstr "Kapsula"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Minimal"
+msgstr "Minimalno"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Subtle"
+msgstr "Nenametljivo"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Glass"
+msgstr "Staklo"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Contrast"
+msgstr "Kontrastno"
+
+#: blocks/exchange-rate/block.json
+msgctxt "block title"
+msgid "Exchange Rate"
+msgstr "Tečaj"
+
+#: blocks/exchange-rate/block.json
+msgctxt "block description"
+msgid ""
+"Display the current exchange rate between the store base currency and the "
+"visitor display currency."
+msgstr ""
+"Prikažite trenutačni tečaj između osnovne valute trgovine i prikazne valute "
+"posjetitelja."
+
+#: blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "rate"
+msgstr "tečaj"
+
+#: blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "fx"
+msgstr "devize"

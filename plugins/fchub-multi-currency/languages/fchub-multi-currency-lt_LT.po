@@ -1,0 +1,1717 @@
+# Copyright (C) 2026 Vibe Code
+# This file is distributed under the GPLv2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-currency\n"
+"Last-Translator: \n"
+"Language-Team: Lithuanian\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-08-18T19:36:27+00:00\n"
+"PO-Revision-Date: 2026-08-19 03:10+0300\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: fchub-multi-currency\n"
+"Language: lt_LT\n"
+"Plural-Forms: nplurals=3; plural=(n % 10 == 1 && (n % 100 < 11 || n % 100 > 19)) ? 0 : ((n % 10 >= 2 && n % 10 <= 9 && (n % 100 < 11 || n % 100 > 19)) ? 1 : 2);\n"
+
+#. Plugin Name of the plugin
+#: fchub-multi-currency.php app/Bootstrap/Modules/BlocksModule.php:77
+#: app/GDPR/PersonalDataHandler.php:24 app/GDPR/PersonalDataHandler.php:34
+#: app/Integration/AddonsRegistration.php:23
+msgid "FCHub Multi-Currency"
+msgstr "FCHub Multi-Currency"
+
+#. Plugin URI of the plugin
+#: fchub-multi-currency.php
+msgid "https://fchub.co/docs/fchub-multi-currency"
+msgstr "https://fchub.co/docs/fchub-multi-currency"
+
+#. Description of the plugin
+#: fchub-multi-currency.php
+msgid "Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure"
+msgstr "FluentCart kelių valiutų rodymo sprendimas su valiutų kursų valdymu ir atsiskaitymo informacija"
+
+#. Author of the plugin
+#: fchub-multi-currency.php
+msgid "Vibe Code"
+msgstr "Vibe Code"
+
+#. Author URI of the plugin
+#: fchub-multi-currency.php
+msgid "https://x.com/vcode_sh"
+msgstr "https://x.com/vcode_sh"
+
+#: app/Bootstrap/Modules/BlocksModule.php:81
+msgid "Currency Showcase"
+msgstr "Valiutų demonstracija"
+
+#: app/Bootstrap/Modules/BlocksModule.php:83
+msgid "A ready-made showcase of the full currency block family."
+msgstr "Paruoštas visos valiutų blokų šeimos pristatymas."
+
+#: app/Bootstrap/Modules/DiagnosticsModule.php:71
+msgid "FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics page or trigger a manual refresh."
+msgstr "FCHub Multi-Currency: kai kurie valiutų kursai pasenę. Patikrinkite diagnostikos puslapį arba atnaujinkite juos rankiniu būdu."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:37
+msgid "Switch the rate provider to Manual rates before saving."
+msgstr "Prieš išsaugodami pasirinkite kursų teikėją „Rankiniai kursai“."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:43
+msgid "Add at least one display currency before saving manual rates."
+msgstr "Prieš išsaugodami rankinius kursus pridėkite bent vieną rodymo valiutą."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:48
+msgid "Provide one rate for every configured display currency."
+msgstr "Nurodykite po vieną kursą kiekvienai sukonfigūruotai rodymo valiutai."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:51
+#: app/Domain/Actions/SaveManualRatesAction.php:98
+msgid "Rates may only be saved for configured display currencies."
+msgstr "Kursus galima išsaugoti tik sukonfigūruotoms rodymo valiutoms."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:67
+#: app/Http/Controllers/Admin/RatesAdminController.php:104
+#: admin/multi-currency-admin.js:222
+msgid "Manual rates could not be saved."
+msgstr "Nepavyko išsaugoti rankinių kursų."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:110
+#: app/Domain/Actions/SaveManualRatesAction.php:117
+msgid "Each manual rate must be a positive decimal string with up to 8 decimal places."
+msgstr "Kiekvienas rankinis kursas turi būti teigiamas dešimtainis skaičius, turintis ne daugiau kaip 8 skaitmenis po kablelio."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:121
+msgid "Each manual rate must be greater than zero."
+msgstr "Kiekvienas rankinis kursas turi būti didesnis už nulį."
+
+#: app/Domain/Enums/RateProvider.php:19 admin/components/rate-settings.js:52
+msgid "ExchangeRate-API (free tier)"
+msgstr "ExchangeRate-API (nemokamas planas)"
+
+#: app/Domain/Enums/RateProvider.php:20 admin/components/rate-settings.js:55
+msgid "Open Exchange Rates"
+msgstr "Open Exchange Rates"
+
+#: app/Domain/Enums/RateProvider.php:21
+msgid "European Central Bank (EUR base, free)"
+msgstr "Europos Centrinis Bankas (pagrindinė valiuta – EUR, nemokamai)"
+
+#: app/Domain/Enums/RateProvider.php:22 admin/components/rate-settings.js:61
+msgid "Manual rates"
+msgstr "Rankiniai kursai"
+
+#: app/Domain/Enums/ResolverSource.php:20
+msgid "URL parameter"
+msgstr "URL parametras"
+
+#: app/Domain/Enums/ResolverSource.php:21
+msgid "User preference"
+msgstr "Naudotojo pasirinkimas"
+
+#: app/Domain/Enums/ResolverSource.php:22
+msgid "Cookie (guest)"
+msgstr "Slapukas (svečias)"
+
+#: app/Domain/Enums/ResolverSource.php:23
+#: admin/components/general-settings.js:225
+msgid "Geolocation"
+msgstr "Geografinės vietos nustatymas"
+
+#: app/Domain/Enums/ResolverSource.php:24
+msgid "Store default"
+msgstr "Numatytoji parduotuvės valiuta"
+
+#: app/Domain/Enums/RoundingMode.php:20 admin/components/rate-settings.js:143
+msgid "Truncate (no rounding)"
+msgstr "Nukirpti (neapvalinti)"
+
+#: app/Domain/Enums/RoundingMode.php:21 admin/components/rate-settings.js:146
+msgid "Round half up (standard)"
+msgstr "Apvalinti pusę aukštyn (standartinis)"
+
+#: app/Domain/Enums/RoundingMode.php:22 admin/components/rate-settings.js:149
+msgid "Round half down"
+msgstr "Apvalinti pusę žemyn"
+
+#: app/Domain/Enums/RoundingMode.php:23 admin/components/rate-settings.js:152
+msgid "Always round up"
+msgstr "Visada apvalinti aukštyn"
+
+#: app/Domain/Enums/RoundingMode.php:24 admin/components/rate-settings.js:155
+msgid "Always round down"
+msgstr "Visada apvalinti žemyn"
+
+#. translators: {base_currency} is a literal placeholder token replaced with the currency code.
+#: app/Domain/Services/CheckoutDisclosureService.php:33
+msgid "Your payment will be processed in {base_currency}."
+msgstr "Mokėjimas bus apdorotas valiuta {base_currency}."
+
+#. translators: %s is a human-readable time difference, e.g. "2 hours".
+#. translators: %s: human-readable time difference, e.g. "2 hours"
+#: app/Frontend/CurrencyContextPresentation.php:36
+#: app/Frontend/CurrencyContextPresentation.php:312
+#: admin/switcher-preview.js:163
+#, php-format
+msgid "Rates updated %s ago"
+msgstr "Kursai atnaujinti prieš %s"
+
+#. translators: %1$s is the base currency code, %2$s the exchange rate, %3$s the display currency code.
+#. translators: 1: base currency code, 2: rate, 3: display currency code
+#. translators: 1: base currency code, 2: exchange rate, 3: display currency code
+#: app/Frontend/CurrencyContextPresentation.php:46
+#: app/Frontend/CurrencyContextPresentation.php:201
+#: app/Frontend/CurrencyContextPresentation.php:332
+#: admin/switcher-preview.js:169
+#, php-format
+msgid "1 %1$s = %2$s %3$s"
+msgstr "1 %1$s = %2$s %3$s"
+
+#. translators: %1$s is the base currency code, %2$s the exchange rate, %3$s the display currency code.
+#. translators: 1: base currency code, 2: rate, 3: display currency code
+#: app/Frontend/CurrencyContextPresentation.php:48
+#: app/Frontend/CurrencyContextPresentation.php:194
+#, php-format
+msgid "Current rate: 1 %1$s = %2$s %3$s"
+msgstr "Dabartinis kursas: 1 %1$s = %2$s %3$s"
+
+#. translators: %1$s is the display currency code, %2$s the base currency code.
+#. translators: 1: display currency code, 2: base currency code
+#: app/Frontend/CurrencyContextPresentation.php:50
+#: app/Frontend/CurrencyContextPresentation.php:233
+#, php-format
+msgid "Viewing prices in %1$s. Checkout in %2$s."
+msgstr "Kainos rodomos valiuta %1$s. Atsiskaitoma valiuta %2$s."
+
+#. translators: %1$s is the display currency code, %2$s the base currency code.
+#. translators: 1: display currency code, 2: base currency code
+#: app/Frontend/CurrencyContextPresentation.php:52
+#: app/Frontend/CurrencyContextPresentation.php:227
+#, php-format
+msgid "Prices shown in %1$s are approximate. Checkout is charged in %2$s."
+msgstr "Valiuta %1$s rodomos kainos yra apytikslės. Atsiskaitoma valiuta %2$s."
+
+#: app/Frontend/CurrencyContextPresentation.php:56
+#: app/Frontend/CurrencyContextPresentation.php:326
+msgid "Base currency currently in use."
+msgstr "Šiuo metu naudojama pagrindinė valiuta."
+
+#. translators: %s is the base currency code.
+#. translators: %s: base currency code
+#: app/Frontend/CurrencyContextPresentation.php:58
+#: app/Frontend/CurrencyContextPresentation.php:351
+#, php-format
+msgid "Display prices only. Checkout is charged in %s."
+msgstr "Kainos rodomos tik informaciniais tikslais. Atsiskaitoma valiuta %s."
+
+#: app/Frontend/CurrencyContextPresentation.php:59
+#: app/Frontend/CurrencyContextPresentation.php:345
+msgid "You are viewing the store base currency."
+msgstr "Kainos rodomos pagrindine parduotuvės valiuta."
+
+#: app/Frontend/CurrencyContextPresentation.php:60
+msgid "That currency is not available right now."
+msgstr "Ši valiuta šiuo metu nepasiekiama."
+
+#. translators: %s is the display currency name.
+#: app/Frontend/CurrencyContextPresentation.php:65
+#, php-format
+msgid "Prices are now shown in %s."
+msgstr "Dabar kainos rodomos: %s."
+
+#. translators: %s is a number of minutes.
+#: app/Frontend/CurrencyContextPresentation.php:123
+#, php-format
+msgid "%s min"
+msgid_plural "%s mins"
+msgstr[0] "%s minutę"
+msgstr[1] "%s minutes"
+msgstr[2] "%s minučių"
+
+#. translators: %s is a number of hours.
+#: app/Frontend/CurrencyContextPresentation.php:125
+#: admin/switcher-preview.js:63
+#, php-format
+msgid "%s hour"
+msgid_plural "%s hours"
+msgstr[0] "%s valandą"
+msgstr[1] "%s valandas"
+msgstr[2] "%s valandų"
+
+#. translators: %s is a number of days.
+#: app/Frontend/CurrencyContextPresentation.php:127
+#: admin/switcher-preview.js:64
+#, php-format
+msgid "%s day"
+msgid_plural "%s days"
+msgstr[0] "%s dieną"
+msgstr[1] "%s dienas"
+msgstr[2] "%s dienų"
+
+#. translators: %s is a number of weeks.
+#: app/Frontend/CurrencyContextPresentation.php:129
+#: admin/switcher-preview.js:65
+#, php-format
+msgid "%s week"
+msgid_plural "%s weeks"
+msgstr[0] "%s savaitę"
+msgstr[1] "%s savaites"
+msgstr[2] "%s savaičių"
+
+#. translators: %s is a number of months.
+#: app/Frontend/CurrencyContextPresentation.php:131
+#, php-format
+msgid "%s month"
+msgid_plural "%s months"
+msgstr[0] "%s mėnesį"
+msgstr[1] "%s mėnesius"
+msgstr[2] "%s mėnesių"
+
+#. translators: %s is a number of years.
+#: app/Frontend/CurrencyContextPresentation.php:133
+#, php-format
+msgid "%s year"
+msgid_plural "%s years"
+msgstr[0] "%s metus"
+msgstr[1] "%s metus"
+msgstr[2] "%s metų"
+
+#: app/Frontend/CurrencySwitcherRenderer.php:310 admin/switcher-preview.js:222
+#: blocks/currency-switcher/editor.js:655
+msgid "Search currency"
+msgstr "Ieškoti valiutos"
+
+#: app/Frontend/CurrencySwitcherRenderer.php:315
+#: app/Frontend/CurrencySwitcherRenderer.php:617
+#: admin/components/general-settings.js:114
+msgid "Select currency"
+msgstr "Pasirinkti valiutą"
+
+#: app/Frontend/CurrencySwitcherRenderer.php:637
+msgid "Apply"
+msgstr "Taikyti"
+
+#: app/GDPR/PersonalDataHandler.php:57
+msgid "Multi-Currency Preferences"
+msgstr "Kelių valiutų pasirinkimai"
+
+#: app/GDPR/PersonalDataHandler.php:61
+#: app/Http/Controllers/Admin/DiagnosticsController.php:77
+msgid "Preferred Currency"
+msgstr "Pageidaujama valiuta"
+
+#: app/GDPR/PersonalDataHandler.php:76
+msgid "Multi-Currency Activity"
+msgstr "Kelių valiutų veikla"
+
+#: app/GDPR/PersonalDataHandler.php:80
+msgid "Event"
+msgstr "Įvykis"
+
+#: app/GDPR/PersonalDataHandler.php:84
+msgid "Date"
+msgstr "Data"
+
+#: app/Http/Controllers/Admin/DiagnosticsController.php:70
+msgid "FluentCRM is not active, so there is nowhere to create the fields."
+msgstr "FluentCRM neaktyvus, todėl laukų sukurti nėra kur."
+
+#: app/Http/Controllers/Admin/DiagnosticsController.php:78
+msgid "Last Order Display Currency"
+msgstr "Paskutinio užsakymo rodymo valiuta"
+
+#: app/Http/Controllers/Admin/DiagnosticsController.php:79
+msgid "Last Order FX Rate"
+msgstr "Paskutinio užsakymo valiutos kursas"
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:53
+msgid "Manual rates are saved explicitly and cannot be refreshed."
+msgstr "Rankiniai kursai išsaugomi tiesiogiai, todėl jų negalima atnaujinti."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:69
+msgid "Failed to refresh exchange rates. Check the logs for details."
+msgstr "Nepavyko atnaujinti valiutų kursų. Išsamesnės informacijos ieškokite žurnaluose."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:77
+msgid "Exchange rates refreshed successfully."
+msgstr "Valiutų kursai sėkmingai atnaujinti."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:89
+msgid "Provide manual rates as a currency-to-rate object."
+msgstr "Pateikite rankinius kursus kaip objektą, susiejantį valiutas su kursais."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:112
+msgid "Manual rates saved successfully."
+msgstr "Rankiniai kursai sėkmingai išsaugoti."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:37
+#: app/Http/Controllers/Pub/ContextController.php:110
+msgid "Invalid JSON payload."
+msgstr "Netinkami JSON duomenys."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:52
+msgid "Select a valid exchange-rate provider."
+msgstr "Pasirinkite tinkamą valiutų kursų teikėją."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:105
+msgid "An API key is required for the selected exchange-rate provider."
+msgstr "Pasirinktam valiutų kursų teikėjui būtinas API raktas."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:136
+msgid "Settings saved successfully."
+msgstr "Nustatymai sėkmingai išsaugoti."
+
+#: app/Http/Controllers/Pub/ContextController.php:46
+#: app/Http/Controllers/Pub/ContextController.php:131
+msgid "Invalid currency code."
+msgstr "Netinkamas valiutos kodas."
+
+#: app/Http/Controllers/Pub/ContextController.php:75
+msgid "Multi-Currency is disabled."
+msgstr "Kelių valiutų funkcija išjungta."
+
+#: app/Http/Controllers/Pub/ContextController.php:95
+msgid "Too many requests. Please try again later."
+msgstr "Per daug užklausų. Bandykite dar kartą vėliau."
+
+#: app/Http/Controllers/Pub/ContextController.php:120
+msgid "Currency code is required."
+msgstr "Būtina nurodyti valiutos kodą."
+
+#: app/Http/Controllers/Pub/ContextController.php:144
+msgid "This currency cannot be selected because no usable exchange rate is available. Please try again later."
+msgstr "Šios valiutos pasirinkti negalima, nes nėra tinkamo valiutos kurso. Bandykite dar kartą vėliau."
+
+#: app/Http/Controllers/Pub/ContextController.php:177
+msgid "Currency preference could not be saved because both cookie and account persistence are disabled."
+msgstr "Valiutos pasirinkimo nepavyko išsaugoti, nes išjungtas išsaugojimas ir slapuke, ir paskyroje."
+
+#: app/Http/Controllers/Pub/ContextController.php:181
+msgid "Currency preference could not be saved. Cookie persistence is disabled, so logged-out visitors cannot keep a currency choice."
+msgstr "Valiutos pasirinkimo nepavyko išsaugoti. Išsaugojimas slapuke išjungtas, todėl neprisijungę lankytojai negali išsaugoti pasirinktos valiutos."
+
+#: app/Http/Controllers/Pub/ContextController.php:204
+msgid "Currency preference saved."
+msgstr "Valiutos pasirinkimas išsaugotas."
+
+#: app/Integration/AddonsRegistration.php:24
+msgid "Display-layer multi-currency with exchange rate management and checkout disclosure."
+msgstr "Kelių valiutų rodymo sprendimas su valiutų kursų valdymu ir atsiskaitymo informacija."
+
+#: app/Integration/FluentCrmSmartCodes.php:189
+msgid "Multi-Currency Order"
+msgstr "Užsakymo kelių valiutų duomenys"
+
+#: app/Integration/FluentCrmSmartCodes.php:190
+msgid "Currency and exchange rate values captured on the order."
+msgstr "Užsakyme įrašytos valiutos ir valiutos kurso reikšmės."
+
+#: app/Integration/FluentCrmSmartCodes.php:201
+msgid "Display Currency Code"
+msgstr "Rodymo valiutos kodas"
+
+#: app/Integration/FluentCrmSmartCodes.php:202
+msgid "Base Currency Code"
+msgstr "Pagrindinės valiutos kodas"
+
+#: app/Integration/FluentCrmSmartCodes.php:203
+msgid "Total in Display Currency"
+msgstr "Bendra suma rodymo valiuta"
+
+#: app/Integration/FluentCrmSmartCodes.php:204
+msgid "Subtotal in Display Currency"
+msgstr "Tarpinė suma rodymo valiuta"
+
+#: app/Integration/FluentCrmSmartCodes.php:205
+msgid "Exchange Rate Used"
+msgstr "Naudotas valiutos kursas"
+
+#: app/Integration/FluentCrmSmartCodes.php:206
+msgid "Checkout Currency Notice"
+msgstr "Pranešimas apie atsiskaitymo valiutą"
+
+#: app/Integration/MultiCurrencySettings.php:39
+msgid "Save Settings"
+msgstr "Išsaugoti nustatymus"
+
+#: app/Integration/MultiCurrencySettings.php:40
+msgid "Multi-Currency integration is active"
+msgstr "Kelių valiutų integracija aktyvi"
+
+#: app/Integration/MultiCurrencySettings.php:41
+msgid "Multi-Currency integration is disabled"
+msgstr "Kelių valiutų integracija išjungta"
+
+#: app/Integration/MultiCurrencySettings.php:45
+msgid "Enable Multi-Currency"
+msgstr "Įjungti kelias valiutas"
+
+#: app/Integration/MultiCurrencySettings.php:46
+#: admin/components/general-settings.js:68
+msgid "Master switch for display-layer multi-currency across the store."
+msgstr "Pagrindinis kelių valiutų rodymo visoje parduotuvėje jungiklis."
+
+#: app/Integration/MultiCurrencySettings.php:48
+#: app/Integration/MultiCurrencySettings.php:57
+#: app/Integration/MultiCurrencySettings.php:66
+#: admin/components/crm-settings.js:57
+msgid "Yes"
+msgstr "Taip"
+
+#: app/Integration/MultiCurrencySettings.php:49
+#: app/Integration/MultiCurrencySettings.php:58
+#: app/Integration/MultiCurrencySettings.php:67
+#: admin/components/crm-settings.js:60
+msgid "No"
+msgstr "Ne"
+
+#: app/Integration/MultiCurrencySettings.php:54
+#: admin/components/checkout-settings.js:23
+msgid "Checkout Disclosure"
+msgstr "Atsiskaitymo pranešimas"
+
+#: app/Integration/MultiCurrencySettings.php:55
+#: admin/components/checkout-settings.js:26
+msgid "Show a notice at checkout that payment is processed in the base currency."
+msgstr "Atsiskaitymo metu rodyti pranešimą, kad mokėjimas apdorojamas pagrindine valiuta."
+
+#: app/Integration/MultiCurrencySettings.php:63
+#: admin/components/crm-settings.js:23
+msgid "FluentCRM Sync"
+msgstr "Sinchronizavimas su FluentCRM"
+
+#: app/Integration/MultiCurrencySettings.php:64
+msgid "Tag contacts in FluentCRM based on their currency preference."
+msgstr "FluentCRM kontaktams priskirti žymas pagal jų pasirinktą valiutą."
+
+#: app/Integration/MultiCurrencySettings.php:72
+msgid "Full Settings"
+msgstr "Visi nustatymai"
+
+#: app/Integration/MultiCurrencySettings.php:73
+msgid "Configure currencies, exchange rates, checkout disclosure, and more."
+msgstr "Konfigūruokite valiutas, jų kursus, atsiskaitymo pranešimą ir kitus nustatymus."
+
+#: app/Integration/MultiCurrencySettings.php:98
+msgid "Multi-Currency settings saved."
+msgstr "Kelių valiutų nustatymai išsaugoti."
+
+#: app/Support/AdminMenu.php:19 admin/multi-currency-admin.js:107
+#: admin/multi-currency-admin.js:259 admin/multi-currency-admin.js:327
+#: admin/multi-currency-admin.js:385
+msgid "Multi-Currency"
+msgstr "Kelios valiutos"
+
+#. translators: %d is the number of hours between rate refreshes
+#: fchub-multi-currency.php:89
+#, php-format
+msgid "Every %d Hours"
+msgstr "Kas %d val."
+
+#: fchub-multi-currency.php:175
+msgid "FCHub Multi-Currency requires FluentCart to be installed and activated."
+msgstr "Kad veiktų FCHub Multi-Currency, turi būti įdiegtas ir įjungtas FluentCart."
+
+#: admin/components/checkout-settings.js:35
+#: admin/components/checkout-settings.js:78 admin/components/crm-settings.js:35
+#: admin/components/crm-settings.js:129 admin/components/general-settings.js:77
+#: admin/components/general-settings.js:133
+#: admin/components/general-settings.js:170
+#: admin/components/general-settings.js:213
+#: admin/components/general-settings.js:239
+msgid "Enabled"
+msgstr "Įjungta"
+
+#: admin/components/checkout-settings.js:38
+#: admin/components/checkout-settings.js:81 admin/components/crm-settings.js:38
+#: admin/components/crm-settings.js:132 admin/components/general-settings.js:80
+#: admin/components/general-settings.js:136
+#: admin/components/general-settings.js:173
+#: admin/components/general-settings.js:216
+#: admin/components/general-settings.js:242
+msgid "Disabled"
+msgstr "Išjungta"
+
+#: admin/components/checkout-settings.js:48
+msgid "Disclosure Text"
+msgstr "Pranešimo tekstas"
+
+#: admin/components/checkout-settings.js:51
+msgid "Supports placeholders: {base_currency}, {display_currency}, {rate}"
+msgstr "Palaikomi kintamieji: {base_currency}, {display_currency}, {rate}"
+
+#: admin/components/checkout-settings.js:66
+msgid "Rate Freshness Badge"
+msgstr "Kurso aktualumo ženklelis"
+
+#: admin/components/checkout-settings.js:69
+msgid "Global gate for the rates-updated badge. When disabled, no surface shows it — including the switcher dropdown footer."
+msgstr "Bendrasis kursų atnaujinimo ženklelio jungiklis. Jį išjungus ženklelis nerodomas niekur – taip pat ir valiutos perjungiklio išskleidžiamojo sąrašo apačioje."
+
+#: admin/components/crm-settings.js:26
+msgid "Tag contacts and update custom fields based on currency preference."
+msgstr "Priskirti kontaktams žymas ir atnaujinti pasirinktinius laukus pagal pasirinktą valiutą."
+
+#: admin/components/crm-settings.js:48
+msgid "Auto-create Tags"
+msgstr "Automatiškai kurti žymas"
+
+#: admin/components/crm-settings.js:51
+msgid "Automatically create tags for each currency."
+msgstr "Automatiškai sukurti po žymą kiekvienai valiutai."
+
+#: admin/components/crm-settings.js:69
+msgid "Tag Prefix"
+msgstr "Žymos priešdėlis"
+
+#: admin/components/crm-settings.js:72
+msgid "Tags created as {prefix}{CODE}, e.g. currency:EUR"
+msgstr "Žymos kuriamos formatu {prefix}{CODE}, pvz., currency:EUR"
+
+#: admin/components/crm-settings.js:83
+msgid "Preferred Currency Field"
+msgstr "Pageidaujamos valiutos laukas"
+
+#: admin/components/crm-settings.js:94
+msgid "Last Order Currency Field"
+msgstr "Paskutinio užsakymo valiutos laukas"
+
+#: admin/components/crm-settings.js:105
+msgid "Last Order FX Rate Field"
+msgstr "Paskutinio užsakymo valiutos kurso laukas"
+
+#: admin/components/crm-settings.js:115
+msgid "FluentCommunity"
+msgstr "FluentCommunity"
+
+#: admin/components/crm-settings.js:120
+msgid "FluentCommunity Sync"
+msgstr "Sinchronizavimas su FluentCommunity"
+
+#: admin/components/crm-settings.js:123
+msgid "Sync currency preference to FluentCommunity user meta."
+msgstr "Sinchronizuoti pasirinktą valiutą su FluentCommunity naudotojo metaduomenimis."
+
+#: admin/components/currency-settings.js:113
+msgid "Search and add a currency…"
+msgstr "Ieškokite ir pridėkite valiutą…"
+
+#: admin/components/currency-settings.js:130
+msgid "Currency"
+msgstr "Valiuta"
+
+#: admin/components/currency-settings.js:133
+#: admin/components/switcher-settings.js:128
+#: blocks/currency-switcher/editor.js:817
+msgid "Symbol"
+msgstr "Simbolis"
+
+#: admin/components/currency-settings.js:136
+msgid "Decimals"
+msgstr "Skaitmenys po kablelio"
+
+#: admin/components/currency-settings.js:139
+msgid "Decimal"
+msgstr "Dešimtainis skirtukas"
+
+#: admin/components/currency-settings.js:142
+msgid "Thousands"
+msgstr "Tūkstančių skirtukas"
+
+#: admin/components/currency-settings.js:145
+msgid "Position"
+msgstr "Padėtis"
+
+#: admin/components/currency-settings.js:153
+msgid "Drag to reorder"
+msgstr "Vilkite, kad pakeistumėte eilės tvarką"
+
+#: admin/components/currency-settings.js:172
+#: admin/components/currency-settings.js:185
+#: blocks/currency-switcher/editor.js:531
+#: blocks/currency-switcher/editor.js:543
+#: blocks/currency-switcher/editor.js:608
+msgid "Auto"
+msgstr "Automatiškai"
+
+#: admin/components/currency-settings.js:175
+#: admin/components/currency-settings.js:191
+msgid "Dot (.)"
+msgstr "Taškas (.)"
+
+#: admin/components/currency-settings.js:178
+#: admin/components/currency-settings.js:188
+msgid "Comma (,)"
+msgstr "Kablelis (,)"
+
+#: admin/components/currency-settings.js:194
+msgid "Space"
+msgstr "Tarpas"
+
+#: admin/components/currency-settings.js:197
+msgid "None"
+msgstr "Nėra"
+
+#: admin/components/currency-settings.js:204
+msgid "Left ($100)"
+msgstr "Kairėje ($100)"
+
+#: admin/components/currency-settings.js:207
+msgid "Right (100$)"
+msgstr "Dešinėje (100$)"
+
+#: admin/components/currency-settings.js:210
+msgid "Left space ($ 100)"
+msgstr "Kairėje su tarpu ($ 100)"
+
+#: admin/components/currency-settings.js:213
+msgid "Right space (100 $)"
+msgstr "Dešinėje su tarpu (100 $)"
+
+#: admin/components/currency-settings.js:225
+msgid "No display currencies added yet. Use the picker above to add currencies."
+msgstr "Rodymo valiutų dar nepridėta. Pridėkite jas naudodami aukščiau esantį pasirinkimo lauką."
+
+#: admin/components/diagnostics-view.js:24
+msgid "Available"
+msgstr "Yra"
+
+#: admin/components/diagnostics-view.js:25
+#: admin/components/diagnostics-view.js:85
+msgid "Missing"
+msgstr "Trūksta"
+
+#: admin/components/diagnostics-view.js:26
+msgid "Active"
+msgstr "Aktyvus"
+
+#: admin/components/diagnostics-view.js:27
+msgid "Not found"
+msgstr "Nerastas"
+
+#: admin/components/diagnostics-view.js:28
+msgid "On"
+msgstr "Įjungta"
+
+#: admin/components/diagnostics-view.js:29
+#: admin/components/switcher-settings.js:179
+#: blocks/currency-switcher/editor.js:505
+msgid "Off"
+msgstr "Išjungta"
+
+#: admin/components/diagnostics-view.js:53
+msgid "Plugin"
+msgstr "Įskiepis"
+
+#: admin/components/diagnostics-view.js:56
+msgid "Version"
+msgstr "Versija"
+
+#: admin/components/diagnostics-view.js:59
+msgid "DB Version"
+msgstr "Duomenų bazės versija"
+
+#: admin/components/diagnostics-view.js:62
+#: admin/components/general-settings.js:89
+msgid "Base Currency"
+msgstr "Pagrindinė valiuta"
+
+#: admin/components/diagnostics-view.js:71
+msgid "Dependencies"
+msgstr "Priklausomybės"
+
+#: admin/components/diagnostics-view.js:77
+msgid "FluentCRM Custom Fields"
+msgstr "FluentCRM pasirinktiniai laukai"
+
+#: admin/components/diagnostics-view.js:82
+msgid "Found"
+msgstr "Rastas"
+
+#: admin/components/diagnostics-view.js:88
+msgid "Unknown"
+msgstr "Nežinoma"
+
+#: admin/components/diagnostics-view.js:93
+msgid "Create missing fields"
+msgstr "Sukurti trūkstamus laukus"
+
+#: admin/components/diagnostics-view.js:102
+msgid "Rates"
+msgstr "Kursai"
+
+#: admin/components/diagnostics-view.js:105
+msgid "Total rates"
+msgstr "Iš viso kursų"
+
+#: admin/components/diagnostics-view.js:108
+msgid "Stale rates"
+msgstr "Pasenę kursai"
+
+#: admin/components/diagnostics-view.js:115
+msgid "Feature Flags"
+msgstr "Funkcijų būsenos"
+
+#: admin/components/diagnostics-view.js:126
+msgid "Switcher Events"
+msgstr "Perjungiklio įvykiai"
+
+#: admin/components/diagnostics-view.js:134
+msgid "No event data yet."
+msgstr "Įvykių duomenų dar nėra."
+
+#: admin/components/diagnostics-view.js:142
+msgid "Top Switched Currencies"
+msgstr "Dažniausiai pasirenkamos valiutos"
+
+#: admin/components/diagnostics-view.js:150
+msgid "No switch data yet."
+msgstr "Valiutų perjungimo duomenų dar nėra."
+
+#: admin/components/diagnostics-view.js:158
+msgid "No diagnostics data."
+msgstr "Diagnostikos duomenų nėra."
+
+#: admin/components/general-settings.js:44
+msgid "Same as base currency (%s) — recommended"
+msgstr "Tokia pati kaip pagrindinė valiuta (%s) – rekomenduojama"
+
+#: admin/components/general-settings.js:45
+msgid "store base"
+msgstr "pagrindinė parduotuvės valiuta"
+
+#: admin/components/general-settings.js:65
+msgid "Multi-Currency Enabled"
+msgstr "Kelios valiutos įjungtos"
+
+#: admin/components/general-settings.js:92
+msgid "Managed in FluentCart Store Setup. Checkout and payment gateways use this currency."
+msgstr "Valdoma FluentCart parduotuvės sąrankoje. Šią valiutą naudoja atsiskaitymas ir mokėjimo sąsajos."
+
+#: admin/components/general-settings.js:106
+msgid "Default Display Currency"
+msgstr "Numatytoji rodymo valiuta"
+
+#: admin/components/general-settings.js:109
+msgid "Currency shown to visitors before any preference is detected."
+msgstr "Valiuta, rodoma lankytojams, kol nenustatytas joks jų pasirinkimas."
+
+#: admin/components/general-settings.js:124
+msgid "URL Parameter"
+msgstr "URL parametras"
+
+#: admin/components/general-settings.js:127
+msgid "Allow currency switching via URL (e.g. ?currency=EUR)."
+msgstr "Leisti perjungti valiutą naudojant URL (pvz., ?currency=EUR)."
+
+#: admin/components/general-settings.js:146
+msgid "URL Parameter Key"
+msgstr "URL parametro raktas"
+
+#: admin/components/general-settings.js:158
+msgid "Cookie Persistence"
+msgstr "Išsaugojimas slapuke"
+
+#: admin/components/general-settings.js:161
+msgid "Remember a guest currency in a cookie and matching browser-storage fallback. Disable this and logged-out visitors cannot keep a currency choice at all — the switch is reported as failed rather than silently ignored."
+msgstr "Įsiminti svečio valiutą slapuke ir atitinkamoje atsarginėje naršyklės saugykloje. Išjungus šią parinktį neprisijungę lankytojai apskritai negalės išsaugoti valiutos pasirinkimo – nepavykęs perjungimas bus rodomas kaip klaida, o ne tyliai ignoruojamas."
+
+#: admin/components/general-settings.js:177
+msgid "Currency switching is now a logged-in-only feature. Guests will be told their preference could not be saved."
+msgstr "Dabar valiutą gali perjungti tik prisijungę naudotojai. Svečiams bus pranešta, kad jų pasirinkimo išsaugoti nepavyko."
+
+#: admin/components/general-settings.js:189
+msgid "Cookie Lifetime (days)"
+msgstr "Slapuko galiojimo trukmė (dienomis)"
+
+#: admin/components/general-settings.js:201
+msgid "Account Persistence"
+msgstr "Išsaugojimas paskyroje"
+
+#: admin/components/general-settings.js:204
+msgid "Remember currency preference in the logged-in user account. Disable this if you want logged-in sessions to respect the default display currency on every fresh visit."
+msgstr "Įsiminti valiutos pasirinkimą prisijungusio naudotojo paskyroje. Išjunkite, jei norite, kad per kiekvieną naują apsilankymą prisijungusiam naudotojui būtų rodoma numatytoji valiuta."
+
+#: admin/components/general-settings.js:227
+msgid "Coming Soon"
+msgstr "Netrukus"
+
+#: admin/components/general-settings.js:230
+msgid "Automatically detect visitor currency based on their country. Requires a geolocation provider."
+msgstr "Automatiškai nustatyti lankytojo valiutą pagal jo šalį. Būtina geografinės vietos nustatymo paslauga."
+
+#: admin/components/general-settings.js:251
+msgid "Remove Data on Uninstall"
+msgstr "Pašalinti duomenis išdiegiant"
+
+#: admin/components/general-settings.js:254
+msgid "If enabled, all tables and settings will be removed when the plugin is uninstalled."
+msgstr "Įjungus šią parinktį, išdiegiant įskiepį bus pašalintos visos lentelės ir nustatymai."
+
+#: admin/components/general-settings.js:263
+msgid "Keep data"
+msgstr "Palikti duomenis"
+
+#: admin/components/general-settings.js:266
+msgid "Delete all"
+msgstr "Ištrinti viską"
+
+#: admin/components/rate-settings.js:28
+msgid "Stale"
+msgstr "Pasenęs"
+
+#: admin/components/rate-settings.js:29
+msgid "OK"
+msgstr "Tinkamas"
+
+#: admin/components/rate-settings.js:30
+msgid "No manual rates saved yet."
+msgstr "Rankinių kursų dar neišsaugota."
+
+#: admin/components/rate-settings.js:31
+msgid "No exchange rates yet. Add display currencies and trigger a refresh."
+msgstr "Valiutų kursų dar nėra. Pridėkite rodymo valiutų ir atnaujinkite kursus."
+
+#: admin/components/rate-settings.js:43
+msgid "Rate Provider"
+msgstr "Kursų teikėjas"
+
+#: admin/components/rate-settings.js:46
+msgid "Service used to fetch exchange rates."
+msgstr "Paslauga, iš kurios gaunami valiutų kursai."
+
+#: admin/components/rate-settings.js:58
+msgid "European Central Bank (free)"
+msgstr "Europos Centrinis Bankas (nemokamai)"
+
+#: admin/components/rate-settings.js:71
+msgid "API Key"
+msgstr "API raktas"
+
+#: admin/components/rate-settings.js:84
+msgid "Refresh Interval (hours)"
+msgstr "Atnaujinimo intervalas (valandomis)"
+
+#: admin/components/rate-settings.js:87
+msgid "How often to fetch new exchange rates."
+msgstr "Kaip dažnai gauti naujus valiutų kursus."
+
+#: admin/components/rate-settings.js:99
+msgid "Stale Threshold (hours)"
+msgstr "Kurso senumo riba (valandomis)"
+
+#: admin/components/rate-settings.js:102
+msgid "Rates older than this will trigger an admin warning."
+msgstr "Jei kursai bus senesni, administratoriui bus rodomas įspėjimas."
+
+#: admin/components/rate-settings.js:113
+msgid "Stale Rate Fallback"
+msgstr "Veiksmas kursui pasenus"
+
+#: admin/components/rate-settings.js:116
+msgid "What to do when rates are outdated beyond the threshold."
+msgstr "Ką daryti, kai kursai yra senesni už nustatytą ribą."
+
+#: admin/components/rate-settings.js:122
+msgid "Show base currency"
+msgstr "Rodyti pagrindinę valiutą"
+
+#: admin/components/rate-settings.js:125
+msgid "Use last known rate"
+msgstr "Naudoti paskutinį žinomą kursą"
+
+#: admin/components/rate-settings.js:134
+msgid "Rounding Mode"
+msgstr "Apvalinimo būdas"
+
+#: admin/components/rate-settings.js:137
+msgid "How converted prices are rounded."
+msgstr "Kaip apvalinamos konvertuotos kainos."
+
+#: admin/components/rate-settings.js:162
+msgid "Manual Rates"
+msgstr "Rankiniai kursai"
+
+#: admin/components/rate-settings.js:165
+msgid "Save the provider change before entering manual rates."
+msgstr "Prieš įvesdami rankinius kursus išsaugokite teikėjo pakeitimą."
+
+#: admin/components/rate-settings.js:168
+msgid "Add and save at least one display currency first."
+msgstr "Pirmiausia pridėkite ir išsaugokite bent vieną rodymo valiutą."
+
+#: admin/components/rate-settings.js:181
+msgid "Current Rates"
+msgstr "Dabartiniai kursai"
+
+#: admin/components/rate-settings.js:184
+msgid "Save Manual Rates"
+msgstr "Išsaugoti rankinius kursus"
+
+#: admin/components/rate-settings.js:187
+msgid "Refresh Now"
+msgstr "Atnaujinti dabar"
+
+#: admin/components/rate-settings.js:192
+msgid "Base"
+msgstr "Pagrindinė"
+
+#: admin/components/rate-settings.js:195
+msgid "Quote"
+msgstr "Kotiruojama"
+
+#: admin/components/rate-settings.js:198
+msgid "Rate"
+msgstr "Kursas"
+
+#: admin/components/rate-settings.js:201
+msgid "Provider"
+msgstr "Teikėjas"
+
+#: admin/components/rate-settings.js:204
+msgid "Fetched"
+msgstr "Gauta"
+
+#: admin/components/rate-settings.js:207
+msgid "Status"
+msgstr "Būsena"
+
+#: admin/components/switcher-settings.js:48
+msgid "Default Preset"
+msgstr "Numatytasis stilius"
+
+#: admin/components/switcher-settings.js:51
+msgid "Visual style used by switcher blocks that inherit global defaults."
+msgstr "Perjungiklio blokų, paveldinčių bendruosius nustatymus, vaizdinis stilius."
+
+#: admin/components/switcher-settings.js:60
+#: blocks/currency-switcher/editor.js:406
+msgid "Default"
+msgstr "Numatytasis"
+
+#: admin/components/switcher-settings.js:63
+#: blocks/currency-switcher/editor.js:407
+msgid "Pill"
+msgstr "Kapsulės formos"
+
+#: admin/components/switcher-settings.js:66
+#: blocks/currency-switcher/editor.js:408
+msgid "Minimal"
+msgstr "Minimalus"
+
+#: admin/components/switcher-settings.js:69
+#: blocks/currency-switcher/editor.js:409
+msgid "Subtle"
+msgstr "Santūrus"
+
+#: admin/components/switcher-settings.js:72
+#: blocks/currency-switcher/editor.js:410
+msgid "Glass"
+msgstr "Stiklinis"
+
+#: admin/components/switcher-settings.js:75
+#: blocks/currency-switcher/editor.js:411
+msgid "Contrast"
+msgstr "Kontrastingas"
+
+#: admin/components/switcher-settings.js:84
+msgid "Label Position"
+msgstr "Etiketės padėtis"
+
+#: admin/components/switcher-settings.js:87
+msgid "Where the optional label should sit relative to the switcher."
+msgstr "Kur perjungiklio atžvilgiu turi būti rodoma pasirinktinė etiketė."
+
+#: admin/components/switcher-settings.js:93
+#: blocks/currency-switcher/editor.js:425
+msgid "Before"
+msgstr "Prieš"
+
+#: admin/components/switcher-settings.js:96
+#: blocks/currency-switcher/editor.js:426
+msgid "After"
+msgstr "Po"
+
+#: admin/components/switcher-settings.js:99
+#: blocks/currency-switcher/editor.js:427
+msgid "Above"
+msgstr "Viršuje"
+
+#: admin/components/switcher-settings.js:102
+#: blocks/currency-switcher/editor.js:428
+msgid "Below"
+msgstr "Apačioje"
+
+#: admin/components/switcher-settings.js:109
+msgid "Trigger Content"
+msgstr "Perjungiklio mygtuko turinys"
+
+#: admin/components/switcher-settings.js:114
+msgid "Trigger Elements"
+msgstr "Mygtuko elementai"
+
+#: admin/components/switcher-settings.js:117
+msgid "Choose what appears in the closed switcher button."
+msgstr "Pasirinkite, kas rodoma uždaryto perjungiklio mygtuke."
+
+#: admin/components/switcher-settings.js:122
+msgid "Flag"
+msgstr "Vėliava"
+
+#: admin/components/switcher-settings.js:125
+#: blocks/currency-switcher/editor.js:816
+msgid "Code"
+msgstr "Kodas"
+
+#: admin/components/switcher-settings.js:131
+#: blocks/currency-switcher/editor.js:818
+msgid "Name"
+msgstr "Pavadinimas"
+
+#: admin/components/switcher-settings.js:137
+msgid "Dropdown Content"
+msgstr "Išskleidžiamojo sąrašo turinys"
+
+#: admin/components/switcher-settings.js:142
+msgid "Option Elements"
+msgstr "Parinkčių elementai"
+
+#: admin/components/switcher-settings.js:145
+msgid "Choose what each currency row displays inside the dropdown."
+msgstr "Pasirinkite, kas rodoma kiekvienoje išskleidžiamojo sąrašo valiutos eilutėje."
+
+#: admin/components/switcher-settings.js:150
+msgid "Flags"
+msgstr "Vėliavos"
+
+#: admin/components/switcher-settings.js:153
+msgid "Codes"
+msgstr "Kodai"
+
+#: admin/components/switcher-settings.js:156
+msgid "Symbols"
+msgstr "Simboliai"
+
+#: admin/components/switcher-settings.js:159
+msgid "Names"
+msgstr "Pavadinimai"
+
+#: admin/components/switcher-settings.js:162
+msgid "Active check"
+msgstr "Aktyvios valiutos žyma"
+
+#: admin/components/switcher-settings.js:170
+msgid "Search Mode"
+msgstr "Paieškos režimas"
+
+#: admin/components/switcher-settings.js:173
+msgid "Useful when you expose more than a handful of currencies."
+msgstr "Praverčia, kai siūloma daugiau nei kelios valiutos."
+
+#: admin/components/switcher-settings.js:182
+#: blocks/currency-switcher/editor.js:506
+msgid "Inline search"
+msgstr "Paieška sąraše"
+
+#: admin/components/switcher-settings.js:191
+msgid "Favorite Currencies"
+msgstr "Mėgstamos valiutos"
+
+#: admin/components/switcher-settings.js:194
+msgid "Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
+msgstr "Kableliais atskirti ISO kodai, rodomi virš kitų, pvz.: EUR, USD, GBP"
+
+#: admin/components/switcher-settings.js:204
+#: blocks/currency-switcher/editor.js:521
+#: blocks/currency-switcher/editor.js:961
+msgid "Show favorites first"
+msgstr "Mėgstamas valiutas rodyti pirmiausia"
+
+#: admin/components/switcher-settings.js:213
+msgid "Layout Defaults"
+msgstr "Numatytasis išdėstymas"
+
+#: admin/components/switcher-settings.js:216
+msgid "Baseline geometry for inheriting switcher blocks."
+msgstr "Pagrindiniai matmenys juos paveldintiems perjungiklio blokams."
+
+#: admin/components/switcher-settings.js:222
+#: blocks/currency-switcher/editor.js:593
+msgid "Size"
+msgstr "Dydis"
+
+#: admin/components/switcher-settings.js:226
+#: blocks/currency-switcher/editor.js:596
+msgid "Small"
+msgstr "Mažas"
+
+#: admin/components/switcher-settings.js:229
+#: blocks/currency-switcher/editor.js:597
+msgid "Medium"
+msgstr "Vidutinis"
+
+#: admin/components/switcher-settings.js:232
+#: blocks/currency-switcher/editor.js:598
+msgid "Large"
+msgstr "Didelis"
+
+#: admin/components/switcher-settings.js:238
+#: blocks/currency-switcher/editor.js:605
+msgid "Width"
+msgstr "Plotis"
+
+#: admin/components/switcher-settings.js:242
+msgid "Auto width"
+msgstr "Automatinis plotis"
+
+#: admin/components/switcher-settings.js:245
+#: blocks/currency-switcher/editor.js:609
+msgid "Full width"
+msgstr "Visas plotis"
+
+#: admin/components/switcher-settings.js:251
+#: blocks/currency-switcher/editor.js:528
+msgid "Dropdown position"
+msgstr "Išskleidžiamojo sąrašo padėtis"
+
+#: admin/components/switcher-settings.js:255
+msgid "Auto position"
+msgstr "Automatinė padėtis"
+
+#: admin/components/switcher-settings.js:258
+#: blocks/currency-switcher/editor.js:532
+msgid "Start"
+msgstr "Pradžioje"
+
+#: admin/components/switcher-settings.js:261
+#: blocks/currency-switcher/editor.js:533
+msgid "End"
+msgstr "Pabaigoje"
+
+#: admin/components/switcher-settings.js:267
+#: blocks/currency-switcher/editor.js:540
+msgid "Dropdown direction"
+msgstr "Išskleidimo kryptis"
+
+#: admin/components/switcher-settings.js:271
+msgid "Auto direction"
+msgstr "Automatinė kryptis"
+
+#: admin/components/switcher-settings.js:274
+#: blocks/currency-switcher/editor.js:544
+msgid "Down"
+msgstr "Žemyn"
+
+#: admin/components/switcher-settings.js:277
+#: blocks/currency-switcher/editor.js:545
+msgid "Up"
+msgstr "Aukštyn"
+
+#: admin/components/switcher-settings.js:287
+#: blocks/currency-switcher/editor.js:554
+msgid "Footer Context"
+msgstr "Apatinės dalies informacija"
+
+#: admin/components/switcher-settings.js:290
+msgid "Optional trust-building context shown at the bottom of the dropdown. The freshness badge also requires the global Rate Freshness Badge gate on the Checkout tab."
+msgstr "Pasirinktinė pasitikėjimą didinanti informacija, rodoma išskleidžiamojo sąrašo apačioje. Aktualumo ženkleliui taip pat turi būti įjungtas bendrasis „Kurso aktualumo ženklelis“ nustatymas kortelėje „Atsiskaitymas“."
+
+#: admin/components/switcher-settings.js:298
+msgid "Freshness badge"
+msgstr "Aktualumo ženklelis"
+
+#: admin/components/switcher-settings.js:301
+msgid "Rate value"
+msgstr "Kurso reikšmė"
+
+#: admin/components/switcher-settings.js:304
+msgid "Checkout context"
+msgstr "Atsiskaitymo informacija"
+
+#: admin/multi-currency-admin.js:47
+msgid "Network error. Please check your connection."
+msgstr "Tinklo klaida. Patikrinkite interneto ryšį."
+
+#: admin/multi-currency-admin.js:78
+msgid "Save"
+msgstr "Išsaugoti"
+
+#: admin/multi-currency-admin.js:79
+msgid "Saving..."
+msgstr "Saugoma…"
+
+#: admin/multi-currency-admin.js:82
+msgid "General"
+msgstr "Bendrieji"
+
+#: admin/multi-currency-admin.js:83
+msgid "Currencies"
+msgstr "Valiutos"
+
+#: admin/multi-currency-admin.js:84
+msgid "Exchange Rates"
+msgstr "Valiutų kursai"
+
+#: admin/multi-currency-admin.js:85
+msgid "Switcher"
+msgstr "Perjungiklis"
+
+#: admin/multi-currency-admin.js:86
+msgid "Checkout"
+msgstr "Atsiskaitymas"
+
+#: admin/multi-currency-admin.js:87
+msgid "CRM"
+msgstr "CRM"
+
+#: admin/multi-currency-admin.js:88
+msgid "Diagnostics"
+msgstr "Diagnostika"
+
+#: admin/multi-currency-admin.js:130
+msgid "Failed to load settings."
+msgstr "Nepavyko įkelti nustatymų."
+
+#: admin/multi-currency-admin.js:156
+msgid "Failed to load exchange rates."
+msgstr "Nepavyko įkelti valiutų kursų."
+
+#: admin/multi-currency-admin.js:171
+msgid "Failed to load diagnostics."
+msgstr "Nepavyko įkelti diagnostikos duomenų."
+
+#: admin/multi-currency-admin.js:185
+msgid "FluentCRM fields created."
+msgstr "FluentCRM laukai sukurti."
+
+#: admin/multi-currency-admin.js:189
+msgid "Could not create the FluentCRM fields."
+msgstr "Nepavyko sukurti FluentCRM laukų."
+
+#: admin/multi-currency-admin.js:200
+msgid "Rates refreshed."
+msgstr "Kursai atnaujinti."
+
+#: admin/multi-currency-admin.js:204
+msgid "Rate refresh failed."
+msgstr "Nepavyko atnaujinti kursų."
+
+#: admin/multi-currency-admin.js:218
+msgid "Manual rates saved."
+msgstr "Rankiniai kursai išsaugoti."
+
+#: admin/multi-currency-admin.js:234
+msgid "Settings saved."
+msgstr "Nustatymai išsaugoti."
+
+#: admin/multi-currency-admin.js:239
+msgid "Failed to save settings."
+msgstr "Nepavyko išsaugoti nustatymų."
+
+#: admin/multi-currency-admin.js:271
+msgid "Multi-Currency settings"
+msgstr "Kelių valiutų nustatymai"
+
+#: admin/switcher-preview.js:26
+msgid "US Dollar"
+msgstr "JAV doleris"
+
+#: admin/switcher-preview.js:32
+msgid "Euro"
+msgstr "Euras"
+
+#: admin/switcher-preview.js:38
+msgid "British Pound"
+msgstr "Didžiosios Britanijos svaras"
+
+#: admin/switcher-preview.js:62
+msgid "%s minute"
+msgid_plural "%s minutes"
+msgstr[0] "%s minutę"
+msgstr[1] "%s minutes"
+msgstr[2] "%s minučių"
+
+#. translators: %1$s is the number of currencies shown, %2$s the total configured.
+#: admin/switcher-preview.js:118
+msgid "Showing %1$s of %2$s currencies. The full list appears on the frontend — this is just a taste."
+msgstr "Rodoma %1$s iš %2$s valiutų. Visas sąrašas matomas parduotuvėje – čia tik trumpa ištrauka."
+
+#: admin/switcher-preview.js:179
+msgid "Display prices only. Checkout charged in %s."
+msgstr "Kainos rodomos tik informaciniais tikslais. Atsiskaitoma valiuta %s."
+
+#: admin/switcher-preview.js:182
+msgid "Display prices only. Checkout is charged in the store currency."
+msgstr "Kainos rodomos tik informaciniais tikslais. Atsiskaitoma parduotuvės valiuta."
+
+#: admin/switcher-preview.js:206
+msgid "Preview"
+msgstr "Peržiūra"
+
+#: blocks/currency-switcher/editor.js:374
+msgid "Source"
+msgstr "Šaltinis"
+
+#: blocks/currency-switcher/editor.js:376
+msgid "Use global switcher defaults"
+msgstr "Naudoti bendruosius perjungiklio nustatymus"
+
+#: blocks/currency-switcher/editor.js:383
+msgid "Label"
+msgstr "Etiketė"
+
+#: blocks/currency-switcher/editor.js:391
+msgid "This block inherits its switcher behavior from the global defaults in Multi-Currency settings. Only the label stays instance-specific."
+msgstr "Šis blokas perjungiklio veikimą paveldi iš bendrųjų kelių valiutų nustatymų. Tik etiketė lieka skirta konkrečiam blokui."
+
+#: blocks/currency-switcher/editor.js:401
+#: blocks/currency-switcher/editor.js:403
+msgid "Preset"
+msgstr "Stilius"
+
+#: blocks/currency-switcher/editor.js:420
+msgid "Trigger"
+msgstr "Mygtukas"
+
+#: blocks/currency-switcher/editor.js:422
+msgid "Label position"
+msgstr "Etiketės padėtis"
+
+#: blocks/currency-switcher/editor.js:435
+msgid "Show trigger flag"
+msgstr "Mygtuke rodyti vėliavą"
+
+#: blocks/currency-switcher/editor.js:442
+msgid "Show trigger code"
+msgstr "Mygtuke rodyti kodą"
+
+#: blocks/currency-switcher/editor.js:449
+msgid "Show trigger symbol"
+msgstr "Mygtuke rodyti simbolį"
+
+#: blocks/currency-switcher/editor.js:456
+msgid "Show trigger name"
+msgstr "Mygtuke rodyti pavadinimą"
+
+#: blocks/currency-switcher/editor.js:465
+msgid "Dropdown"
+msgstr "Išskleidžiamasis sąrašas"
+
+#: blocks/currency-switcher/editor.js:467
+msgid "Show option flags"
+msgstr "Parinktyse rodyti vėliavas"
+
+#: blocks/currency-switcher/editor.js:474
+msgid "Show option codes"
+msgstr "Parinktyse rodyti kodus"
+
+#: blocks/currency-switcher/editor.js:481
+msgid "Show option symbols"
+msgstr "Parinktyse rodyti simbolius"
+
+#: blocks/currency-switcher/editor.js:488
+msgid "Show option names"
+msgstr "Parinktyse rodyti pavadinimus"
+
+#: blocks/currency-switcher/editor.js:495
+msgid "Show active indicator"
+msgstr "Rodyti aktyvios valiutos žymą"
+
+#: blocks/currency-switcher/editor.js:502
+msgid "Search"
+msgstr "Paieška"
+
+#: blocks/currency-switcher/editor.js:513
+#: blocks/currency-switcher/editor.js:953
+msgid "Favorite currencies"
+msgstr "Mėgstamos valiutos"
+
+#: blocks/currency-switcher/editor.js:514
+#: blocks/currency-switcher/editor.js:954
+msgid "Comma-separated ISO codes, for example: EUR, USD, GBP"
+msgstr "Kableliais atskirti ISO kodai, pvz.: EUR, USD, GBP"
+
+#: blocks/currency-switcher/editor.js:556
+msgid "Show freshness badge"
+msgstr "Rodyti aktualumo ženklelį"
+
+#: blocks/currency-switcher/editor.js:563
+msgid "Show rate value"
+msgstr "Rodyti kurso reikšmę"
+
+#: blocks/currency-switcher/editor.js:570
+msgid "Show checkout context note"
+msgstr "Rodyti atsiskaitymo informacinį pranešimą"
+
+#: blocks/currency-switcher/editor.js:579
+#: blocks/currency-switcher/editor.js:951
+msgid "Layout"
+msgstr "Išdėstymas"
+
+#: blocks/currency-switcher/editor.js:581
+msgid "Alignment"
+msgstr "Lygiavimas"
+
+#: blocks/currency-switcher/editor.js:584
+msgid "Left"
+msgstr "Kairėje"
+
+#: blocks/currency-switcher/editor.js:585
+msgid "Center"
+msgstr "Centre"
+
+#: blocks/currency-switcher/editor.js:586
+msgid "Right"
+msgstr "Dešinėje"
+
+#: blocks/currency-switcher/editor.js:625
+msgid "Editor preview uses your actual configured currencies and current global switcher defaults."
+msgstr "Redaktoriaus peržiūroje naudojamos jūsų sukonfigūruotos valiutos ir dabartiniai bendrieji perjungiklio nustatymai."
+
+#: blocks/currency-switcher/editor.js:676
+msgid "Rates updated 2 hours ago"
+msgstr "Kursai atnaujinti prieš 2 valandas"
+
+#: blocks/currency-switcher/editor.js:680
+msgid "1 EUR = 1.1000 USD"
+msgstr "1 EUR = 1,1000 USD"
+
+#: blocks/currency-switcher/editor.js:683
+msgid "Display prices only. Checkout is charged in EUR."
+msgstr "Kainos rodomos tik informaciniais tikslais. Atsiskaitoma valiuta EUR."
+
+#: blocks/currency-switcher/editor.js:702
+msgid "Header Compact"
+msgstr "Kompaktiškas antraštės variantas"
+
+#: blocks/currency-switcher/editor.js:702
+msgid "Flag and code only, tuned for narrow header space."
+msgstr "Tik vėliava ir kodas, kad tilptų siauroje antraštėje."
+
+#: blocks/currency-switcher/editor.js:718
+msgid "Footer Descriptive"
+msgstr "Išsamus poraštės variantas"
+
+#: blocks/currency-switcher/editor.js:718
+msgid "A more descriptive switcher for footer or utility content."
+msgstr "Išsamesnis perjungiklis poraštei ar pagalbiniam turiniui."
+
+#: blocks/currency-switcher/editor.js:731
+msgid "Mobile Full Width"
+msgstr "Viso pločio mobilusis variantas"
+
+#: blocks/currency-switcher/editor.js:731
+msgid "Full-width mobile-friendly switcher with room for more context."
+msgstr "Mobiliesiems pritaikytas viso pločio perjungiklis, kuriame telpa daugiau informacijos."
+
+#: blocks/currency-switcher/editor.js:809
+#: blocks/currency-switcher/editor.js:852
+#: blocks/currency-switcher/editor.js:906
+msgid "Display"
+msgstr "Rodymas"
+
+#: blocks/currency-switcher/editor.js:811
+#: blocks/currency-switcher/editor.js:908
+msgid "Mode"
+msgstr "Režimas"
+
+#: blocks/currency-switcher/editor.js:814
+msgid "Flag + Code"
+msgstr "Vėliava ir kodas"
+
+#: blocks/currency-switcher/editor.js:815
+msgid "Flag + Name"
+msgstr "Vėliava ir pavadinimas"
+
+#: blocks/currency-switcher/editor.js:819
+msgid "Symbol + Code"
+msgstr "Simbolis ir kodas"
+
+#: blocks/currency-switcher/editor.js:854
+msgid "Format"
+msgstr "Formatas"
+
+#: blocks/currency-switcher/editor.js:857
+#: blocks/currency-switcher/editor.js:911
+msgid "Compact"
+msgstr "Kompaktiškas"
+
+#: blocks/currency-switcher/editor.js:858
+msgid "Sentence"
+msgstr "Sakinys"
+
+#: blocks/currency-switcher/editor.js:865
+msgid "Precision"
+msgstr "Tikslumas"
+
+#: blocks/currency-switcher/editor.js:872
+#: blocks/currency-switcher/editor.js:920
+msgid "Hide when base currency is displayed"
+msgstr "Slėpti, kai rodoma pagrindinė valiuta"
+
+#: blocks/currency-switcher/editor.js:912
+msgid "Checkout disclosure"
+msgstr "Atsiskaitymo pranešimas"
+
+#: blocks/currency-switcher/editor.js:913
+msgid "Full note"
+msgstr "Visas pranešimas"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block title"
+msgid "Currency Context Notice"
+msgstr "Informacija apie valiutą"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block description"
+msgid "Show a currency context note such as display currency vs checkout currency."
+msgstr "Rodyti informaciją apie valiutą, pavyzdžiui, kuo skiriasi rodymo ir atsiskaitymo valiutos."
+
+#: blocks/currency-context-notice/block.json blocks/currency-current/block.json
+#: blocks/currency-selector-buttons/block.json
+#: blocks/currency-switcher/block.json blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "currency"
+msgstr "valiuta"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block keyword"
+msgid "notice"
+msgstr "pranešimas"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block keyword"
+msgid "checkout"
+msgstr "atsiskaitymas"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block keyword"
+msgid "context"
+msgstr "kontekstas"
+
+#: blocks/currency-current/block.json
+msgctxt "block title"
+msgid "Current Currency"
+msgstr "Dabartinė valiuta"
+
+#: blocks/currency-current/block.json
+msgctxt "block description"
+msgid "Display the visitor's current display currency in compact form."
+msgstr "Kompaktiškai rodyti dabartinę lankytojui rodomą valiutą."
+
+#: blocks/currency-current/block.json
+msgctxt "block keyword"
+msgid "current"
+msgstr "dabartinė"
+
+#: blocks/currency-current/block.json
+msgctxt "block keyword"
+msgid "display"
+msgstr "rodymas"
+
+#: blocks/currency-current/block.json blocks/currency-switcher/block.json
+msgctxt "block keyword"
+msgid "money"
+msgstr "pinigai"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block title"
+msgid "Currency Selector Buttons"
+msgstr "Valiutos pasirinkimo mygtukai"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block description"
+msgid "A button-group alternative to the dropdown switcher for stores with a few main currencies."
+msgstr "Mygtukų grupė vietoje išskleidžiamojo perjungiklio parduotuvėms, siūlančioms kelias pagrindines valiutas."
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block keyword"
+msgid "selector"
+msgstr "pasirinkimas"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block keyword"
+msgid "buttons"
+msgstr "mygtukai"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block keyword"
+msgid "toggle"
+msgstr "perjungimas"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block title"
+msgid "Currency Switcher"
+msgstr "Valiutos perjungiklis"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block description"
+msgid "Display the FCHub Multi-Currency switcher in posts, pages, templates, and template parts."
+msgstr "Rodyti FCHub Multi-Currency perjungiklį įrašuose, puslapiuose, šablonuose ir jų dalyse."
+
+#: blocks/currency-switcher/block.json
+msgctxt "block keyword"
+msgid "switcher"
+msgstr "perjungiklis"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block keyword"
+msgid "multi-currency"
+msgstr "kelios valiutos"
+
+#: blocks/currency-switcher/block.json blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "exchange"
+msgstr "keitimas"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Default"
+msgstr "Numatytasis"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Pill"
+msgstr "Kapsulės formos"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Minimal"
+msgstr "Minimalus"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Subtle"
+msgstr "Santūrus"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Glass"
+msgstr "Stiklinis"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Contrast"
+msgstr "Kontrastingas"
+
+#: blocks/exchange-rate/block.json
+msgctxt "block title"
+msgid "Exchange Rate"
+msgstr "Valiutos kursas"
+
+#: blocks/exchange-rate/block.json
+msgctxt "block description"
+msgid "Display the current exchange rate between the store base currency and the visitor display currency."
+msgstr "Rodyti dabartinį parduotuvės pagrindinės valiutos ir lankytojui rodomos valiutos tarpusavio kursą."
+
+#: blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "rate"
+msgstr "kursas"
+
+#: blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "fx"
+msgstr "valiutų kursai"

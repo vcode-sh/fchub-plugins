@@ -1,0 +1,1710 @@
+# Copyright (C) 2026 Vibe Code
+# This file is distributed under the GPLv2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: FCHub Multi-Currency 1.4.8\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fchub-multi-currency\n"
+"Last-Translator: \n"
+"Language-Team: French\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-08-18T19:36:27+00:00\n"
+"PO-Revision-Date: 2026-08-19 00:35+0300\n"
+"X-Generator: GNU gettext 1.0\n"
+"X-Domain: fchub-multi-currency\n"
+"Language: fr_FR\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#. Plugin Name of the plugin
+#: fchub-multi-currency.php app/Bootstrap/Modules/BlocksModule.php:77
+#: app/GDPR/PersonalDataHandler.php:24 app/GDPR/PersonalDataHandler.php:34
+#: app/Integration/AddonsRegistration.php:23
+msgid "FCHub Multi-Currency"
+msgstr "FCHub Multi-Currency"
+
+#. Plugin URI of the plugin
+#: fchub-multi-currency.php
+msgid "https://fchub.co/docs/fchub-multi-currency"
+msgstr "https://fchub.co/docs/fchub-multi-currency"
+
+#. Description of the plugin
+#: fchub-multi-currency.php
+msgid "Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure"
+msgstr "Gestion multidevise pour FluentCart au niveau de l’affichage, avec gestion des taux de change et information au paiement"
+
+#. Author of the plugin
+#: fchub-multi-currency.php
+msgid "Vibe Code"
+msgstr "Vibe Code"
+
+#. Author URI of the plugin
+#: fchub-multi-currency.php
+msgid "https://x.com/vcode_sh"
+msgstr "https://x.com/vcode_sh"
+
+#: app/Bootstrap/Modules/BlocksModule.php:81
+msgid "Currency Showcase"
+msgstr "Vitrine des devises"
+
+#: app/Bootstrap/Modules/BlocksModule.php:83
+msgid "A ready-made showcase of the full currency block family."
+msgstr "Une vitrine prête à l’emploi regroupant toute la famille de blocs de devise."
+
+#: app/Bootstrap/Modules/DiagnosticsModule.php:71
+msgid "FCHub Multi-Currency: Some exchange rates are stale. Check the diagnostics page or trigger a manual refresh."
+msgstr "FCHub Multi-Currency : certains taux de change sont obsolètes. Consultez la page de diagnostic ou lancez une actualisation manuelle."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:37
+msgid "Switch the rate provider to Manual rates before saving."
+msgstr "Sélectionnez le fournisseur « Taux manuels » avant d’enregistrer."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:43
+msgid "Add at least one display currency before saving manual rates."
+msgstr "Ajoutez au moins une devise d’affichage avant d’enregistrer les taux manuels."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:48
+msgid "Provide one rate for every configured display currency."
+msgstr "Indiquez un taux pour chaque devise d’affichage configurée."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:51
+#: app/Domain/Actions/SaveManualRatesAction.php:98
+msgid "Rates may only be saved for configured display currencies."
+msgstr "Les taux ne peuvent être enregistrés que pour les devises d’affichage configurées."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:67
+#: app/Http/Controllers/Admin/RatesAdminController.php:104
+#: admin/multi-currency-admin.js:222
+msgid "Manual rates could not be saved."
+msgstr "Impossible d’enregistrer les taux manuels."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:110
+#: app/Domain/Actions/SaveManualRatesAction.php:117
+msgid "Each manual rate must be a positive decimal string with up to 8 decimal places."
+msgstr "Chaque taux manuel doit être un nombre décimal positif comptant au maximum 8 décimales."
+
+#: app/Domain/Actions/SaveManualRatesAction.php:121
+msgid "Each manual rate must be greater than zero."
+msgstr "Chaque taux manuel doit être supérieur à zéro."
+
+#: app/Domain/Enums/RateProvider.php:19 admin/components/rate-settings.js:52
+msgid "ExchangeRate-API (free tier)"
+msgstr "ExchangeRate-API (offre gratuite)"
+
+#: app/Domain/Enums/RateProvider.php:20 admin/components/rate-settings.js:55
+msgid "Open Exchange Rates"
+msgstr "Open Exchange Rates"
+
+#: app/Domain/Enums/RateProvider.php:21
+msgid "European Central Bank (EUR base, free)"
+msgstr "Banque centrale européenne (base EUR, gratuit)"
+
+#: app/Domain/Enums/RateProvider.php:22 admin/components/rate-settings.js:61
+msgid "Manual rates"
+msgstr "Taux manuels"
+
+#: app/Domain/Enums/ResolverSource.php:20
+msgid "URL parameter"
+msgstr "Paramètre d’URL"
+
+#: app/Domain/Enums/ResolverSource.php:21
+msgid "User preference"
+msgstr "Préférence de l’utilisateur"
+
+#: app/Domain/Enums/ResolverSource.php:22
+msgid "Cookie (guest)"
+msgstr "Cookie (visiteur)"
+
+#: app/Domain/Enums/ResolverSource.php:23
+#: admin/components/general-settings.js:225
+msgid "Geolocation"
+msgstr "Géolocalisation"
+
+#: app/Domain/Enums/ResolverSource.php:24
+msgid "Store default"
+msgstr "Valeur par défaut de la boutique"
+
+#: app/Domain/Enums/RoundingMode.php:20 admin/components/rate-settings.js:143
+msgid "Truncate (no rounding)"
+msgstr "Tronquer (sans arrondi)"
+
+#: app/Domain/Enums/RoundingMode.php:21 admin/components/rate-settings.js:146
+msgid "Round half up (standard)"
+msgstr "Arrondir les valeurs médianes au supérieur (standard)"
+
+#: app/Domain/Enums/RoundingMode.php:22 admin/components/rate-settings.js:149
+msgid "Round half down"
+msgstr "Arrondir les valeurs médianes à l’inférieur"
+
+#: app/Domain/Enums/RoundingMode.php:23 admin/components/rate-settings.js:152
+msgid "Always round up"
+msgstr "Toujours arrondir au supérieur"
+
+#: app/Domain/Enums/RoundingMode.php:24 admin/components/rate-settings.js:155
+msgid "Always round down"
+msgstr "Toujours arrondir à l’inférieur"
+
+#. translators: {base_currency} is a literal placeholder token replaced with the currency code.
+#: app/Domain/Services/CheckoutDisclosureService.php:33
+msgid "Your payment will be processed in {base_currency}."
+msgstr "Votre paiement sera traité en {base_currency}."
+
+#. translators: %s is a human-readable time difference, e.g. "2 hours".
+#. translators: %s: human-readable time difference, e.g. "2 hours"
+#: app/Frontend/CurrencyContextPresentation.php:36
+#: app/Frontend/CurrencyContextPresentation.php:312
+#: admin/switcher-preview.js:163
+#, php-format
+msgid "Rates updated %s ago"
+msgstr "Taux mis à jour il y a %s"
+
+#. translators: %1$s is the base currency code, %2$s the exchange rate, %3$s the display currency code.
+#. translators: 1: base currency code, 2: rate, 3: display currency code
+#. translators: 1: base currency code, 2: exchange rate, 3: display currency code
+#: app/Frontend/CurrencyContextPresentation.php:46
+#: app/Frontend/CurrencyContextPresentation.php:201
+#: app/Frontend/CurrencyContextPresentation.php:332
+#: admin/switcher-preview.js:169
+#, php-format
+msgid "1 %1$s = %2$s %3$s"
+msgstr "1 %1$s = %2$s %3$s"
+
+#. translators: %1$s is the base currency code, %2$s the exchange rate, %3$s the display currency code.
+#. translators: 1: base currency code, 2: rate, 3: display currency code
+#: app/Frontend/CurrencyContextPresentation.php:48
+#: app/Frontend/CurrencyContextPresentation.php:194
+#, php-format
+msgid "Current rate: 1 %1$s = %2$s %3$s"
+msgstr "Taux actuel : 1 %1$s = %2$s %3$s"
+
+#. translators: %1$s is the display currency code, %2$s the base currency code.
+#. translators: 1: display currency code, 2: base currency code
+#: app/Frontend/CurrencyContextPresentation.php:50
+#: app/Frontend/CurrencyContextPresentation.php:233
+#, php-format
+msgid "Viewing prices in %1$s. Checkout in %2$s."
+msgstr "Prix affichés en %1$s. Paiement en %2$s."
+
+#. translators: %1$s is the display currency code, %2$s the base currency code.
+#. translators: 1: display currency code, 2: base currency code
+#: app/Frontend/CurrencyContextPresentation.php:52
+#: app/Frontend/CurrencyContextPresentation.php:227
+#, php-format
+msgid "Prices shown in %1$s are approximate. Checkout is charged in %2$s."
+msgstr "Les prix affichés en %1$s sont indicatifs. Le paiement est débité en %2$s."
+
+#: app/Frontend/CurrencyContextPresentation.php:56
+#: app/Frontend/CurrencyContextPresentation.php:326
+msgid "Base currency currently in use."
+msgstr "Devise de base actuellement utilisée."
+
+#. translators: %s is the base currency code.
+#. translators: %s: base currency code
+#: app/Frontend/CurrencyContextPresentation.php:58
+#: app/Frontend/CurrencyContextPresentation.php:351
+#, php-format
+msgid "Display prices only. Checkout is charged in %s."
+msgstr "Prix affichés à titre indicatif. Le paiement est débité en %s."
+
+#: app/Frontend/CurrencyContextPresentation.php:59
+#: app/Frontend/CurrencyContextPresentation.php:345
+msgid "You are viewing the store base currency."
+msgstr "Vous consultez les prix dans la devise de base de la boutique."
+
+#: app/Frontend/CurrencyContextPresentation.php:60
+msgid "That currency is not available right now."
+msgstr "Cette devise n’est pas disponible pour le moment."
+
+#. translators: %s is the display currency name.
+#: app/Frontend/CurrencyContextPresentation.php:65
+#, php-format
+msgid "Prices are now shown in %s."
+msgstr "Les prix sont désormais affichés en %s."
+
+#. translators: %s is a number of minutes.
+#: app/Frontend/CurrencyContextPresentation.php:123
+#, php-format
+msgid "%s min"
+msgid_plural "%s mins"
+msgstr[0] "%s min"
+msgstr[1] "%s min"
+
+#. translators: %s is a number of hours.
+#: app/Frontend/CurrencyContextPresentation.php:125
+#: admin/switcher-preview.js:63
+#, php-format
+msgid "%s hour"
+msgid_plural "%s hours"
+msgstr[0] "%s heure"
+msgstr[1] "%s heures"
+
+#. translators: %s is a number of days.
+#: app/Frontend/CurrencyContextPresentation.php:127
+#: admin/switcher-preview.js:64
+#, php-format
+msgid "%s day"
+msgid_plural "%s days"
+msgstr[0] "%s jour"
+msgstr[1] "%s jours"
+
+#. translators: %s is a number of weeks.
+#: app/Frontend/CurrencyContextPresentation.php:129
+#: admin/switcher-preview.js:65
+#, php-format
+msgid "%s week"
+msgid_plural "%s weeks"
+msgstr[0] "%s semaine"
+msgstr[1] "%s semaines"
+
+#. translators: %s is a number of months.
+#: app/Frontend/CurrencyContextPresentation.php:131
+#, php-format
+msgid "%s month"
+msgid_plural "%s months"
+msgstr[0] "%s mois"
+msgstr[1] "%s mois"
+
+#. translators: %s is a number of years.
+#: app/Frontend/CurrencyContextPresentation.php:133
+#, php-format
+msgid "%s year"
+msgid_plural "%s years"
+msgstr[0] "%s an"
+msgstr[1] "%s ans"
+
+#: app/Frontend/CurrencySwitcherRenderer.php:310 admin/switcher-preview.js:222
+#: blocks/currency-switcher/editor.js:655
+msgid "Search currency"
+msgstr "Rechercher une devise"
+
+#: app/Frontend/CurrencySwitcherRenderer.php:315
+#: app/Frontend/CurrencySwitcherRenderer.php:617
+#: admin/components/general-settings.js:114
+msgid "Select currency"
+msgstr "Sélectionner une devise"
+
+#: app/Frontend/CurrencySwitcherRenderer.php:637
+msgid "Apply"
+msgstr "Appliquer"
+
+#: app/GDPR/PersonalDataHandler.php:57
+msgid "Multi-Currency Preferences"
+msgstr "Préférences Multi-Currency"
+
+#: app/GDPR/PersonalDataHandler.php:61
+#: app/Http/Controllers/Admin/DiagnosticsController.php:77
+msgid "Preferred Currency"
+msgstr "Devise préférée"
+
+#: app/GDPR/PersonalDataHandler.php:76
+msgid "Multi-Currency Activity"
+msgstr "Activité Multi-Currency"
+
+#: app/GDPR/PersonalDataHandler.php:80
+msgid "Event"
+msgstr "Événement"
+
+#: app/GDPR/PersonalDataHandler.php:84
+msgid "Date"
+msgstr "Date"
+
+#: app/Http/Controllers/Admin/DiagnosticsController.php:70
+msgid "FluentCRM is not active, so there is nowhere to create the fields."
+msgstr "FluentCRM n’est pas actif : il est donc impossible d’y créer les champs."
+
+#: app/Http/Controllers/Admin/DiagnosticsController.php:78
+msgid "Last Order Display Currency"
+msgstr "Devise d’affichage de la dernière commande"
+
+#: app/Http/Controllers/Admin/DiagnosticsController.php:79
+msgid "Last Order FX Rate"
+msgstr "Taux de change de la dernière commande"
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:53
+msgid "Manual rates are saved explicitly and cannot be refreshed."
+msgstr "Les taux manuels sont enregistrés directement et ne peuvent pas être actualisés."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:69
+msgid "Failed to refresh exchange rates. Check the logs for details."
+msgstr "Échec de l’actualisation des taux de change. Consultez les journaux pour plus de détails."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:77
+msgid "Exchange rates refreshed successfully."
+msgstr "Les taux de change ont bien été actualisés."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:89
+msgid "Provide manual rates as a currency-to-rate object."
+msgstr "Fournissez les taux manuels sous forme d’un objet associant chaque devise à son taux."
+
+#: app/Http/Controllers/Admin/RatesAdminController.php:112
+msgid "Manual rates saved successfully."
+msgstr "Les taux manuels ont bien été enregistrés."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:37
+#: app/Http/Controllers/Pub/ContextController.php:110
+msgid "Invalid JSON payload."
+msgstr "Charge utile JSON non valide."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:52
+msgid "Select a valid exchange-rate provider."
+msgstr "Sélectionnez un fournisseur de taux de change valide."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:105
+msgid "An API key is required for the selected exchange-rate provider."
+msgstr "Une clé API est requise pour le fournisseur de taux de change sélectionné."
+
+#: app/Http/Controllers/Admin/SettingsAdminController.php:136
+msgid "Settings saved successfully."
+msgstr "Les réglages ont bien été enregistrés."
+
+#: app/Http/Controllers/Pub/ContextController.php:46
+#: app/Http/Controllers/Pub/ContextController.php:131
+msgid "Invalid currency code."
+msgstr "Code de devise non valide."
+
+#: app/Http/Controllers/Pub/ContextController.php:75
+msgid "Multi-Currency is disabled."
+msgstr "Multi-Currency est désactivé."
+
+#: app/Http/Controllers/Pub/ContextController.php:95
+msgid "Too many requests. Please try again later."
+msgstr "Trop de requêtes. Veuillez réessayer plus tard."
+
+#: app/Http/Controllers/Pub/ContextController.php:120
+msgid "Currency code is required."
+msgstr "Le code de devise est obligatoire."
+
+#: app/Http/Controllers/Pub/ContextController.php:144
+msgid "This currency cannot be selected because no usable exchange rate is available. Please try again later."
+msgstr "Cette devise ne peut pas être sélectionnée, car aucun taux de change exploitable n’est disponible. Veuillez réessayer plus tard."
+
+#: app/Http/Controllers/Pub/ContextController.php:177
+msgid "Currency preference could not be saved because both cookie and account persistence are disabled."
+msgstr "Impossible d’enregistrer la préférence de devise, car la mémorisation par cookie et dans le compte sont toutes deux désactivées."
+
+#: app/Http/Controllers/Pub/ContextController.php:181
+msgid "Currency preference could not be saved. Cookie persistence is disabled, so logged-out visitors cannot keep a currency choice."
+msgstr "Impossible d’enregistrer la préférence de devise. La mémorisation par cookie est désactivée ; les visiteurs non connectés ne peuvent donc pas conserver leur choix de devise."
+
+#: app/Http/Controllers/Pub/ContextController.php:204
+msgid "Currency preference saved."
+msgstr "Préférence de devise enregistrée."
+
+#: app/Integration/AddonsRegistration.php:24
+msgid "Display-layer multi-currency with exchange rate management and checkout disclosure."
+msgstr "Gestion multidevise au niveau de l’affichage, avec gestion des taux de change et information au paiement."
+
+#: app/Integration/FluentCrmSmartCodes.php:189
+msgid "Multi-Currency Order"
+msgstr "Commande Multi-Currency"
+
+#: app/Integration/FluentCrmSmartCodes.php:190
+msgid "Currency and exchange rate values captured on the order."
+msgstr "Devise et taux de change enregistrés avec la commande."
+
+#: app/Integration/FluentCrmSmartCodes.php:201
+msgid "Display Currency Code"
+msgstr "Code de la devise d’affichage"
+
+#: app/Integration/FluentCrmSmartCodes.php:202
+msgid "Base Currency Code"
+msgstr "Code de la devise de base"
+
+#: app/Integration/FluentCrmSmartCodes.php:203
+msgid "Total in Display Currency"
+msgstr "Total dans la devise d’affichage"
+
+#: app/Integration/FluentCrmSmartCodes.php:204
+msgid "Subtotal in Display Currency"
+msgstr "Sous-total dans la devise d’affichage"
+
+#: app/Integration/FluentCrmSmartCodes.php:205
+msgid "Exchange Rate Used"
+msgstr "Taux de change utilisé"
+
+#: app/Integration/FluentCrmSmartCodes.php:206
+msgid "Checkout Currency Notice"
+msgstr "Mention de devise au paiement"
+
+#: app/Integration/MultiCurrencySettings.php:39
+msgid "Save Settings"
+msgstr "Enregistrer les réglages"
+
+#: app/Integration/MultiCurrencySettings.php:40
+msgid "Multi-Currency integration is active"
+msgstr "L’intégration Multi-Currency est active"
+
+#: app/Integration/MultiCurrencySettings.php:41
+msgid "Multi-Currency integration is disabled"
+msgstr "L’intégration Multi-Currency est désactivée"
+
+#: app/Integration/MultiCurrencySettings.php:45
+msgid "Enable Multi-Currency"
+msgstr "Activer Multi-Currency"
+
+#: app/Integration/MultiCurrencySettings.php:46
+#: admin/components/general-settings.js:68
+msgid "Master switch for display-layer multi-currency across the store."
+msgstr "Interrupteur principal de l’affichage multidevise dans toute la boutique."
+
+#: app/Integration/MultiCurrencySettings.php:48
+#: app/Integration/MultiCurrencySettings.php:57
+#: app/Integration/MultiCurrencySettings.php:66
+#: admin/components/crm-settings.js:57
+msgid "Yes"
+msgstr "Oui"
+
+#: app/Integration/MultiCurrencySettings.php:49
+#: app/Integration/MultiCurrencySettings.php:58
+#: app/Integration/MultiCurrencySettings.php:67
+#: admin/components/crm-settings.js:60
+msgid "No"
+msgstr "Non"
+
+#: app/Integration/MultiCurrencySettings.php:54
+#: admin/components/checkout-settings.js:23
+msgid "Checkout Disclosure"
+msgstr "Mention au paiement"
+
+#: app/Integration/MultiCurrencySettings.php:55
+#: admin/components/checkout-settings.js:26
+msgid "Show a notice at checkout that payment is processed in the base currency."
+msgstr "Afficher au paiement une mention indiquant que celui-ci est traité dans la devise de base."
+
+#: app/Integration/MultiCurrencySettings.php:63
+#: admin/components/crm-settings.js:23
+msgid "FluentCRM Sync"
+msgstr "Synchronisation FluentCRM"
+
+#: app/Integration/MultiCurrencySettings.php:64
+msgid "Tag contacts in FluentCRM based on their currency preference."
+msgstr "Étiqueter les contacts dans FluentCRM selon leur préférence de devise."
+
+#: app/Integration/MultiCurrencySettings.php:72
+msgid "Full Settings"
+msgstr "Tous les réglages"
+
+#: app/Integration/MultiCurrencySettings.php:73
+msgid "Configure currencies, exchange rates, checkout disclosure, and more."
+msgstr "Configurez les devises, les taux de change, la mention au paiement et plus encore."
+
+#: app/Integration/MultiCurrencySettings.php:98
+msgid "Multi-Currency settings saved."
+msgstr "Réglages Multi-Currency enregistrés."
+
+#: app/Support/AdminMenu.php:19 admin/multi-currency-admin.js:107
+#: admin/multi-currency-admin.js:259 admin/multi-currency-admin.js:327
+#: admin/multi-currency-admin.js:385
+msgid "Multi-Currency"
+msgstr "Multi-Currency"
+
+#. translators: %d is the number of hours between rate refreshes
+#: fchub-multi-currency.php:89
+#, php-format
+msgid "Every %d Hours"
+msgstr "Toutes les %d heures"
+
+#: fchub-multi-currency.php:175
+msgid "FCHub Multi-Currency requires FluentCart to be installed and activated."
+msgstr "FCHub Multi-Currency nécessite que FluentCart soit installé et activé."
+
+#: admin/components/checkout-settings.js:35
+#: admin/components/checkout-settings.js:78 admin/components/crm-settings.js:35
+#: admin/components/crm-settings.js:129 admin/components/general-settings.js:77
+#: admin/components/general-settings.js:133
+#: admin/components/general-settings.js:170
+#: admin/components/general-settings.js:213
+#: admin/components/general-settings.js:239
+msgid "Enabled"
+msgstr "Activé"
+
+#: admin/components/checkout-settings.js:38
+#: admin/components/checkout-settings.js:81 admin/components/crm-settings.js:38
+#: admin/components/crm-settings.js:132 admin/components/general-settings.js:80
+#: admin/components/general-settings.js:136
+#: admin/components/general-settings.js:173
+#: admin/components/general-settings.js:216
+#: admin/components/general-settings.js:242
+msgid "Disabled"
+msgstr "Désactivé"
+
+#: admin/components/checkout-settings.js:48
+msgid "Disclosure Text"
+msgstr "Texte de la mention"
+
+#: admin/components/checkout-settings.js:51
+msgid "Supports placeholders: {base_currency}, {display_currency}, {rate}"
+msgstr "Variables disponibles : {base_currency}, {display_currency}, {rate}"
+
+#: admin/components/checkout-settings.js:66
+msgid "Rate Freshness Badge"
+msgstr "Badge d’actualisation des taux"
+
+#: admin/components/checkout-settings.js:69
+msgid "Global gate for the rates-updated badge. When disabled, no surface shows it — including the switcher dropdown footer."
+msgstr "Réglage général du badge de mise à jour des taux. Lorsqu’il est désactivé, le badge n’apparaît nulle part, y compris au bas du menu du sélecteur."
+
+#: admin/components/crm-settings.js:26
+msgid "Tag contacts and update custom fields based on currency preference."
+msgstr "Étiqueter les contacts et mettre à jour les champs personnalisés selon leur préférence de devise."
+
+#: admin/components/crm-settings.js:48
+msgid "Auto-create Tags"
+msgstr "Créer automatiquement les étiquettes"
+
+#: admin/components/crm-settings.js:51
+msgid "Automatically create tags for each currency."
+msgstr "Créer automatiquement une étiquette pour chaque devise."
+
+#: admin/components/crm-settings.js:69
+msgid "Tag Prefix"
+msgstr "Préfixe des étiquettes"
+
+#: admin/components/crm-settings.js:72
+msgid "Tags created as {prefix}{CODE}, e.g. currency:EUR"
+msgstr "Étiquettes créées sous la forme {prefix}{CODE}, par ex. currency:EUR"
+
+#: admin/components/crm-settings.js:83
+msgid "Preferred Currency Field"
+msgstr "Champ de la devise préférée"
+
+#: admin/components/crm-settings.js:94
+msgid "Last Order Currency Field"
+msgstr "Champ de la devise de la dernière commande"
+
+#: admin/components/crm-settings.js:105
+msgid "Last Order FX Rate Field"
+msgstr "Champ du taux de change de la dernière commande"
+
+#: admin/components/crm-settings.js:115
+msgid "FluentCommunity"
+msgstr "FluentCommunity"
+
+#: admin/components/crm-settings.js:120
+msgid "FluentCommunity Sync"
+msgstr "Synchronisation FluentCommunity"
+
+#: admin/components/crm-settings.js:123
+msgid "Sync currency preference to FluentCommunity user meta."
+msgstr "Synchroniser la préférence de devise avec les métadonnées utilisateur de FluentCommunity."
+
+#: admin/components/currency-settings.js:113
+msgid "Search and add a currency…"
+msgstr "Rechercher et ajouter une devise…"
+
+#: admin/components/currency-settings.js:130
+msgid "Currency"
+msgstr "Devise"
+
+#: admin/components/currency-settings.js:133
+#: admin/components/switcher-settings.js:128
+#: blocks/currency-switcher/editor.js:817
+msgid "Symbol"
+msgstr "Symbole"
+
+#: admin/components/currency-settings.js:136
+msgid "Decimals"
+msgstr "Décimales"
+
+#: admin/components/currency-settings.js:139
+msgid "Decimal"
+msgstr "Séparateur décimal"
+
+#: admin/components/currency-settings.js:142
+msgid "Thousands"
+msgstr "Séparateur de milliers"
+
+#: admin/components/currency-settings.js:145
+msgid "Position"
+msgstr "Position"
+
+#: admin/components/currency-settings.js:153
+msgid "Drag to reorder"
+msgstr "Faire glisser pour réorganiser"
+
+#: admin/components/currency-settings.js:172
+#: admin/components/currency-settings.js:185
+#: blocks/currency-switcher/editor.js:531
+#: blocks/currency-switcher/editor.js:543
+#: blocks/currency-switcher/editor.js:608
+msgid "Auto"
+msgstr "Automatique"
+
+#: admin/components/currency-settings.js:175
+#: admin/components/currency-settings.js:191
+msgid "Dot (.)"
+msgstr "Point (.)"
+
+#: admin/components/currency-settings.js:178
+#: admin/components/currency-settings.js:188
+msgid "Comma (,)"
+msgstr "Virgule (,)"
+
+#: admin/components/currency-settings.js:194
+msgid "Space"
+msgstr "Espace"
+
+#: admin/components/currency-settings.js:197
+msgid "None"
+msgstr "Aucun"
+
+#: admin/components/currency-settings.js:204
+msgid "Left ($100)"
+msgstr "À gauche ($100)"
+
+#: admin/components/currency-settings.js:207
+msgid "Right (100$)"
+msgstr "À droite (100$)"
+
+#: admin/components/currency-settings.js:210
+msgid "Left space ($ 100)"
+msgstr "À gauche avec espace ($ 100)"
+
+#: admin/components/currency-settings.js:213
+msgid "Right space (100 $)"
+msgstr "À droite avec espace (100 $)"
+
+#: admin/components/currency-settings.js:225
+msgid "No display currencies added yet. Use the picker above to add currencies."
+msgstr "Aucune devise d’affichage n’a encore été ajoutée. Utilisez le sélecteur ci-dessus pour en ajouter."
+
+#: admin/components/diagnostics-view.js:24
+msgid "Available"
+msgstr "Disponible"
+
+#: admin/components/diagnostics-view.js:25
+#: admin/components/diagnostics-view.js:85
+msgid "Missing"
+msgstr "Manquant"
+
+#: admin/components/diagnostics-view.js:26
+msgid "Active"
+msgstr "Actif"
+
+#: admin/components/diagnostics-view.js:27
+msgid "Not found"
+msgstr "Introuvable"
+
+#: admin/components/diagnostics-view.js:28
+msgid "On"
+msgstr "Activé"
+
+#: admin/components/diagnostics-view.js:29
+#: admin/components/switcher-settings.js:179
+#: blocks/currency-switcher/editor.js:505
+msgid "Off"
+msgstr "Désactivé"
+
+#: admin/components/diagnostics-view.js:53
+msgid "Plugin"
+msgstr "Extension"
+
+#: admin/components/diagnostics-view.js:56
+msgid "Version"
+msgstr "Version"
+
+#: admin/components/diagnostics-view.js:59
+msgid "DB Version"
+msgstr "Version de la base de données"
+
+#: admin/components/diagnostics-view.js:62
+#: admin/components/general-settings.js:89
+msgid "Base Currency"
+msgstr "Devise de base"
+
+#: admin/components/diagnostics-view.js:71
+msgid "Dependencies"
+msgstr "Dépendances"
+
+#: admin/components/diagnostics-view.js:77
+msgid "FluentCRM Custom Fields"
+msgstr "Champs personnalisés FluentCRM"
+
+#: admin/components/diagnostics-view.js:82
+msgid "Found"
+msgstr "Trouvé"
+
+#: admin/components/diagnostics-view.js:88
+msgid "Unknown"
+msgstr "Inconnu"
+
+#: admin/components/diagnostics-view.js:93
+msgid "Create missing fields"
+msgstr "Créer les champs manquants"
+
+#: admin/components/diagnostics-view.js:102
+msgid "Rates"
+msgstr "Taux"
+
+#: admin/components/diagnostics-view.js:105
+msgid "Total rates"
+msgstr "Nombre total de taux"
+
+#: admin/components/diagnostics-view.js:108
+msgid "Stale rates"
+msgstr "Taux obsolètes"
+
+#: admin/components/diagnostics-view.js:115
+msgid "Feature Flags"
+msgstr "Indicateurs de fonctionnalités"
+
+#: admin/components/diagnostics-view.js:126
+msgid "Switcher Events"
+msgstr "Événements du sélecteur"
+
+#: admin/components/diagnostics-view.js:134
+msgid "No event data yet."
+msgstr "Aucune donnée d’événement pour le moment."
+
+#: admin/components/diagnostics-view.js:142
+msgid "Top Switched Currencies"
+msgstr "Devises les plus sélectionnées"
+
+#: admin/components/diagnostics-view.js:150
+msgid "No switch data yet."
+msgstr "Aucune donnée de changement pour le moment."
+
+#: admin/components/diagnostics-view.js:158
+msgid "No diagnostics data."
+msgstr "Aucune donnée de diagnostic."
+
+#: admin/components/general-settings.js:44
+msgid "Same as base currency (%s) — recommended"
+msgstr "Identique à la devise de base (%s) — recommandé"
+
+#: admin/components/general-settings.js:45
+msgid "store base"
+msgstr "devise de base de la boutique"
+
+#: admin/components/general-settings.js:65
+msgid "Multi-Currency Enabled"
+msgstr "Multi-Currency activé"
+
+#: admin/components/general-settings.js:92
+msgid "Managed in FluentCart Store Setup. Checkout and payment gateways use this currency."
+msgstr "Gérée dans la configuration de la boutique FluentCart. Le paiement et les passerelles de paiement utilisent cette devise."
+
+#: admin/components/general-settings.js:106
+msgid "Default Display Currency"
+msgstr "Devise d’affichage par défaut"
+
+#: admin/components/general-settings.js:109
+msgid "Currency shown to visitors before any preference is detected."
+msgstr "Devise présentée aux visiteurs avant qu’une préférence ne soit détectée."
+
+#: admin/components/general-settings.js:124
+msgid "URL Parameter"
+msgstr "Paramètre d’URL"
+
+#: admin/components/general-settings.js:127
+msgid "Allow currency switching via URL (e.g. ?currency=EUR)."
+msgstr "Autoriser le changement de devise via l’URL (par ex. ?currency=EUR)."
+
+#: admin/components/general-settings.js:146
+msgid "URL Parameter Key"
+msgstr "Clé du paramètre d’URL"
+
+#: admin/components/general-settings.js:158
+msgid "Cookie Persistence"
+msgstr "Mémorisation par cookie"
+
+#: admin/components/general-settings.js:161
+msgid "Remember a guest currency in a cookie and matching browser-storage fallback. Disable this and logged-out visitors cannot keep a currency choice at all — the switch is reported as failed rather than silently ignored."
+msgstr "Mémoriser la devise d’un visiteur dans un cookie, avec une solution de repli dans le stockage du navigateur. Si cette option est désactivée, les visiteurs non connectés ne peuvent conserver aucun choix de devise : le changement est signalé comme ayant échoué au lieu d’être ignoré en silence."
+
+#: admin/components/general-settings.js:177
+msgid "Currency switching is now a logged-in-only feature. Guests will be told their preference could not be saved."
+msgstr "Le changement de devise est désormais réservé aux utilisateurs connectés. Les visiteurs seront informés que leur préférence n’a pas pu être enregistrée."
+
+#: admin/components/general-settings.js:189
+msgid "Cookie Lifetime (days)"
+msgstr "Durée de vie du cookie (jours)"
+
+#: admin/components/general-settings.js:201
+msgid "Account Persistence"
+msgstr "Mémorisation dans le compte"
+
+#: admin/components/general-settings.js:204
+msgid "Remember currency preference in the logged-in user account. Disable this if you want logged-in sessions to respect the default display currency on every fresh visit."
+msgstr "Mémoriser la préférence de devise dans le compte de l’utilisateur connecté. Désactivez cette option pour que chaque nouvelle visite d’un utilisateur connecté reprenne la devise d’affichage par défaut."
+
+#: admin/components/general-settings.js:227
+msgid "Coming Soon"
+msgstr "Bientôt disponible"
+
+#: admin/components/general-settings.js:230
+msgid "Automatically detect visitor currency based on their country. Requires a geolocation provider."
+msgstr "Détecter automatiquement la devise du visiteur selon son pays. Nécessite un fournisseur de géolocalisation."
+
+#: admin/components/general-settings.js:251
+msgid "Remove Data on Uninstall"
+msgstr "Supprimer les données lors de la désinstallation"
+
+#: admin/components/general-settings.js:254
+msgid "If enabled, all tables and settings will be removed when the plugin is uninstalled."
+msgstr "Si cette option est activée, toutes les tables et tous les réglages seront supprimés lors de la désinstallation de l’extension."
+
+#: admin/components/general-settings.js:263
+msgid "Keep data"
+msgstr "Conserver les données"
+
+#: admin/components/general-settings.js:266
+msgid "Delete all"
+msgstr "Tout supprimer"
+
+#: admin/components/rate-settings.js:28
+msgid "Stale"
+msgstr "Obsolète"
+
+#: admin/components/rate-settings.js:29
+msgid "OK"
+msgstr "OK"
+
+#: admin/components/rate-settings.js:30
+msgid "No manual rates saved yet."
+msgstr "Aucun taux manuel enregistré pour le moment."
+
+#: admin/components/rate-settings.js:31
+msgid "No exchange rates yet. Add display currencies and trigger a refresh."
+msgstr "Aucun taux de change pour le moment. Ajoutez des devises d’affichage et lancez une actualisation."
+
+#: admin/components/rate-settings.js:43
+msgid "Rate Provider"
+msgstr "Fournisseur de taux"
+
+#: admin/components/rate-settings.js:46
+msgid "Service used to fetch exchange rates."
+msgstr "Service utilisé pour récupérer les taux de change."
+
+#: admin/components/rate-settings.js:58
+msgid "European Central Bank (free)"
+msgstr "Banque centrale européenne (gratuit)"
+
+#: admin/components/rate-settings.js:71
+msgid "API Key"
+msgstr "Clé API"
+
+#: admin/components/rate-settings.js:84
+msgid "Refresh Interval (hours)"
+msgstr "Intervalle d’actualisation (heures)"
+
+#: admin/components/rate-settings.js:87
+msgid "How often to fetch new exchange rates."
+msgstr "Fréquence de récupération des nouveaux taux de change."
+
+#: admin/components/rate-settings.js:99
+msgid "Stale Threshold (hours)"
+msgstr "Seuil d’obsolescence (heures)"
+
+#: admin/components/rate-settings.js:102
+msgid "Rates older than this will trigger an admin warning."
+msgstr "Les taux plus anciens que ce seuil déclencheront un avertissement dans l’administration."
+
+#: admin/components/rate-settings.js:113
+msgid "Stale Rate Fallback"
+msgstr "Solution de repli pour les taux obsolètes"
+
+#: admin/components/rate-settings.js:116
+msgid "What to do when rates are outdated beyond the threshold."
+msgstr "Action à effectuer lorsque les taux dépassent le seuil d’obsolescence."
+
+#: admin/components/rate-settings.js:122
+msgid "Show base currency"
+msgstr "Afficher la devise de base"
+
+#: admin/components/rate-settings.js:125
+msgid "Use last known rate"
+msgstr "Utiliser le dernier taux connu"
+
+#: admin/components/rate-settings.js:134
+msgid "Rounding Mode"
+msgstr "Mode d’arrondi"
+
+#: admin/components/rate-settings.js:137
+msgid "How converted prices are rounded."
+msgstr "Méthode d’arrondi des prix convertis."
+
+#: admin/components/rate-settings.js:162
+msgid "Manual Rates"
+msgstr "Taux manuels"
+
+#: admin/components/rate-settings.js:165
+msgid "Save the provider change before entering manual rates."
+msgstr "Enregistrez le changement de fournisseur avant de saisir des taux manuels."
+
+#: admin/components/rate-settings.js:168
+msgid "Add and save at least one display currency first."
+msgstr "Commencez par ajouter et enregistrer au moins une devise d’affichage."
+
+#: admin/components/rate-settings.js:181
+msgid "Current Rates"
+msgstr "Taux actuels"
+
+#: admin/components/rate-settings.js:184
+msgid "Save Manual Rates"
+msgstr "Enregistrer les taux manuels"
+
+#: admin/components/rate-settings.js:187
+msgid "Refresh Now"
+msgstr "Actualiser maintenant"
+
+#: admin/components/rate-settings.js:192
+msgid "Base"
+msgstr "Base"
+
+#: admin/components/rate-settings.js:195
+msgid "Quote"
+msgstr "Cotation"
+
+#: admin/components/rate-settings.js:198
+msgid "Rate"
+msgstr "Taux"
+
+#: admin/components/rate-settings.js:201
+msgid "Provider"
+msgstr "Fournisseur"
+
+#: admin/components/rate-settings.js:204
+msgid "Fetched"
+msgstr "Récupéré le"
+
+#: admin/components/rate-settings.js:207
+msgid "Status"
+msgstr "État"
+
+#: admin/components/switcher-settings.js:48
+msgid "Default Preset"
+msgstr "Préréglage par défaut"
+
+#: admin/components/switcher-settings.js:51
+msgid "Visual style used by switcher blocks that inherit global defaults."
+msgstr "Style visuel utilisé par les blocs de sélecteur qui héritent des réglages généraux."
+
+#: admin/components/switcher-settings.js:60
+#: blocks/currency-switcher/editor.js:406
+msgid "Default"
+msgstr "Par défaut"
+
+#: admin/components/switcher-settings.js:63
+#: blocks/currency-switcher/editor.js:407
+msgid "Pill"
+msgstr "Pastille"
+
+#: admin/components/switcher-settings.js:66
+#: blocks/currency-switcher/editor.js:408
+msgid "Minimal"
+msgstr "Minimal"
+
+#: admin/components/switcher-settings.js:69
+#: blocks/currency-switcher/editor.js:409
+msgid "Subtle"
+msgstr "Discret"
+
+#: admin/components/switcher-settings.js:72
+#: blocks/currency-switcher/editor.js:410
+msgid "Glass"
+msgstr "Effet verre"
+
+#: admin/components/switcher-settings.js:75
+#: blocks/currency-switcher/editor.js:411
+msgid "Contrast"
+msgstr "Contraste"
+
+#: admin/components/switcher-settings.js:84
+msgid "Label Position"
+msgstr "Position du libellé"
+
+#: admin/components/switcher-settings.js:87
+msgid "Where the optional label should sit relative to the switcher."
+msgstr "Emplacement du libellé facultatif par rapport au sélecteur."
+
+#: admin/components/switcher-settings.js:93
+#: blocks/currency-switcher/editor.js:425
+msgid "Before"
+msgstr "Avant"
+
+#: admin/components/switcher-settings.js:96
+#: blocks/currency-switcher/editor.js:426
+msgid "After"
+msgstr "Après"
+
+#: admin/components/switcher-settings.js:99
+#: blocks/currency-switcher/editor.js:427
+msgid "Above"
+msgstr "Au-dessus"
+
+#: admin/components/switcher-settings.js:102
+#: blocks/currency-switcher/editor.js:428
+msgid "Below"
+msgstr "En dessous"
+
+#: admin/components/switcher-settings.js:109
+msgid "Trigger Content"
+msgstr "Contenu du bouton"
+
+#: admin/components/switcher-settings.js:114
+msgid "Trigger Elements"
+msgstr "Éléments du bouton"
+
+#: admin/components/switcher-settings.js:117
+msgid "Choose what appears in the closed switcher button."
+msgstr "Choisissez les éléments affichés sur le bouton du sélecteur lorsqu’il est fermé."
+
+#: admin/components/switcher-settings.js:122
+msgid "Flag"
+msgstr "Drapeau"
+
+#: admin/components/switcher-settings.js:125
+#: blocks/currency-switcher/editor.js:816
+msgid "Code"
+msgstr "Code"
+
+#: admin/components/switcher-settings.js:131
+#: blocks/currency-switcher/editor.js:818
+msgid "Name"
+msgstr "Nom"
+
+#: admin/components/switcher-settings.js:137
+msgid "Dropdown Content"
+msgstr "Contenu de la liste déroulante"
+
+#: admin/components/switcher-settings.js:142
+msgid "Option Elements"
+msgstr "Éléments des options"
+
+#: admin/components/switcher-settings.js:145
+msgid "Choose what each currency row displays inside the dropdown."
+msgstr "Choisissez les éléments affichés sur chaque ligne de devise dans la liste déroulante."
+
+#: admin/components/switcher-settings.js:150
+msgid "Flags"
+msgstr "Drapeaux"
+
+#: admin/components/switcher-settings.js:153
+msgid "Codes"
+msgstr "Codes"
+
+#: admin/components/switcher-settings.js:156
+msgid "Symbols"
+msgstr "Symboles"
+
+#: admin/components/switcher-settings.js:159
+msgid "Names"
+msgstr "Noms"
+
+#: admin/components/switcher-settings.js:162
+msgid "Active check"
+msgstr "Coche de la devise active"
+
+#: admin/components/switcher-settings.js:170
+msgid "Search Mode"
+msgstr "Mode de recherche"
+
+#: admin/components/switcher-settings.js:173
+msgid "Useful when you expose more than a handful of currencies."
+msgstr "Utile lorsque vous proposez plus de quelques devises."
+
+#: admin/components/switcher-settings.js:182
+#: blocks/currency-switcher/editor.js:506
+msgid "Inline search"
+msgstr "Recherche intégrée"
+
+#: admin/components/switcher-settings.js:191
+msgid "Favorite Currencies"
+msgstr "Devises favorites"
+
+#: admin/components/switcher-settings.js:194
+msgid "Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP"
+msgstr "Codes ISO séparés par des virgules et épinglés au-dessus des autres, par exemple : EUR, USD, GBP"
+
+#: admin/components/switcher-settings.js:204
+#: blocks/currency-switcher/editor.js:521
+#: blocks/currency-switcher/editor.js:961
+msgid "Show favorites first"
+msgstr "Afficher les favoris en premier"
+
+#: admin/components/switcher-settings.js:213
+msgid "Layout Defaults"
+msgstr "Mise en page par défaut"
+
+#: admin/components/switcher-settings.js:216
+msgid "Baseline geometry for inheriting switcher blocks."
+msgstr "Dimensions de référence pour les blocs de sélecteur qui héritent des réglages généraux."
+
+#: admin/components/switcher-settings.js:222
+#: blocks/currency-switcher/editor.js:593
+msgid "Size"
+msgstr "Taille"
+
+#: admin/components/switcher-settings.js:226
+#: blocks/currency-switcher/editor.js:596
+msgid "Small"
+msgstr "Petite"
+
+#: admin/components/switcher-settings.js:229
+#: blocks/currency-switcher/editor.js:597
+msgid "Medium"
+msgstr "Moyenne"
+
+#: admin/components/switcher-settings.js:232
+#: blocks/currency-switcher/editor.js:598
+msgid "Large"
+msgstr "Grande"
+
+#: admin/components/switcher-settings.js:238
+#: blocks/currency-switcher/editor.js:605
+msgid "Width"
+msgstr "Largeur"
+
+#: admin/components/switcher-settings.js:242
+msgid "Auto width"
+msgstr "Largeur automatique"
+
+#: admin/components/switcher-settings.js:245
+#: blocks/currency-switcher/editor.js:609
+msgid "Full width"
+msgstr "Pleine largeur"
+
+#: admin/components/switcher-settings.js:251
+#: blocks/currency-switcher/editor.js:528
+msgid "Dropdown position"
+msgstr "Position de la liste déroulante"
+
+#: admin/components/switcher-settings.js:255
+msgid "Auto position"
+msgstr "Position automatique"
+
+#: admin/components/switcher-settings.js:258
+#: blocks/currency-switcher/editor.js:532
+msgid "Start"
+msgstr "Début"
+
+#: admin/components/switcher-settings.js:261
+#: blocks/currency-switcher/editor.js:533
+msgid "End"
+msgstr "Fin"
+
+#: admin/components/switcher-settings.js:267
+#: blocks/currency-switcher/editor.js:540
+msgid "Dropdown direction"
+msgstr "Sens d’ouverture de la liste"
+
+#: admin/components/switcher-settings.js:271
+msgid "Auto direction"
+msgstr "Sens automatique"
+
+#: admin/components/switcher-settings.js:274
+#: blocks/currency-switcher/editor.js:544
+msgid "Down"
+msgstr "Vers le bas"
+
+#: admin/components/switcher-settings.js:277
+#: blocks/currency-switcher/editor.js:545
+msgid "Up"
+msgstr "Vers le haut"
+
+#: admin/components/switcher-settings.js:287
+#: blocks/currency-switcher/editor.js:554
+msgid "Footer Context"
+msgstr "Informations en pied de liste"
+
+#: admin/components/switcher-settings.js:290
+msgid "Optional trust-building context shown at the bottom of the dropdown. The freshness badge also requires the global Rate Freshness Badge gate on the Checkout tab."
+msgstr "Informations facultatives affichées au bas de la liste déroulante pour rassurer les clients. Le badge d’actualisation nécessite également l’activation générale du badge d’actualisation des taux dans l’onglet Paiement."
+
+#: admin/components/switcher-settings.js:298
+msgid "Freshness badge"
+msgstr "Badge d’actualisation"
+
+#: admin/components/switcher-settings.js:301
+msgid "Rate value"
+msgstr "Valeur du taux"
+
+#: admin/components/switcher-settings.js:304
+msgid "Checkout context"
+msgstr "Contexte du paiement"
+
+#: admin/multi-currency-admin.js:47
+msgid "Network error. Please check your connection."
+msgstr "Erreur réseau. Vérifiez votre connexion."
+
+#: admin/multi-currency-admin.js:78
+msgid "Save"
+msgstr "Enregistrer"
+
+#: admin/multi-currency-admin.js:79
+msgid "Saving..."
+msgstr "Enregistrement…"
+
+#: admin/multi-currency-admin.js:82
+msgid "General"
+msgstr "Général"
+
+#: admin/multi-currency-admin.js:83
+msgid "Currencies"
+msgstr "Devises"
+
+#: admin/multi-currency-admin.js:84
+msgid "Exchange Rates"
+msgstr "Taux de change"
+
+#: admin/multi-currency-admin.js:85
+msgid "Switcher"
+msgstr "Sélecteur"
+
+#: admin/multi-currency-admin.js:86
+msgid "Checkout"
+msgstr "Paiement"
+
+#: admin/multi-currency-admin.js:87
+msgid "CRM"
+msgstr "CRM"
+
+#: admin/multi-currency-admin.js:88
+msgid "Diagnostics"
+msgstr "Diagnostic"
+
+#: admin/multi-currency-admin.js:130
+msgid "Failed to load settings."
+msgstr "Impossible de charger les réglages."
+
+#: admin/multi-currency-admin.js:156
+msgid "Failed to load exchange rates."
+msgstr "Impossible de charger les taux de change."
+
+#: admin/multi-currency-admin.js:171
+msgid "Failed to load diagnostics."
+msgstr "Impossible de charger le diagnostic."
+
+#: admin/multi-currency-admin.js:185
+msgid "FluentCRM fields created."
+msgstr "Champs FluentCRM créés."
+
+#: admin/multi-currency-admin.js:189
+msgid "Could not create the FluentCRM fields."
+msgstr "Impossible de créer les champs FluentCRM."
+
+#: admin/multi-currency-admin.js:200
+msgid "Rates refreshed."
+msgstr "Taux actualisés."
+
+#: admin/multi-currency-admin.js:204
+msgid "Rate refresh failed."
+msgstr "Échec de l’actualisation des taux."
+
+#: admin/multi-currency-admin.js:218
+msgid "Manual rates saved."
+msgstr "Taux manuels enregistrés."
+
+#: admin/multi-currency-admin.js:234
+msgid "Settings saved."
+msgstr "Réglages enregistrés."
+
+#: admin/multi-currency-admin.js:239
+msgid "Failed to save settings."
+msgstr "Impossible d’enregistrer les réglages."
+
+#: admin/multi-currency-admin.js:271
+msgid "Multi-Currency settings"
+msgstr "Réglages Multi-Currency"
+
+#: admin/switcher-preview.js:26
+msgid "US Dollar"
+msgstr "Dollar américain"
+
+#: admin/switcher-preview.js:32
+msgid "Euro"
+msgstr "Euro"
+
+#: admin/switcher-preview.js:38
+msgid "British Pound"
+msgstr "Livre sterling"
+
+#: admin/switcher-preview.js:62
+msgid "%s minute"
+msgid_plural "%s minutes"
+msgstr[0] "%s minute"
+msgstr[1] "%s minutes"
+
+#. translators: %1$s is the number of currencies shown, %2$s the total configured.
+#: admin/switcher-preview.js:118
+msgid "Showing %1$s of %2$s currencies. The full list appears on the frontend — this is just a taste."
+msgstr "Aperçu de %1$s devises sur %2$s. La liste complète apparaît sur le site — ceci n’est qu’un avant-goût."
+
+#: admin/switcher-preview.js:179
+msgid "Display prices only. Checkout charged in %s."
+msgstr "Prix affichés à titre indicatif. Le paiement est débité en %s."
+
+#: admin/switcher-preview.js:182
+msgid "Display prices only. Checkout is charged in the store currency."
+msgstr "Prix affichés à titre indicatif. Le paiement est débité dans la devise de la boutique."
+
+#: admin/switcher-preview.js:206
+msgid "Preview"
+msgstr "Aperçu"
+
+#: blocks/currency-switcher/editor.js:374
+msgid "Source"
+msgstr "Source"
+
+#: blocks/currency-switcher/editor.js:376
+msgid "Use global switcher defaults"
+msgstr "Utiliser les réglages généraux du sélecteur"
+
+#: blocks/currency-switcher/editor.js:383
+msgid "Label"
+msgstr "Libellé"
+
+#: blocks/currency-switcher/editor.js:391
+msgid "This block inherits its switcher behavior from the global defaults in Multi-Currency settings. Only the label stays instance-specific."
+msgstr "Ce bloc hérite du comportement défini dans les réglages généraux du sélecteur Multi-Currency. Seul son libellé reste propre à cette instance."
+
+#: blocks/currency-switcher/editor.js:401
+#: blocks/currency-switcher/editor.js:403
+msgid "Preset"
+msgstr "Préréglage"
+
+#: blocks/currency-switcher/editor.js:420
+msgid "Trigger"
+msgstr "Bouton"
+
+#: blocks/currency-switcher/editor.js:422
+msgid "Label position"
+msgstr "Position du libellé"
+
+#: blocks/currency-switcher/editor.js:435
+msgid "Show trigger flag"
+msgstr "Afficher le drapeau sur le bouton"
+
+#: blocks/currency-switcher/editor.js:442
+msgid "Show trigger code"
+msgstr "Afficher le code sur le bouton"
+
+#: blocks/currency-switcher/editor.js:449
+msgid "Show trigger symbol"
+msgstr "Afficher le symbole sur le bouton"
+
+#: blocks/currency-switcher/editor.js:456
+msgid "Show trigger name"
+msgstr "Afficher le nom sur le bouton"
+
+#: blocks/currency-switcher/editor.js:465
+msgid "Dropdown"
+msgstr "Liste déroulante"
+
+#: blocks/currency-switcher/editor.js:467
+msgid "Show option flags"
+msgstr "Afficher les drapeaux des options"
+
+#: blocks/currency-switcher/editor.js:474
+msgid "Show option codes"
+msgstr "Afficher les codes des options"
+
+#: blocks/currency-switcher/editor.js:481
+msgid "Show option symbols"
+msgstr "Afficher les symboles des options"
+
+#: blocks/currency-switcher/editor.js:488
+msgid "Show option names"
+msgstr "Afficher les noms des options"
+
+#: blocks/currency-switcher/editor.js:495
+msgid "Show active indicator"
+msgstr "Afficher l’indicateur de la devise active"
+
+#: blocks/currency-switcher/editor.js:502
+msgid "Search"
+msgstr "Recherche"
+
+#: blocks/currency-switcher/editor.js:513
+#: blocks/currency-switcher/editor.js:953
+msgid "Favorite currencies"
+msgstr "Devises favorites"
+
+#: blocks/currency-switcher/editor.js:514
+#: blocks/currency-switcher/editor.js:954
+msgid "Comma-separated ISO codes, for example: EUR, USD, GBP"
+msgstr "Codes ISO séparés par des virgules, par exemple : EUR, USD, GBP"
+
+#: blocks/currency-switcher/editor.js:556
+msgid "Show freshness badge"
+msgstr "Afficher le badge d’actualisation"
+
+#: blocks/currency-switcher/editor.js:563
+msgid "Show rate value"
+msgstr "Afficher la valeur du taux"
+
+#: blocks/currency-switcher/editor.js:570
+msgid "Show checkout context note"
+msgstr "Afficher la mention sur le contexte du paiement"
+
+#: blocks/currency-switcher/editor.js:579
+#: blocks/currency-switcher/editor.js:951
+msgid "Layout"
+msgstr "Mise en page"
+
+#: blocks/currency-switcher/editor.js:581
+msgid "Alignment"
+msgstr "Alignement"
+
+#: blocks/currency-switcher/editor.js:584
+msgid "Left"
+msgstr "Gauche"
+
+#: blocks/currency-switcher/editor.js:585
+msgid "Center"
+msgstr "Centre"
+
+#: blocks/currency-switcher/editor.js:586
+msgid "Right"
+msgstr "Droite"
+
+#: blocks/currency-switcher/editor.js:625
+msgid "Editor preview uses your actual configured currencies and current global switcher defaults."
+msgstr "L’aperçu dans l’éditeur utilise les devises réellement configurées et les réglages généraux actuels du sélecteur."
+
+#: blocks/currency-switcher/editor.js:676
+msgid "Rates updated 2 hours ago"
+msgstr "Taux mis à jour il y a 2 heures"
+
+#: blocks/currency-switcher/editor.js:680
+msgid "1 EUR = 1.1000 USD"
+msgstr "1 EUR = 1,1000 USD"
+
+#: blocks/currency-switcher/editor.js:683
+msgid "Display prices only. Checkout is charged in EUR."
+msgstr "Prix affichés à titre indicatif. Le paiement est débité en EUR."
+
+#: blocks/currency-switcher/editor.js:702
+msgid "Header Compact"
+msgstr "En-tête compact"
+
+#: blocks/currency-switcher/editor.js:702
+msgid "Flag and code only, tuned for narrow header space."
+msgstr "Drapeau et code uniquement, adaptés à l’espace restreint d’un en-tête."
+
+#: blocks/currency-switcher/editor.js:718
+msgid "Footer Descriptive"
+msgstr "Pied de page descriptif"
+
+#: blocks/currency-switcher/editor.js:718
+msgid "A more descriptive switcher for footer or utility content."
+msgstr "Un sélecteur plus descriptif pour le pied de page ou un contenu utilitaire."
+
+#: blocks/currency-switcher/editor.js:731
+msgid "Mobile Full Width"
+msgstr "Mobile pleine largeur"
+
+#: blocks/currency-switcher/editor.js:731
+msgid "Full-width mobile-friendly switcher with room for more context."
+msgstr "Sélecteur pleine largeur adapté aux mobiles, avec davantage d’espace pour les informations contextuelles."
+
+#: blocks/currency-switcher/editor.js:809
+#: blocks/currency-switcher/editor.js:852
+#: blocks/currency-switcher/editor.js:906
+msgid "Display"
+msgstr "Affichage"
+
+#: blocks/currency-switcher/editor.js:811
+#: blocks/currency-switcher/editor.js:908
+msgid "Mode"
+msgstr "Mode"
+
+#: blocks/currency-switcher/editor.js:814
+msgid "Flag + Code"
+msgstr "Drapeau + code"
+
+#: blocks/currency-switcher/editor.js:815
+msgid "Flag + Name"
+msgstr "Drapeau + nom"
+
+#: blocks/currency-switcher/editor.js:819
+msgid "Symbol + Code"
+msgstr "Symbole + code"
+
+#: blocks/currency-switcher/editor.js:854
+msgid "Format"
+msgstr "Format"
+
+#: blocks/currency-switcher/editor.js:857
+#: blocks/currency-switcher/editor.js:911
+msgid "Compact"
+msgstr "Compact"
+
+#: blocks/currency-switcher/editor.js:858
+msgid "Sentence"
+msgstr "Phrase"
+
+#: blocks/currency-switcher/editor.js:865
+msgid "Precision"
+msgstr "Précision"
+
+#: blocks/currency-switcher/editor.js:872
+#: blocks/currency-switcher/editor.js:920
+msgid "Hide when base currency is displayed"
+msgstr "Masquer lorsque la devise de base est affichée"
+
+#: blocks/currency-switcher/editor.js:912
+msgid "Checkout disclosure"
+msgstr "Mention au paiement"
+
+#: blocks/currency-switcher/editor.js:913
+msgid "Full note"
+msgstr "Mention complète"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block title"
+msgid "Currency Context Notice"
+msgstr "Mention sur le contexte de devise"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block description"
+msgid "Show a currency context note such as display currency vs checkout currency."
+msgstr "Afficher une mention sur le contexte de devise, par exemple la devise d’affichage par rapport à celle du paiement."
+
+#: blocks/currency-context-notice/block.json blocks/currency-current/block.json
+#: blocks/currency-selector-buttons/block.json
+#: blocks/currency-switcher/block.json blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "currency"
+msgstr "devise"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block keyword"
+msgid "notice"
+msgstr "mention"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block keyword"
+msgid "checkout"
+msgstr "paiement"
+
+#: blocks/currency-context-notice/block.json
+msgctxt "block keyword"
+msgid "context"
+msgstr "contexte"
+
+#: blocks/currency-current/block.json
+msgctxt "block title"
+msgid "Current Currency"
+msgstr "Devise actuelle"
+
+#: blocks/currency-current/block.json
+msgctxt "block description"
+msgid "Display the visitor's current display currency in compact form."
+msgstr "Afficher sous forme compacte la devise d’affichage actuelle du visiteur."
+
+#: blocks/currency-current/block.json
+msgctxt "block keyword"
+msgid "current"
+msgstr "actuelle"
+
+#: blocks/currency-current/block.json
+msgctxt "block keyword"
+msgid "display"
+msgstr "affichage"
+
+#: blocks/currency-current/block.json blocks/currency-switcher/block.json
+msgctxt "block keyword"
+msgid "money"
+msgstr "argent"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block title"
+msgid "Currency Selector Buttons"
+msgstr "Boutons de sélection de devise"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block description"
+msgid "A button-group alternative to the dropdown switcher for stores with a few main currencies."
+msgstr "Une alternative au sélecteur déroulant sous forme de groupe de boutons, pour les boutiques proposant quelques devises principales."
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block keyword"
+msgid "selector"
+msgstr "sélecteur"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block keyword"
+msgid "buttons"
+msgstr "boutons"
+
+#: blocks/currency-selector-buttons/block.json
+msgctxt "block keyword"
+msgid "toggle"
+msgstr "basculer"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block title"
+msgid "Currency Switcher"
+msgstr "Sélecteur de devise"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block description"
+msgid "Display the FCHub Multi-Currency switcher in posts, pages, templates, and template parts."
+msgstr "Afficher le sélecteur FCHub Multi-Currency dans les articles, les pages, les modèles et les parties de modèle."
+
+#: blocks/currency-switcher/block.json
+msgctxt "block keyword"
+msgid "switcher"
+msgstr "sélecteur"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block keyword"
+msgid "multi-currency"
+msgstr "multidevise"
+
+#: blocks/currency-switcher/block.json blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "exchange"
+msgstr "change"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Default"
+msgstr "Par défaut"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Pill"
+msgstr "Pastille"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Minimal"
+msgstr "Minimal"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Subtle"
+msgstr "Discret"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Glass"
+msgstr "Effet verre"
+
+#: blocks/currency-switcher/block.json
+msgctxt "block style label"
+msgid "Contrast"
+msgstr "Contraste"
+
+#: blocks/exchange-rate/block.json
+msgctxt "block title"
+msgid "Exchange Rate"
+msgstr "Taux de change"
+
+#: blocks/exchange-rate/block.json
+msgctxt "block description"
+msgid "Display the current exchange rate between the store base currency and the visitor display currency."
+msgstr "Afficher le taux de change actuel entre la devise de base de la boutique et la devise d’affichage du visiteur."
+
+#: blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "rate"
+msgstr "taux"
+
+#: blocks/exchange-rate/block.json
+msgctxt "block keyword"
+msgid "fx"
+msgstr "fx"
