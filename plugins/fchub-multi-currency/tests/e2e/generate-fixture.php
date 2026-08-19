@@ -68,6 +68,7 @@ function resetStore(): void
 
     $GLOBALS['wp_options'][Constants::OPTION_SETTINGS] = [
         'enabled'                     => 'yes',
+        'geo_enabled'                 => 'yes',
         'base_currency'               => BASE_CURRENCY,
         'default_display_currency'    => BASE_CURRENCY,
         'display_currencies'          => [

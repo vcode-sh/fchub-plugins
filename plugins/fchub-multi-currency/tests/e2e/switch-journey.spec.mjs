@@ -390,3 +390,15 @@ test("critical-window CSS does not depend on classes missing from the served HTM
 		"Critical-window rules must not key off classes absent from the HTML; a used-CSS pass may drop them.",
 	).toHaveLength(0);
 });
+
+test("a first visit from a mapped timezone paints that currency", async ({ browser }) => {
+	await using origin = await startHostileOrigin({ queryStringMode: "ignored" });
+	const context = await browser.newContext({ timezoneId: "Europe/Berlin" });
+	const page = await context.newPage();
+
+	await page.goto(`${origin.url}/pricing`);
+	await expect(page.locator("[data-fchub-mc-trigger]").first()).toContainText("EUR");
+	await expect(page.locator(".fct-item-price").first()).toContainText("€");
+
+	await context.close();
+});
