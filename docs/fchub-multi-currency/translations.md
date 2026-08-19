@@ -41,8 +41,15 @@ From `plugins/fchub-multi-currency/`:
 2. Set the `Plural-Forms` header for the language. It is load-bearing: it
    drives both `.mo` selection and the `timePluralRule` table.
 3. Translate every `msgstr`, and every `msgstr[n]` on plural entries.
-4. `composer i18n:build` — runs `wp i18n make-mo languages` and
-   `wp i18n make-json languages --no-purge`. Requires WP-CLI on the host.
+4. `composer i18n:build` — runs `wp i18n make-mo languages`,
+   `wp i18n make-php languages` and `wp i18n make-json languages --no-purge`.
+   Requires WP-CLI on the host. The `.l10n.php` file is the one WordPress
+   6.5+ actually loads (a plain PHP array opcache holds); the `.mo` stays
+   as the fallback and the JED `.json` files carry the JS strings.
+   **Never rebuild the `.mo` alone** — Poedit's save does exactly that —
+   because WordPress prefers the sibling `.l10n.php` and a stale one
+   silently masks the edit. The package test pins `.po` and `.l10n.php`
+   revision headers together, so a lone `.mo` rebuild fails the suite.
 5. Verify live: site language for the storefront (switcher labels, freshness
    badge at 2 and 5 units old, checkout notice), profile language for the
    admin panel.

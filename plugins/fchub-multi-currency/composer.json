@@ -46,6 +46,7 @@
         "i18n:pot": "wp i18n make-pot . languages/fchub-multi-currency.pot --domain=fchub-multi-currency --exclude=vendor,node_modules,tests,test-results,admin/lib,docs",
         "i18n:build": [
             "wp i18n make-mo languages",
+            "wp i18n make-php languages",
             "wp i18n make-json languages --no-purge"
         ]
     }

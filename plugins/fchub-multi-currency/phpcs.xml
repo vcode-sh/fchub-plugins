@@ -9,6 +9,8 @@
     <exclude-pattern>*/vendor/*</exclude-pattern>
     <exclude-pattern>*/node_modules/*</exclude-pattern>
     <exclude-pattern>*/tests/*</exclude-pattern>
+    <!-- Generated translation artifacts (.l10n.php) are not authored code. -->
+    <exclude-pattern>*/languages/*</exclude-pattern>
     <exclude-pattern>*/docs/*</exclude-pattern>
     <exclude-pattern>*/assets/*</exclude-pattern>
     <arg value="sp"/>

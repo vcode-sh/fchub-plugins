@@ -125,6 +125,40 @@ final class WordPressOrgPackageTest extends TestCase
     }
 
     /**
+     * WordPress 6.5+ prefers a .l10n.php translation file over the .mo it
+     * sits beside: a plain PHP array opcache holds, instead of a binary
+     * parse on every request of every translated page. The plugin's floor
+     * is far above 6.5, so every locale must ship all three artifacts.
+     */
+    #[Test]
+    public function everyLocaleShipsThePerformantTranslationFormat(): void
+    {
+        $catalogues = glob($this->pluginRoot . '/languages/*.po') ?: [];
+
+        self::assertNotEmpty($catalogues, 'The shipped locales are expected in languages/.');
+
+        foreach ($catalogues as $catalogue) {
+            $base = substr($catalogue, 0, -3);
+            self::assertFileExists($base . '.mo', basename($catalogue) . ' must ship its .mo');
+            self::assertFileExists($base . '.l10n.php', basename($catalogue) . ' must ship its .l10n.php');
+
+            // WordPress loads .l10n.php FIRST and never checks freshness, so
+            // a .po edited and rebuilt as .mo alone (Poedit's default save)
+            // would be silently masked by a stale .l10n.php. The revision
+            // header ties the artifact to the catalogue it was built from.
+            preg_match('/"PO-Revision-Date: ([^\\\\"]+)/', (string) file_get_contents($catalogue), $match);
+            self::assertNotEmpty($match[1] ?? '', basename($catalogue) . ' must carry PO-Revision-Date');
+
+            $artifact = require $base . '.l10n.php';
+            self::assertSame(
+                $match[1],
+                $artifact['po-revision-date'] ?? null,
+                basename($base . '.l10n.php') . ' is stale — run composer i18n:build, never make-mo alone.',
+            );
+        }
+    }
+
+    /**
      * wp-cli's make-json (i18n-command ≤ 2.12) matches script names against
      * the unescaped pattern "/.min.js$/", so a name like "…admin.js" is
      * treated as a minified artifact and its JED translation file is written
