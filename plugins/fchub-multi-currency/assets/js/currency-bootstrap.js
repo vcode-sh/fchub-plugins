@@ -122,7 +122,13 @@
 		return offered(code) ? code : "";
 	}
 
-	/** Mirrors the server's resolver order, so a page and its scripts never disagree. */
+	/**
+	 * Mirrors the server's resolver order, with one browser-only extra: the
+	 * locale hint sits between the cookie and the default because only the
+	 * browser knows the visitor's timezone. The server resolving for REST or
+	 * the no-JS form never sees a locale guess, and that is the design — a
+	 * hint is a per-paint answer, never shared state.
+	 */
 	function resolve() {
 		if (config.cookiePersistenceEnabled !== true) forget();
 
