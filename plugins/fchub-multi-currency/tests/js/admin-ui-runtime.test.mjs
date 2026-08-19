@@ -285,3 +285,30 @@ describe("locale detection is a real setting", () => {
 		assert.match(template, /v-model="settings\.geo_enabled"/);
 	});
 });
+
+describe("charm rounding is one labeled decision", () => {
+	it("offers the six rules with self-describing labels", () => {
+		const { page } = loadAdminRuntime();
+		const template = page.components.RateSettings.template;
+
+		assert.match(template, /v-model="settings\.charm_rounding"/);
+		for (const label of [
+			"No charm rounding",
+			"Whole amounts (35)",
+			"…99 endings (34.99)",
+			"…95 endings (34.95)",
+			"Nearest 5 (35)",
+			"Nearest 10 (30)",
+		]) {
+			assert.ok(template.includes(label), label);
+		}
+	});
+
+	it("passes every rule label through wp.i18n", () => {
+		const { window } = loadAdminRuntime({ translate: (text) => `«${text}»` });
+		const template = window.FchubMcAdmin.components.RateSettings.template;
+
+		assert.ok(template.includes("«Charm Rounding»"));
+		assert.ok(template.includes("«No charm rounding»"));
+	});
+});

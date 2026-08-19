@@ -157,6 +157,42 @@
             </el-select>\
         </div>\
     </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">' +
+			__("Charm Rounding", "fchub-multi-currency") +
+			'</span>\
+            <div class="form-note">' +
+			__(
+				"Round converted display prices to selling endings. Display-only, like every converted price; checkout still charges the base currency exactly.",
+				"fchub-multi-currency",
+			) +
+			'</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-select v-model="settings.charm_rounding" style="max-width:320px">\
+                <el-option label="' +
+			__("No charm rounding", "fchub-multi-currency") +
+			'" value="none" />\
+                <el-option label="' +
+			__("Whole amounts (35)", "fchub-multi-currency") +
+			'" value="whole" />\
+                <el-option label="' +
+			__("…99 endings (34.99)", "fchub-multi-currency") +
+			'" value="ending_99" />\
+                <el-option label="' +
+			__("…95 endings (34.95)", "fchub-multi-currency") +
+			'" value="ending_95" />\
+                <el-option label="' +
+			__("Nearest 5 (35)", "fchub-multi-currency") +
+			'" value="nearest_5" />\
+                <el-option label="' +
+			__("Nearest 10 (30)", "fchub-multi-currency") +
+			'" value="nearest_10" />\
+            </el-select>\
+        </div>\
+    </div>\
     <div v-if="settings.rate_provider === \'manual\'" style="margin-top:24px">\
         <h3 style="font-size:16px;font-weight:500;margin:0 0 12px">' +
 			__("Manual Rates", "fchub-multi-currency") +

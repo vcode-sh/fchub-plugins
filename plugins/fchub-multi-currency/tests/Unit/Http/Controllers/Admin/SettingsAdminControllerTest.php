@@ -243,4 +243,18 @@ final class SettingsAdminControllerTest extends TestCase
         self::assertSame(200, $response->get_status());
         self::assertFalse(wp_next_scheduled('fchub_mc_refresh_rates'));
     }
+
+    #[Test]
+    public function testCharmRoundingAcceptsKnownRulesAndDegradesUnknownOnes(): void
+    {
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params(['charm_rounding' => 'ending_99']);
+        $settings = (new SettingsAdminController())->save($request)->get_data()['data']['settings'];
+        $this->assertSame('ending_99', $settings['charm_rounding']);
+
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params(['charm_rounding' => 'exotic']);
+        $settings = (new SettingsAdminController())->save($request)->get_data()['data']['settings'];
+        $this->assertSame('none', $settings['charm_rounding']);
+    }
 }

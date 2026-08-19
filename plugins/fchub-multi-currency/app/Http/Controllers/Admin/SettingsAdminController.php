@@ -83,6 +83,11 @@ final class SettingsAdminController
                 'rate_provider' => self::sanitizeEnum((string) $value, array_column(RateProvider::cases(), 'value'), 'manual'),
                 'stale_fallback' => self::sanitizeEnum((string) $value, ['base', 'last_known'], 'base'),
                 'rounding_mode' => self::sanitizeEnum((string) $value, array_column(RoundingMode::cases(), 'value'), 'half_up'),
+                'charm_rounding' => self::sanitizeEnum(
+                    (string) $value,
+                    ['none', 'whole', 'ending_99', 'ending_95', 'nearest_5', 'nearest_10'],
+                    'none',
+                ),
                 'cookie_lifetime_days' => max(1, min(365, (int) $value)),
                 'rate_refresh_interval_hrs' => max(1, min(168, (int) $value)),
                 'stale_threshold_hrs' => max(1, min(720, (int) $value)),
