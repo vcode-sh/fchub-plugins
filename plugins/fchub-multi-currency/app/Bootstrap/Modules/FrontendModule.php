@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Bootstrap\Modules;
 
 use FChubMultiCurrency\Bootstrap\ModuleContract;
+use FChubMultiCurrency\Domain\ValueObjects\SelectableCurrencyCodes;
 use FChubMultiCurrency\Frontend\CurrencyContextPresentation;
 use FChubMultiCurrency\Frontend\CurrencySwitcherRenderer;
 use FChubMultiCurrency\Frontend\CurrencyTablePayload;
 use FChubMultiCurrency\Integration\FluentCartCurrency;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Constants;
+use FChubMultiCurrency\Support\CurrencyGeography;
 use FChubMultiCurrency\Support\FeatureFlags;
 use FChubMultiCurrency\Support\Hooks;
 use FluentCart\Api\CurrencySettings;
@@ -172,6 +174,12 @@ final class FrontendModule implements ModuleContract
             'projectionEnabled'     => Hooks::isEnabled() && FeatureFlags::isEnabled('js_projection'),
             'urlParamEnabled'       => $optionStore->get('url_param_enabled', 'yes') === 'yes',
             'urlParamKey'           => (string) $optionStore->get('url_param_key', 'currency'),
+            'geoEnabled'            => $optionStore->get('geo_enabled', 'no') === 'yes',
+            // Store facts only: offered currencies and the zones that imply
+            // them. Which zone THIS visitor is in stays in the browser.
+            'localeCurrencies'      => $optionStore->get('geo_enabled', 'no') === 'yes'
+                ? CurrencyGeography::timezoneMap(SelectableCurrencyCodes::fromSettings($settings)->all())
+                : [],
             'flagBaseUrl'           => FCHUB_MC_URL . 'assets/flags/4x3/',
             'baseCurrencySign'      => html_entity_decode($fcSettings['currency_sign'] ?? '$', ENT_QUOTES, 'UTF-8'),
             'baseCurrencyPosition'  => $fcSettings['currency_position'] ?? 'before',

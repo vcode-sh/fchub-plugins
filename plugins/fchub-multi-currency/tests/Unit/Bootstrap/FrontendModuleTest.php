@@ -403,4 +403,38 @@ final class FrontendModuleTest extends TestCase
         $this->assertStringContainsString('data-value="USD"', $html);
         $this->assertNotEmpty($GLOBALS['wp_inline_scripts']['fchub-mc-bootstrap']['after']);
     }
+
+    /**
+     * The locale map is a store fact — offered currencies and their zones —
+     * so it is safe in cached HTML. It ships only while the merchant enabled
+     * detection; an empty map otherwise keeps untouched stores byte-stable.
+     */
+    #[Test]
+    public function testConfigShipsTheLocaleMapOnlyWhenGeoIsEnabled(): void
+    {
+        CurrencySettings::setMock(['currency' => 'EUR']);
+        $this->setOption('fchub_mc_settings', [
+            'geo_enabled' => 'yes',
+            'base_currency' => 'EUR',
+            'display_currencies' => [
+                ['code' => 'PLN', 'name' => 'Polish Złoty', 'symbol' => 'zł', 'decimals' => 2, 'position' => 'right'],
+            ],
+        ]);
+        $this->setWpdbMockRow([
+            'base_currency' => 'EUR', 'quote_currency' => 'PLN', 'rate' => '4.30000000',
+            'provider' => 'manual', 'fetched_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+
+        $config = FrontendModule::buildFrontendConfig();
+
+        $this->assertTrue($config['geoEnabled']);
+        $this->assertSame('PLN', $config['localeCurrencies']['Europe/Warsaw']);
+        $this->assertSame('EUR', $config['localeCurrencies']['Europe/Berlin']);
+
+        $this->setOption('fchub_mc_settings', ['geo_enabled' => 'no']);
+        $config = FrontendModule::buildFrontendConfig();
+
+        $this->assertFalse($config['geoEnabled']);
+        $this->assertSame([], $config['localeCurrencies']);
+    }
 }
