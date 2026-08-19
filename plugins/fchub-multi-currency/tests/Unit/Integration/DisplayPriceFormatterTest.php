@@ -84,4 +84,54 @@ final class DisplayPriceFormatterTest extends TestCase
     {
         $this->assertSame('USD $12.00', $this->formatUsd('symbool_and_iso'));
     }
+
+    /** Formats base minor units into a doubled EUR under one charm rule. */
+    private function formatEur(float $baseMinorUnits, string $charmRule, int $decimals = 2): string
+    {
+        CurrencySettings::setMock([
+            'currency' => 'USD',
+            'currency_sign' => '$',
+            'currency_position' => 'before',
+        ]);
+        $this->setOption('fchub_mc_settings', [
+            'base_currency' => 'USD',
+            'charm_rounding' => $charmRule,
+            'display_currencies' => [
+                [
+                    'code' => 'EUR',
+                    'name' => 'Euro',
+                    'symbol' => '€',
+                    'decimals' => $decimals,
+                    'position' => 'left',
+                ],
+            ],
+        ]);
+
+        return DisplayPriceFormatter::format($baseMinorUnits, '2.00000000', 'EUR', new OptionStore());
+    }
+
+    #[Test]
+    public function testTheConfiguredCharmRuleReachesTheRenderedPrice(): void
+    {
+        $this->assertSame('€69.99', $this->formatEur(3455.0, 'ending_99'));
+        $this->assertSame('€1,720.00', $this->formatEur(86126.0, 'nearest_10'));
+    }
+
+    #[Test]
+    public function testTheShippedDefaultLeavesEveryPriceWhereConversionPutIt(): void
+    {
+        $this->assertSame('€69.10', $this->formatEur(3455.0, 'none'));
+    }
+
+    #[Test]
+    public function testAZeroDecimalCurrencyCollapsesEndingsToWholeAmounts(): void
+    {
+        $this->assertSame('€69', $this->formatEur(3455.0, 'ending_99', 0));
+    }
+
+    #[Test]
+    public function testADiscountRowKeepsItsSignAndItsAmount(): void
+    {
+        $this->assertSame('-€69.10', $this->formatEur(-3455.0, 'ending_99'));
+    }
 }

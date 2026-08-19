@@ -74,6 +74,7 @@ final class Constants
         'stale_threshold_hrs'         => 24,
         'stale_fallback'              => 'base',
         'rounding_mode'               => 'half_up',
+        'charm_rounding'              => 'none',
         'checkout_disclosure_enabled' => 'yes',
         'checkout_disclosure_text'    => 'Your payment will be processed in {base_currency}.',
         'show_rate_freshness_badge'   => 'yes',

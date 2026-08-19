@@ -129,4 +129,83 @@ final class RoundingPolicyTest extends TestCase
 
         $this->assertSame(99999999, $policy->apply('99999999'));
     }
+
+    #[Test]
+    public function testCharmWholeRoundsToTheNearestMajorUnit(): void
+    {
+        $this->assertSame(35.0, RoundingPolicy::charm(34.55, 'whole', 2));
+        $this->assertSame(34.0, RoundingPolicy::charm(34.02, 'whole', 2));
+        $this->assertSame(1723.0, RoundingPolicy::charm(1722.52, 'whole', 2));
+        $this->assertSame(1722.0, RoundingPolicy::charm(1722.0, 'whole', 0));
+    }
+
+    #[Test]
+    public function testCharmEnding99LandsOnTheNextWholeUnitLessACent(): void
+    {
+        $this->assertSame(34.99, RoundingPolicy::charm(34.55, 'ending_99', 2));
+        $this->assertSame(34.99, RoundingPolicy::charm(34.02, 'ending_99', 2));
+        $this->assertSame(1722.99, RoundingPolicy::charm(1722.52, 'ending_99', 2));
+        $this->assertSame(1722.0, RoundingPolicy::charm(1722.0, 'ending_99', 0));
+    }
+
+    #[Test]
+    public function testCharmEnding95LandsOnTheNextWholeUnitLessFiveCents(): void
+    {
+        $this->assertSame(34.95, RoundingPolicy::charm(34.55, 'ending_95', 2));
+        $this->assertSame(34.95, RoundingPolicy::charm(34.02, 'ending_95', 2));
+        $this->assertSame(1722.95, RoundingPolicy::charm(1722.52, 'ending_95', 2));
+        $this->assertSame(1722.0, RoundingPolicy::charm(1722.0, 'ending_95', 0));
+    }
+
+    #[Test]
+    public function testCharmNearest5SnapsToAMultipleOfFive(): void
+    {
+        $this->assertSame(35.0, RoundingPolicy::charm(34.55, 'nearest_5', 2));
+        $this->assertSame(35.0, RoundingPolicy::charm(34.02, 'nearest_5', 2));
+        $this->assertSame(1725.0, RoundingPolicy::charm(1722.52, 'nearest_5', 2));
+        $this->assertSame(1720.0, RoundingPolicy::charm(1722.0, 'nearest_5', 0));
+    }
+
+    #[Test]
+    public function testCharmNearest10SnapsToAMultipleOfTen(): void
+    {
+        $this->assertSame(30.0, RoundingPolicy::charm(34.55, 'nearest_10', 2));
+        $this->assertSame(30.0, RoundingPolicy::charm(34.02, 'nearest_10', 2));
+        $this->assertSame(1720.0, RoundingPolicy::charm(1722.52, 'nearest_10', 2));
+        $this->assertSame(1720.0, RoundingPolicy::charm(1722.0, 'nearest_10', 0));
+    }
+
+    #[Test]
+    public function testCharmNoneAndUnknownRulesLeaveTheAmountAlone(): void
+    {
+        $this->assertSame(34.55, RoundingPolicy::charm(34.55, 'none', 2));
+        $this->assertSame(1722.52, RoundingPolicy::charm(1722.52, 'none', 2));
+        $this->assertSame(34.55, RoundingPolicy::charm(34.55, 'ending_98', 2));
+    }
+
+    #[Test]
+    public function testCharmIsIdempotentOnAnAlreadyCharmedAmount(): void
+    {
+        $this->assertSame(34.99, RoundingPolicy::charm(34.99, 'ending_99', 2));
+        $this->assertSame(34.95, RoundingPolicy::charm(34.95, 'ending_95', 2));
+        $this->assertSame(35.0, RoundingPolicy::charm(35.0, 'nearest_5', 2));
+    }
+
+    #[Test]
+    public function testCharmNeverPromotesASubUnitAmountAboveTheEnding(): void
+    {
+        $this->assertSame(0.99, RoundingPolicy::charm(0.4, 'ending_99', 2));
+        $this->assertSame(0.95, RoundingPolicy::charm(0.01, 'ending_95', 2));
+    }
+
+    #[Test]
+    public function testCharmLeavesFreeAndNegativeAmountsExactlyAsTheyAre(): void
+    {
+        // A charmed zero would advertise 0.99 for a free line, and a charmed
+        // negative would flip a discount row positive. Neither is a selling price.
+        $this->assertSame(0.0, RoundingPolicy::charm(0.0, 'ending_99', 2));
+        $this->assertSame(0.0, RoundingPolicy::charm(0.0, 'whole', 2));
+        $this->assertSame(-34.55, RoundingPolicy::charm(-34.55, 'ending_99', 2));
+        $this->assertSame(-34.55, RoundingPolicy::charm(-34.55, 'nearest_10', 2));
+    }
 }

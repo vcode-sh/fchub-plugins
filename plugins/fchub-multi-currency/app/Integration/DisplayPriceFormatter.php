@@ -35,9 +35,14 @@ final class DisplayPriceFormatter
             $currency->decimals,
             $roundingMode,
         );
-        $negative = $roundedMinorUnits < 0;
+        $majorAmount = RoundingPolicy::charm(
+            $roundedMinorUnits / 100,
+            (string) $optionStore->get('charm_rounding', 'none'),
+            $currency->decimals,
+        );
+        $negative = $majorAmount < 0;
         $number = number_format(
-            abs($roundedMinorUnits) / 100,
+            abs($majorAmount),
             $currency->decimals,
             $decimalSeparator,
             $thousandSeparator,

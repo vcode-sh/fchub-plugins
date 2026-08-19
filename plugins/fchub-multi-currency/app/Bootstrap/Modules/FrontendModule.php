@@ -160,6 +160,7 @@ final class FrontendModule implements ModuleContract
                 ? strtoupper((string) get_user_meta($userId, Constants::USER_META_KEY, true))
                 : '',
             'roundingMode'          => $optionStore->get('rounding_mode', 'half_up'),
+            'charmRounding'         => $optionStore->get('charm_rounding', 'none'),
             'restUrl'               => rest_url(Constants::REST_NAMESPACE),
             // A nonce is per visitor and per twelve hours, so a cached copy belongs to
             // whoever warmed the cache. Guests never needed one: the context endpoint

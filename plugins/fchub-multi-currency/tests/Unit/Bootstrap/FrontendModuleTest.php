@@ -437,4 +437,31 @@ final class FrontendModuleTest extends TestCase
         $this->assertFalse($config['geoEnabled']);
         $this->assertSame([], $config['localeCurrencies']);
     }
+
+    /**
+     * The charm rule is a store fact, so it rides the cacheable config once
+     * rather than being copied into every currency-table entry.
+     */
+    #[Test]
+    public function testFrontendConfigShipsTheCharmRuleAsAStoreFact(): void
+    {
+        $this->setOption('fchub_mc_settings', $this->switcherSettings() + ['charm_rounding' => 'ending_95']);
+        $this->setWpdbMockRow(null);
+
+        $config = FrontendModule::buildFrontendConfig();
+
+        $this->assertSame('ending_95', $config['charmRounding']);
+        foreach ($config['currencyTable'] as $entry) {
+            $this->assertArrayNotHasKey('charmRounding', $entry);
+        }
+    }
+
+    #[Test]
+    public function testFrontendConfigFallsBackToNoCharmRounding(): void
+    {
+        $this->setOption('fchub_mc_settings', $this->switcherSettings());
+        $this->setWpdbMockRow(null);
+
+        $this->assertSame('none', FrontendModule::buildFrontendConfig()['charmRounding']);
+    }
 }

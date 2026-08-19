@@ -49,4 +49,33 @@ final class RoundingPolicy
             RoundingMode::Floor    => (int) (floor($floatValue / $step) * $step),
         };
     }
+
+    /**
+     * The psychological-pricing step, applied after conversion and decimal
+     * rounding. Display-only like every converted number here: checkout still
+     * charges the base currency, and the disclosure already calls converted
+     * prices approximate.
+     *
+     * Only a positive selling price is charmed. Zero stays free and a negative
+     * stays a discount: an ending on either is a wrong number, not a nicer one.
+     */
+    public static function charm(float $amount, string $rule, int $decimals): float
+    {
+        if ($amount <= 0) {
+            return $amount;
+        }
+
+        if ($decimals === 0 && ($rule === 'ending_99' || $rule === 'ending_95')) {
+            $rule = 'whole';
+        }
+
+        return match ($rule) {
+            'whole'      => round($amount),
+            'ending_99'  => ceil($amount) - 0.01,
+            'ending_95'  => ceil($amount) - 0.05,
+            'nearest_5'  => round($amount / 5) * 5,
+            'nearest_10' => round($amount / 10) * 10,
+            default      => $amount,
+        };
+    }
 }
