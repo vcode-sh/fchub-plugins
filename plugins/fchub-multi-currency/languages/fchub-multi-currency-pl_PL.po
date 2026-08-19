@@ -235,7 +235,7 @@ msgstr "Ta waluta jest teraz niedostępna."
 #: app/Frontend/CurrencyContextPresentation.php:65
 #, php-format
 msgid "Prices are now shown in %s."
-msgstr "Ceny są teraz wyświetlane w %s."
+msgstr "Ceny są teraz wyświetlane w walucie %s."
 
 #. translators: %s is a number of minutes.
 #: app/Frontend/CurrencyContextPresentation.php:123
