@@ -20,7 +20,7 @@
 (() => {
 	// Re-read per pass rather than captured once: the visitor may switch currency
 	// without leaving the page, and every one of these changes when they do.
-	let rate, decimals, symbol, position, roundingMode, displayCode, baseCode;
+	let rate, decimals, symbol, position, roundingMode, charmRule, displayCode, baseCode;
 	let baseSign, baseDecSep, baseThousandSep, displayDecSep, displayThousandSep, disclosureText;
 	let converting = false;
 
@@ -34,6 +34,7 @@
 		symbol = cfg.symbol || cfg.displayCurrency;
 		position = cfg.position || "left";
 		roundingMode = cfg.roundingMode || "half_up";
+		charmRule = cfg.charmRounding || "none";
 		displayCode = cfg.displayCurrency;
 		baseCode = cfg.baseCurrencyCode || cfg.baseCurrency;
 		baseSign = cfg.baseCurrencySign || "$";
@@ -206,9 +207,47 @@
 	}
 
 	/**
-	 * Apply rounding based on configured mode.
+	 * The displayed amount for a converted value: the configured rounding mode
+	 * first, then the charm ending. Every conversion site goes through here, so
+	 * a surface added later cannot get one step and miss the other.
 	 */
 	function applyRounding(amount) {
+		return charmRound(roundToDecimals(amount));
+	}
+
+	/**
+	 * Mirrors RoundingPolicy::charm — display-only endings after conversion.
+	 * Only a positive selling price is charmed: zero stays free and a negative
+	 * stays a discount.
+	 */
+	function charmRound(amount) {
+		if (amount <= 0) return amount;
+
+		let rule = charmRule;
+		if (decimals === 0 && (rule === "ending_99" || rule === "ending_95")) {
+			rule = "whole";
+		}
+
+		switch (rule) {
+			case "whole":
+				return Math.round(amount);
+			case "ending_99":
+				return Math.ceil(amount) - 0.01;
+			case "ending_95":
+				return Math.ceil(amount) - 0.05;
+			case "nearest_5":
+				return Math.round(amount / 5) * 5;
+			case "nearest_10":
+				return Math.round(amount / 10) * 10;
+			default:
+				return amount;
+		}
+	}
+
+	/**
+	 * Apply rounding based on configured mode.
+	 */
+	function roundToDecimals(amount) {
 		const factor = 10 ** decimals;
 		const scaled = amount * factor;
 		const sign = scaled < 0 ? -1 : 1;
