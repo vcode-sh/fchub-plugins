@@ -10,7 +10,6 @@ final class FeatureFlags
 {
     private const DEFAULTS = [
         'js_projection' => true,
-        'geo_resolver'  => false,
     ];
 
     public static function isEnabled(string $flag): bool

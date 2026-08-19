@@ -7,7 +7,6 @@ namespace FChubMultiCurrency\Domain\Services;
 use FChubMultiCurrency\Domain\Enums\ResolverSource;
 use FChubMultiCurrency\Domain\Enums\StaleRateFallback;
 use FChubMultiCurrency\Domain\Resolvers\CookieResolver;
-use FChubMultiCurrency\Domain\Resolvers\GeoResolver;
 use FChubMultiCurrency\Domain\Resolvers\ResolverChain;
 use FChubMultiCurrency\Domain\Resolvers\UrlParamResolver;
 use FChubMultiCurrency\Domain\Resolvers\UserMetaResolver;
@@ -18,7 +17,6 @@ use FChubMultiCurrency\Integration\FluentCartCurrency;
 use FChubMultiCurrency\Storage\ExchangeRateRepository;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Storage\RatesCacheStore;
-use FChubMultiCurrency\Support\FeatureFlags;
 
 defined('ABSPATH') || exit;
 
@@ -76,12 +74,6 @@ final class CurrencyResolution
         if (($settings['cookie_enabled'] ?? 'yes') === 'yes') {
             $cookieResolver = new CookieResolver();
             $chain->add(ResolverSource::Cookie, self::wrapResolver($cookieResolver, $rateService, $maxRateAge, $staleFallback, ResolverSource::Cookie));
-        }
-
-        // Priority 4: Geolocation (feature-flagged)
-        if (($settings['geo_enabled'] ?? 'no') === 'yes' && FeatureFlags::isEnabled('geo_resolver')) {
-            $geoResolver = new GeoResolver();
-            $chain->add(ResolverSource::Geo, self::wrapResolver($geoResolver, $rateService, $maxRateAge, $staleFallback, ResolverSource::Geo));
         }
 
         // Priority 5: Default (uses default_display_currency setting, falls back to base)

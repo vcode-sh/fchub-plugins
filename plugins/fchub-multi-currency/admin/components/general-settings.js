@@ -219,22 +219,20 @@
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
-    <div class="fchub-mc-row fchub-mc-coming-soon-row">\
+    <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
             <span class="setting-label">' +
-			__("Geolocation", "fchub-multi-currency") +
-			' <span class="fchub-mc-badge-soon">' +
-			__("Coming Soon", "fchub-multi-currency") +
-			'</span></span>\
+			__("Detect from visitor locale", "fchub-multi-currency") +
+			'</span>\
             <div class="form-note">' +
 			__(
-				"Automatically detect visitor currency based on their country. Requires a geolocation provider.",
+				"On a first visit with no saved preference, show the offered currency implied by the visitor's timezone. Runs entirely in the browser — no lookup service, nothing stored until they choose.",
 				"fchub-multi-currency",
 			) +
 			'</div>\
         </div>\
         <div class="setting-fields-inner">\
-            <el-radio-group v-model="settings.geo_enabled" disabled>\
+            <el-radio-group v-model="settings.geo_enabled">\
                 <el-radio label="' +
 			__("Enabled", "fchub-multi-currency") +
 			'" value="yes" />\

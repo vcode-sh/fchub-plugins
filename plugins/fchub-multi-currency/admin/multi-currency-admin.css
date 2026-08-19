@@ -283,28 +283,3 @@
 .fchub-mc-chosen {
 	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
-
-/* Coming Soon */
-.fchub-mc-coming-soon-row {
-	opacity: 0.5;
-	pointer-events: none;
-}
-
-.fchub-mc-coming-soon-row .el-radio__original:disabled {
-	opacity: 0;
-}
-
-.fchub-mc-badge-soon {
-	display: inline-block;
-	font-size: 10px;
-	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.5px;
-	padding: 2px 7px;
-	margin-left: 8px;
-	border-radius: 4px;
-	background: var(--el-color-info-light-7, #e6e8eb);
-	color: var(--el-text-color-secondary, #909399);
-	vertical-align: middle;
-	line-height: 1.4;
-}

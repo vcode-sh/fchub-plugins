@@ -271,3 +271,17 @@ describe("every admin surface string flows through wp.i18n", () => {
 		assert.doesNotMatch(page.template, /"Save"|"Saving\.\.\."/, "no raw save labels left in the template");
 	});
 });
+
+describe("locale detection is a real setting", () => {
+	it("offers the geolocation toggle unlocked with locale copy", () => {
+		const { page } = loadAdminRuntime();
+		const template = page.components.GeneralSettings.template;
+
+		assert.doesNotMatch(template, /Coming Soon/);
+		assert.doesNotMatch(template, /fchub-mc-coming-soon-row/);
+		assert.doesNotMatch(template, /disabled/, "the radio group is live, not decorative");
+		assert.match(template, /Detect from visitor locale/);
+		assert.match(template, /timezone/i);
+		assert.match(template, /v-model="settings\.geo_enabled"/);
+	});
+});
