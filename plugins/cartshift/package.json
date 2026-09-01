@@ -11,14 +11,14 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "vue": "^3.5.41"
+    "vue": "^3.5.42"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.8",
-    "@vue/test-utils": "^2.4.11",
-    "happy-dom": "^20.11.2",
-    "vite": "^8.2.1",
-    "vitest": "^4.1.10"
+    "@vue/test-utils": "^2.5.0",
+    "happy-dom": "^20.11.15",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "nanoid": "3.3.18",
