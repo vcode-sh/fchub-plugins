@@ -31,7 +31,7 @@
     "jsdom": "30.0.1",
     "unplugin-vue-components": "32.1.0",
     "vite": "8.2.0",
-    "vitest": "4.1.10"
+    "vitest": "4.1.12"
   },
   "overrides": {
     "brace-expansion": "5.0.9",
